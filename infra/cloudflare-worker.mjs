@@ -2,10 +2,10 @@ import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./deli
 import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "12baba4cba3cf14c47d9c04d06f69934926f9f01";
+const DEPLOY_SHA = "11e770a2361487d28e49b86e615d762b356b7beb";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
-const CHALK_ASSETS_SHA = "12baba4cba3cf14c47d9c04d06f69934926f9f01";
+const CHALK_ASSETS_SHA = "11e770a2361487d28e49b86e615d762b356b7beb";
 const UPSTREAM_LIVE = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_ASSETS = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_CHALK = `https://raw.githubusercontent.com/LitKanna/getyolko/${CHALK_ASSETS_SHA}`;
@@ -4621,7 +4621,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "183",
+      "X-Yolko-Build": "184",
     };
     // Let browsers revalidate expired files with a cheap 304 instead of a full download.
     const etag = upstreamResp.headers.get("ETag");
