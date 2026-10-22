@@ -555,7 +555,9 @@ async function createCheckoutForOrder(env, order, settings) {
 // Secrets: STRIPE_WEBHOOK_SECRET, ZEPTOMAIL_TOKEN, ORDER_EMAIL_FROM.
 // Optional: ORDER_NOTIFY_EMAIL (shop copy), ZEPTOMAIL_API_URL (region host).
 
-const ZEPTOMAIL_DEFAULT_URL = "https://api.zeptomail.com.au/v1.1/email";
+// Zoho CPaaS (same API as ZeptoMail). Override for other data centres, e.g.
+// https://cpaas.zoho.eu/v1.1/email or https://api.zeptomail.com.au/v1.1/email.
+const ZEPTOMAIL_DEFAULT_URL = "https://cpaas.zoho.com/v1.1/email";
 const STRIPE_SIG_TOLERANCE_SEC = 300;
 
 function hexToBytes(hex) {

@@ -48,7 +48,7 @@ Order payments and emails: `POST /api/stripe-webhook` (Stripe events `checkout.s
 and `checkout.session.async_payment_succeeded`) marks orders paid and sends the confirmation
 email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN`,
 `ORDER_EMAIL_FROM`; optional `ORDER_NOTIFY_EMAIL` (shop copy) and `ZEPTOMAIL_API_URL`
-(defaults to the AU host `https://api.zeptomail.com.au/v1.1/email`). Without them the webhook
+(defaults to Zoho CPaaS `https://cpaas.zoho.com/v1.1/email`; same API as ZeptoMail). Without them the webhook
 returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
 sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
 
