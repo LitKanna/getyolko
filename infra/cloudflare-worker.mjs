@@ -550,6 +550,209 @@ async function createCheckoutForOrder(env, order, settings) {
   return { url: session.url, price: total, subtotal, deliveryFee, unitPrice, orderId: order.id };
 }
 
+// ---------------------------------------------------------------------------
+// Payment confirmation: Stripe webhook + order confirmation email (ZeptoMail).
+// Secrets: STRIPE_WEBHOOK_SECRET, ZEPTOMAIL_TOKEN, ORDER_EMAIL_FROM.
+// Optional: ORDER_NOTIFY_EMAIL (shop copy), ZEPTOMAIL_API_URL (region host).
+
+const ZEPTOMAIL_DEFAULT_URL = "https://api.zeptomail.com.au/v1.1/email";
+const STRIPE_SIG_TOLERANCE_SEC = 300;
+
+function hexToBytes(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+/** Verify a Stripe-Signature header (t=...,v1=...) against the raw body. */
+async function verifyStripeSignature(payload, header, secret, nowSec = Math.floor(Date.now() / 1000)) {
+  if (!header || !secret) return false;
+  let t = null;
+  const sigs = [];
+  for (const part of String(header).split(",")) {
+    const [k, v] = part.split("=", 2).map((s) => (s || "").trim());
+    if (k === "t") t = Number(v);
+    else if (k === "v1" && /^[0-9a-f]{64}$/i.test(v)) sigs.push(v.toLowerCase());
+  }
+  if (!Number.isFinite(t) || !sigs.length) return false;
+  if (Math.abs(nowSec - t) > STRIPE_SIG_TOLERANCE_SEC) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  const signed = new TextEncoder().encode(`${t}.${payload}`);
+  for (const sig of sigs) {
+    if (await crypto.subtle.verify("HMAC", key, hexToBytes(sig), signed)) return true;
+  }
+  return false;
+}
+
+async function fetchStripeSession(env, sid) {
+  const resp = await fetch(
+    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sid)}?expand[]=payment_intent.latest_charge`,
+    { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
+  );
+  return resp.json();
+}
+
+/** Idempotently mark an order paid from a paid Checkout Session. */
+async function markOrderPaid(env, order, session) {
+  if (order.paymentStatus !== "paid") {
+    order.paymentStatus = "paid";
+    order.sessionId = order.sessionId || session.id;
+    order.stripe = stripeDetailsFromSession(session);
+    // Paid customers jump the queue: auto-confirm and allocate trays.
+    if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
+    await syncStock(env, order, order.status);
+    await env.DATA.put(order.id, JSON.stringify(order));
+    if (order.phone) await clearOpenOrder(env, order.phone);
+    return { order, newlyPaid: true };
+  }
+  if (!order.stripe?.amountTotal) {
+    order.stripe = stripeDetailsFromSession(session);
+    await env.DATA.put(order.id, JSON.stringify(order));
+  }
+  return { order, newlyPaid: false };
+}
+
+function htmlEscape(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function money(n) {
+  return `$${(Number(n) || 0).toFixed(2)}`;
+}
+
+function orderRef(order) {
+  return String(order.id || "").slice(-6).toUpperCase();
+}
+
+function buildOrderEmail(order) {
+  const first = String(order.name || "").split(/\s+/)[0] || "there";
+  const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
+  const qty = Math.max(1, Number(order.quantity) || 1);
+  const total = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
+  const when = `Saturday${order.pickupDate ? " " + order.pickupDate : ""}`;
+  const where = order.deliveryAddress || "Your delivery address";
+  const ref = orderRef(order);
+  const receipt = order.stripe?.receiptUrl || "";
+  const wa = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+  const subject = `Your YOLKO order is confirmed (#${ref})`;
+
+  const row = (label, value) =>
+    `<tr><td style="padding:6px 0;color:#6b6257">${htmlEscape(label)}</td><td style="padding:6px 0;text-align:right;color:#1f1a14">${htmlEscape(value)}</td></tr>`;
+
+  const html = `<!doctype html><html><body style="margin:0;background:#faf6ef;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ef;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;padding:28px">
+<tr><td style="font-size:22px;font-weight:700;color:#1f1a14;letter-spacing:0.5px">YOLKO</td></tr>
+<tr><td style="padding-top:18px;font-size:18px;color:#1f1a14">Thanks ${htmlEscape(first)}, your eggs are booked.</td></tr>
+<tr><td style="padding-top:8px;font-size:15px;line-height:1.5;color:#4a4238">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
+<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;border-top:1px solid #eee5d8">
+${row("Order", "#" + ref)}
+${row("Item", `${qty} x ${item}`)}
+${order.subtotal != null ? row("Subtotal", money(order.subtotal)) : ""}
+${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : ""}
+<tr><td style="padding:10px 0;border-top:1px solid #eee5d8;font-weight:700;color:#1f1a14">Total paid</td><td style="padding:10px 0;border-top:1px solid #eee5d8;text-align:right;font-weight:700;color:#1f1a14">${htmlEscape(money(total))} AUD</td></tr>
+</table></td></tr>
+<tr><td style="padding-top:16px;font-size:15px;line-height:1.5;color:#4a4238"><strong style="color:#1f1a14">Delivery</strong><br>${htmlEscape(when)}<br>${htmlEscape(where)}</td></tr>
+${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:#f2a516;color:#1f1a14;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px">View receipt</a></td></tr>` : ""}
+<tr><td style="padding-top:22px;font-size:14px;line-height:1.5;color:#6b6257">Questions or need to change something? Reply to this email or message us on <a href="${wa}" style="color:#b9770e">WhatsApp</a>.</td></tr>
+</table>
+<p style="font-size:12px;color:#9a8f80;margin-top:14px">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:#9a8f80">getyolko.com</a></p>
+</td></tr></table></body></html>`;
+
+  const text = [
+    `Thanks ${first}, your eggs are booked.`,
+    "",
+    `Order #${ref}`,
+    `${qty} x ${item}`,
+    order.subtotal != null ? `Subtotal: ${money(order.subtotal)}` : null,
+    Number(order.deliveryFee) > 0 ? `Delivery: ${money(order.deliveryFee)}` : null,
+    `Total paid: ${money(total)} AUD`,
+    "",
+    `Delivery: ${when}`,
+    where,
+    receipt ? `\nReceipt: ${receipt}` : null,
+    "",
+    `Questions? Reply to this email or WhatsApp us: ${wa}`,
+    "YOLKO · getyolko.com",
+  ].filter((l) => l !== null).join("\n");
+
+  return { subject, html, text };
+}
+
+/** Send the confirmation via ZeptoMail. Returns { ok, skipped?, error? }. */
+async function sendOrderConfirmationEmail(env, order) {
+  const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
+  const from = String(env.ORDER_EMAIL_FROM || "").trim();
+  const to = String(order.stripe?.email || order.email || "").trim();
+  if (!token || !from) return { ok: false, skipped: true, reason: "email not configured" };
+  if (!to) return { ok: false, skipped: true, reason: "no customer email" };
+
+  const { subject, html, text } = buildOrderEmail(order);
+  const payload = {
+    from: { address: from, name: STRIPE_BRAND },
+    to: [{ email_address: { address: to, name: order.name || "" } }],
+    reply_to: [{ address: STRIPE_SUPPORT_EMAIL, name: STRIPE_BRAND }],
+    subject,
+    htmlbody: html,
+    textbody: text,
+  };
+  const notify = String(env.ORDER_NOTIFY_EMAIL || "").trim();
+  if (notify && notify.toLowerCase() !== to.toLowerCase()) {
+    payload.bcc = [{ email_address: { address: notify, name: STRIPE_BRAND } }];
+  }
+
+  const resp = await fetch(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL), {
+    method: "POST",
+    headers: {
+      Authorization: `Zoho-enczapikey ${token.replace(/^Zoho-enczapikey\s+/i, "")}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) {
+    const error = data?.error?.details?.[0]?.message || data?.error?.message || `HTTP ${resp.status}`;
+    return { ok: false, error: String(error).slice(0, 300) };
+  }
+  return { ok: true, to, requestId: data?.request_id || null };
+}
+
+/**
+ * Send the confirmation once per order. Webhook and success page can both
+ * call this; the short claim key stops a double send when they race.
+ */
+async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
+  const order = await env.DATA.get(orderId, "json");
+  if (!order || order.paymentStatus !== "paid") return { ok: false, skipped: true, reason: "not paid" };
+  if (!force && order.confirmationEmail?.sentAt) return { ok: true, already: true };
+  const claimKey = `email:claim:${orderId}`;
+  if (!force) {
+    if (await env.DATA.get(claimKey)) return { ok: true, already: true };
+    await env.DATA.put(claimKey, "1", { expirationTtl: 120 });
+  }
+  const result = await sendOrderConfirmationEmail(env, order).catch((err) => ({
+    ok: false,
+    error: String(err?.message || err),
+  }));
+  const fresh = (await env.DATA.get(orderId, "json")) || order;
+  fresh.confirmationEmail = result.ok
+    ? { sentAt: new Date().toISOString(), to: result.to, requestId: result.requestId }
+    : { ...(fresh.confirmationEmail || {}), lastError: result.error || result.reason, lastTriedAt: new Date().toISOString() };
+  await env.DATA.put(orderId, JSON.stringify(fresh));
+  if (!result.ok) {
+    await env.DATA.delete(claimKey).catch(() => null);
+    console.log("order email not sent", orderId, result.error || result.reason);
+  }
+  return result;
+}
+
 // How many physical trays an order consumes (dozen packs do not use tray stock)
 function traysFor(order) {
   const b = order.bundle;
@@ -1337,17 +1540,58 @@ async function handleApi(request, env, url, ctx) {
     return json({ ok: true, ...result });
   }
 
+  // Stripe webhook: the reliable "paid" signal, even if the customer closes
+  // the tab before returning to the site. Marks the order paid and emails them.
+  if (url.pathname === "/api/stripe-webhook" && request.method === "POST") {
+    if (!env.STRIPE_KEY || !env.STRIPE_WEBHOOK_SECRET) {
+      return json({ error: "webhook not configured" }, 503);
+    }
+    const payload = await request.text();
+    const ok = await verifyStripeSignature(
+      payload,
+      request.headers.get("Stripe-Signature"),
+      env.STRIPE_WEBHOOK_SECRET
+    );
+    if (!ok) return json({ error: "bad signature" }, 400);
+
+    const event = JSON.parse(payload);
+    const handled = ["checkout.session.completed", "checkout.session.async_payment_succeeded"];
+    if (!handled.includes(event.type)) return json({ received: true, ignored: event.type });
+
+    const sid = event.data?.object?.id;
+    const orderId = event.data?.object?.metadata?.orderId;
+    if (!sid || !String(orderId || "").startsWith("order:")) {
+      return json({ received: true, ignored: "no order" });
+    }
+    // Re-fetch so we act on Stripe's current state with charge details expanded.
+    const session = await fetchStripeSession(env, sid);
+    if (session.error) return json({ error: session.error.message || "stripe error" }, 502);
+    if (session.payment_status !== "paid") return json({ received: true, pending: true });
+
+    const order = await env.DATA.get(orderId, "json");
+    if (!order) return json({ received: true, ignored: "order not found" });
+    await markOrderPaid(env, order, session);
+    const email = await maybeSendOrderEmail(env, orderId);
+    return json({ received: true, email: { ok: !!email.ok, reason: email.reason || email.error || null } });
+  }
+
+  // Admin: send (or resend) the order confirmation email for a paid order
+  if (url.pathname === "/api/admin/order-email" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => null);
+    const id = String(body?.id || "");
+    if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
+    const result = await maybeSendOrderEmail(env, id, { force: true });
+    return json(result, result.ok ? 200 : 502);
+  }
+
   // Public: confirm payment after returning from Stripe
   if (url.pathname === "/api/confirm-payment" && request.method === "GET") {
     if (!env.STRIPE_KEY) return json({ error: "payments not configured" }, 503);
     const sid = url.searchParams.get("session") || "";
     if (!sid.startsWith("cs_")) return json({ error: "bad session" }, 400);
 
-    const resp = await fetch(
-      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sid)}?expand[]=payment_intent.latest_charge`,
-      { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
-    );
-    const session = await resp.json();
+    const session = await fetchStripeSession(env, sid);
     const orderId = session?.metadata?.orderId;
     const paid = session?.payment_status === "paid";
 
@@ -1356,19 +1600,11 @@ async function handleApi(request, env, url, ctx) {
     if (paid && orderId) {
       let order = await env.DATA.get(orderId, "json");
       if (order) {
-        const wasUnpaid = order.paymentStatus !== "paid";
-        if (wasUnpaid) {
-          order.paymentStatus = "paid";
-          order.sessionId = order.sessionId || sid;
-          order.stripe = stripeDetailsFromSession(session);
-          // Paid customers jump the queue: auto-confirm and allocate trays.
-          if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
-          await syncStock(env, order, order.status);
-          await env.DATA.put(orderId, JSON.stringify(order));
-          if (order.phone) await clearOpenOrder(env, order.phone);
-        } else if (!order.stripe?.amountTotal) {
-          order.stripe = stripeDetailsFromSession(session);
-          await env.DATA.put(orderId, JSON.stringify(order));
+        ({ order } = await markOrderPaid(env, order, session));
+        // Backup for the webhook: send the confirmation if it has not gone out.
+        if (!order.confirmationEmail?.sentAt) {
+          const job = maybeSendOrderEmail(env, orderId);
+          if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
         }
 
         // Meta CAPI Purchase (dedupe with browser Pixel via event_id = order.id)
