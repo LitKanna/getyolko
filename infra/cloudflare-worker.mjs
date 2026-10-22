@@ -2,20 +2,22 @@ import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./deli
 import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "9cd6245448e50dded84945de2c64486baead0863";
+const DEPLOY_SHA = "287af1a1d1aff95676bc5e8352134bdb460bdd85";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
-const CHALK_ASSETS_SHA = "9cd6245448e50dded84945de2c64486baead0863";
+const CHALK_ASSETS_SHA = "287af1a1d1aff95676bc5e8352134bdb460bdd85";
 const UPSTREAM_LIVE = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_ASSETS = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_CHALK = `https://raw.githubusercontent.com/LitKanna/getyolko/${CHALK_ASSETS_SHA}`;
 
-// HTML always revalidates. Hash-named fonts never change. Files requested with
-// ?v= get a long cache because the version is bumped whenever they change.
+// HTML stays no-store so Back from Stripe reloads the page instead of restoring a
+// stuck "Opening…" button from bfcache. Hash-named fonts never change. Code and
+// config get 5 minutes so a missed ?v= bump heals quickly; versioned images a day.
 function browserCacheControl(ext, url) {
-  if (ext === "html") return "no-cache";
+  if (ext === "html") return "no-store, no-cache, must-revalidate, max-age=0";
   if (url.pathname.startsWith("/assets/fonts/")) return "public, max-age=31536000, immutable";
-  if (url.searchParams.has("v")) return "public, max-age=2592000";
+  if (ext === "js" || ext === "css" || ext === "mjs") return "public, max-age=300";
+  if (url.searchParams.has("v")) return "public, max-age=86400";
   return "public, max-age=300";
 }
 
@@ -4577,13 +4579,21 @@ export default {
       return new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
     }
 
-    return new Response(upstreamResp.body, {
-      status: 200,
-      headers: {
-        "Content-Type": MIME[ext] || "application/octet-stream",
-        "Cache-Control": browserCacheControl(ext, url),
-        "X-Yolko-Build": "179",
-      },
-    });
+    const headers = {
+      "Content-Type": MIME[ext] || "application/octet-stream",
+      "Cache-Control": browserCacheControl(ext, url),
+      "X-Yolko-Build": "181",
+    };
+    // Let browsers revalidate expired files with a cheap 304 instead of a full download.
+    const etag = upstreamResp.headers.get("ETag");
+    if (etag && ext !== "html") {
+      headers.ETag = etag;
+      const weak = (tag) => String(tag || "").replace(/^W\//, "");
+      if (weak(request.headers.get("If-None-Match")) === weak(etag)) {
+        return new Response(null, { status: 304, headers });
+      }
+    }
+
+    return new Response(upstreamResp.body, { status: 200, headers });
   },
 };
