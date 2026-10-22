@@ -9,7 +9,7 @@ when they are user-facing; avoid reintroducing `-` in `index.html`, `app.js`, or
 `ADMIN_HTML` strings.
 
 ### What this repo is
-YOLKO (`Markett`) is a single **static, one-page marketing/ordering website** for selling
+YOLKO (`getyolko`) is a single **static, one-page marketing/ordering website** for selling
 fresh egg trays. The core files are `index.html`, `styles-modern.css`, `app.js`, and `config.js`.
 There is **no framework and no build step**. The files are served as-is.
 
