@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="format-detection" content="telephone=no">
   <title>Egg delivery Rhodes | Eggs delivered to your apartment | YOLKO</title>
-  <meta name="description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, including apartment buildings. Pace Farm XL cage 30-egg tray $13 plus a flat +$5 from Flemington.">
+  <meta name="description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, apartments included. Pace Farm 30-egg tray $13 plus a flat +$5 from Flemington.">
   <meta name="theme-color" content="#ffd32a">
   <meta name="geo.region" content="AU-NSW">
   <meta name="geo.placename" content="Flemington">
@@ -14,7 +14,7 @@
   <meta property="og:site_name" content="YOLKO">
   <meta property="og:locale" content="en_AU">
   <meta property="og:title" content="Egg delivery Rhodes | Eggs delivered to your apartment | YOLKO">
-  <meta property="og:description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, including apartment buildings. Pace Farm XL cage 30-egg tray $13 plus a flat +$5 from Flemington.">
+  <meta property="og:description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, apartments included. Pace Farm 30-egg tray $13 plus a flat +$5 from Flemington.">
   <meta property="og:image" content="https://getyolko.com/assets/chalk-tray/13-1536.jpg?v=112">
   <meta property="og:image:width" content="1536">
   <meta property="og:image:height" content="1536">
@@ -23,7 +23,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Egg delivery Rhodes | Eggs delivered to your apartment | YOLKO">
-  <meta name="twitter:description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, including apartment buildings. Pace Farm XL cage 30-egg tray $13 plus a flat +$5 from Flemington.">
+  <meta name="twitter:description" content="Eggs delivered to Rhodes 2138 on Saturday mornings, apartments included. Pace Farm 30-egg tray $13 plus a flat +$5 from Flemington.">
   <meta name="twitter:image" content="https://getyolko.com/assets/chalk-tray/13-1536.jpg?v=112">
   <meta name="twitter:image:alt" content="Pace Farm 30-egg tray · $13 · YOLKO">
 
@@ -45,7 +45,7 @@
         "@id": "https://getyolko.com/egg-delivery-rhodes#page",
         "url": "https://getyolko.com/egg-delivery-rhodes",
         "name": "Egg delivery Rhodes",
-        "description": "Eggs delivered to Rhodes 2138 on Saturday mornings, including apartment buildings. Pace Farm XL cage 30-egg tray $13 plus a flat +$5 from Flemington.",
+        "description": "Eggs delivered to Rhodes 2138 on Saturday mornings, apartments included. Pace Farm 30-egg tray $13 plus a flat +$5 from Flemington.",
         "isPartOf": {
           "@id": "https://getyolko.com/#website"
         },
@@ -79,6 +79,25 @@
         ]
       },
       {
+        "@type": "Service",
+        "@id": "https://getyolko.com/egg-delivery-rhodes#service",
+        "name": "Egg delivery Rhodes",
+        "serviceType": "Egg delivery",
+        "provider": {
+          "@id": "https://getyolko.com/#business"
+        },
+        "areaServed": {
+          "@type": "Place",
+          "name": "Rhodes NSW 2138"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "5.00",
+          "priceCurrency": "AUD",
+          "description": "Flat Saturday delivery fee"
+        }
+      },
+      {
         "@type": "FAQPage",
         "@id": "https://getyolko.com/egg-delivery-rhodes#faq",
         "mainEntity": [
@@ -87,7 +106,23 @@
             "name": "Do you deliver eggs to Rhodes?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Rhodes 2138 is about 6 km from our Flemington hub and inside the Saturday 45 km zone. Your postcode is checked at checkout."
+              "text": "Yes. Rhodes 2138 is about 6 km from Flemington, inside our Saturday delivery zone. Checkout confirms your postcode."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "When do eggs arrive in Rhodes?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Saturday morning. Order by Friday night."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How much is egg delivery to Rhodes?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "$13 a tray (30 eggs), $25 for two, $72 for a 180-egg box. Delivery is a flat +$5."
             }
           },
           {
@@ -95,31 +130,15 @@
             "name": "Can you deliver to my apartment building?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Add your unit number and access notes (buzzer, concierge, or parcel room) on the order form. If anything is unclear on the day, we message you on WhatsApp."
+              "text": "Yes. Add your unit number and access notes (buzzer, concierge, or parcel room) at checkout. If anything is unclear on the day, we message you on WhatsApp."
             }
           },
           {
             "@type": "Question",
-            "name": "When is Rhodes egg delivery?",
+            "name": "What eggs are they?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday morning. Book by Friday night. There is no weekday Rhodes run."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "How much is delivery to Rhodes?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "A flat +$5. The 30-egg tray is $13. Bundles are $13, $25, and $72."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Is Wentworth Point covered too?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes. Wentworth Point is across the Bennelong Bridge and inside the 45 km zone. Enter your address at checkout to confirm."
+              "text": "Pace Farm XL cage eggs, 30 to a tray (1.75 kg). The same supermarket brand, sealed and stamped."
             }
           }
         ]
@@ -175,9 +194,9 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <p class="hero-kicker">Rhodes · Riverside apartments</p>
+          <p class="hero-kicker">Rhodes · Riverside</p>
           <h1>Egg delivery,<br><span>Rhodes.</span></h1>
-          <p class="hero-sub">Saturday egg delivery for <b>Rhodes</b>, apartments included. A Pace Farm XL cage 30-egg tray is <strong>$13</strong>, plus a flat <strong>+$5</strong>.</p>
+          <p class="hero-sub">30 Pace Farm eggs for <strong>$13</strong>. Saturday morning, to your door. Flat <strong>+$5</strong>.</p>
           <div class="hero-cta">
             <a class="btn btn-solid" href="/#order">
               Order Saturday delivery <span class="btn-arrow" aria-hidden="true">↗</span>
@@ -205,13 +224,26 @@
     <section class="local-band">
       <div class="wrap">
         <header class="section-head left">
-          <p class="section-label">Eggs delivered · Rhodes</p>
-          <h2>Saturday from<br>Flemington.</h2>
+          <p class="section-label">How it works</p>
+          <h2>Order by Friday.<br>Eggs on Saturday.</h2>
         </header>
-        <div class="local-prose">
-          <p><strong>Rhodes</strong> is about 6&nbsp;km by road from our Flemington hub, on the Parramatta River. YOLKO delivers a Pace Farm XL cage <strong>30-egg tray for $13</strong> every Saturday morning, plus a flat <strong>+$5</strong> delivery.</p>
-          <p>Most Rhodes orders go to apartment towers. Add your unit number and any buzzer, concierge, or parcel room notes when you order, so the trays reach your door and not the lobby floor.</p>
-          <p>A tray is 30 eggs, so one order covers most of a week of breakfasts. Two trays are <strong>$25</strong> if you share with a neighbour.</p>
+        <div class="local-model">
+          <article>
+            <p class="step-n">01</p>
+            <p><strong>Pick a pack</strong><span>$13, $25, or $72.</span></p>
+          </article>
+          <article>
+            <p class="step-n">02</p>
+            <p><strong>Add your address</strong><span>Rhodes 2138 is in range.</span></p>
+          </article>
+          <article>
+            <p class="step-n">03</p>
+            <p><strong>Pay by card</strong><span>Secure Stripe checkout.</span></p>
+          </article>
+          <article>
+            <p class="step-n">04</p>
+            <p><strong>Saturday drop</strong><span>Morning, at your door.</span></p>
+          </article>
         </div>
       </div>
     </section>
@@ -220,16 +252,21 @@
       <div class="wrap">
         <header class="section-head">
           <div>
-            <p class="section-label">Local context</p>
-            <h2>Up by<br>the river.</h2>
+            <p class="section-label">Around Rhodes</p>
+            <h2>Rhodes<br>and nearby.</h2>
           </div>
-          <p>Rhodes 2138 sits north of Concord West, inside the Saturday zone.</p>
+          <p>2138 · about 6&nbsp;km from Flemington. Same Saturday drop for every suburb below.</p>
         </header>
-        <div class="local-prose">
-          <p>Rhodes is a short run north of Flemington past Concord West, and Wentworth Point is just across the Bennelong Bridge.</p>
-          <p>Nearby suburbs on the same run: Liberty Grove, Concord West, Wentworth Point, Homebush Bay, Meadowbank, and Putney. Not sure about your street? Check the <a href="/egg-delivery-areas">full list of suburbs we cover</a>, or order anyway. Coverage is the 45&nbsp;km Saturday zone, confirmed by postcode.</p>
-        </div>
-        <p class="section-label local-nearby-label">Nearby pages</p>
+        <ul class="areas-list">
+          <li>Liberty Grove</li>
+          <li>Concord West</li>
+          <li>Wentworth Point</li>
+          <li>Meadowbank</li>
+          <li>Putney</li>
+          <li>Homebush Bay</li>
+          <li><a href="/egg-delivery-areas">+ all suburbs</a></li>
+        </ul>
+        <p class="section-label local-nearby-label">More delivery pages</p>
         <ul class="local-siblings">
           <li><a href="/egg-delivery-sydney">Egg delivery Sydney</a></li>
           <li><a href="/egg-delivery-strathfield">Strathfield</a></li>
@@ -254,29 +291,29 @@
         <header class="section-head">
           <div>
             <p class="section-label">FAQ</p>
-            <h2>Rhodes delivery,<br>answered.</h2>
+            <h2>Rhodes,<br>answered.</h2>
           </div>
         </header>
         <div class="faq-grid">
           <details open>
             <summary>Do you deliver eggs to Rhodes?</summary>
-            <p>Yes. Rhodes 2138 is about 6&nbsp;km from our Flemington hub and inside the Saturday 45&nbsp;km zone. Your postcode is checked at checkout.</p>
+            <p>Yes. Rhodes 2138 is about 6&nbsp;km from Flemington, inside our Saturday delivery zone. Checkout confirms your postcode.</p>
+          </details>
+          <details>
+            <summary>When do eggs arrive in Rhodes?</summary>
+            <p>Saturday morning. Order by Friday night.</p>
+          </details>
+          <details>
+            <summary>How much is egg delivery to Rhodes?</summary>
+            <p><strong>$13</strong> a tray (30 eggs), <strong>$25</strong> for two, <strong>$72</strong> for a 180-egg box. Delivery is a flat <strong>+$5</strong>.</p>
           </details>
           <details>
             <summary>Can you deliver to my apartment building?</summary>
-            <p>Yes. Add your unit number and access notes (buzzer, concierge, or parcel room) on the order form. If anything is unclear on the day, we message you on WhatsApp.</p>
+            <p>Yes. Add your unit number and access notes (buzzer, concierge, or parcel room) at checkout. If anything is unclear on the day, we message you on WhatsApp.</p>
           </details>
           <details>
-            <summary>When is Rhodes egg delivery?</summary>
-            <p>Saturday morning. Book by Friday night. There is no weekday Rhodes run.</p>
-          </details>
-          <details>
-            <summary>How much is delivery to Rhodes?</summary>
-            <p>A flat <strong>+$5</strong>. The 30-egg tray is <strong>$13</strong>. Bundles are <strong>$13</strong>, <strong>$25</strong>, and <strong>$72</strong>.</p>
-          </details>
-          <details>
-            <summary>Is Wentworth Point covered too?</summary>
-            <p>Yes. Wentworth Point is across the Bennelong Bridge and inside the 45&nbsp;km zone. Enter your address at checkout to confirm.</p>
+            <summary>What eggs are they?</summary>
+            <p>Pace Farm XL cage eggs, 30 to a tray (1.75&nbsp;kg). The same supermarket brand, sealed and stamped.</p>
           </details>
         </div>
       </div>
@@ -285,7 +322,7 @@
     <section class="local-cta-band">
       <div class="wrap">
         <h2>Rhodes,<br>this Saturday.</h2>
-        <p>Apartment or house, same offer. Tray $13, delivery +$5, book by Friday night.</p>
+        <p>Tray $13. Delivery +$5. Order by Friday night.</p>
         <div class="hero-cta">
           <a class="btn btn-solid" href="/#order">Order now <span class="btn-arrow" aria-hidden="true">↗</span></a>
           <a class="btn btn-ghost" href="/egg-delivery-sydney">Sydney delivery hub</a>
