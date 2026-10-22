@@ -2,6 +2,8 @@ name = "yolko-site"
 main = "infra/cloudflare-worker.mjs"
 compatibility_date = "2026-06-01"
 account_id = "3af91e3294583af96a50ed10fef9c3b3"
+# Keep plain variables added in the Cloudflare dashboard across deploys.
+keep_vars = true
 
 [[kv_namespaces]]
 binding = "DATA"
@@ -11,3 +13,8 @@ id = "98fb94415ceb4012b3de2e5adcf253a5"
 # (retailers have no push webhooks — this is the reactive loop).
 [triggers]
 crons = ["*/15 * * * *"]
+
+# Plain (non-secret) settings. Secrets (STRIPE_KEY, ZEPTOMAIL_TOKEN,
+# STRIPE_WEBHOOK_SECRET, ADMIN_KEY, ...) live in Cloudflare, never here.
+[vars]
+ORDER_EMAIL_FROM = "orders@getyolko.com"
