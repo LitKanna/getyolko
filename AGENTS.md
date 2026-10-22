@@ -44,6 +44,14 @@ needs a KV namespace bound as `DATA` (wrangler dev provides a local simulation) 
 `ADMIN_KEY` and `STRIPE_KEY` secrets; Stripe endpoints return 503 when `STRIPE_KEY` is unset.
 `wrangler` is intentionally not a declared dependency. invoke via `npx`.
 
+Order payments and emails: `POST /api/stripe-webhook` (Stripe events `checkout.session.completed`
+and `checkout.session.async_payment_succeeded`) marks orders paid and sends the confirmation
+email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN`,
+`ORDER_EMAIL_FROM`; optional `ORDER_NOTIFY_EMAIL` (shop copy) and `ZEPTOMAIL_API_URL`
+(defaults to the AU host `https://api.zeptomail.com.au/v1.1/email`). Without them the webhook
+returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
+sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
+
 ### No lint / test / build tooling
 There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder
 that intentionally fails (`echo "Error: no test specified" && exit 1`). do not treat that as
