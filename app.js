@@ -888,7 +888,7 @@ function applySettings(settings) {
   const stock = Number(settings.traysAvailable);
   if (Number.isFinite(stock)) {
     if (stock > 0) {
-      stockNote.textContent = `${stock} trays left this week.`;
+      stockNote.textContent = `${stock} ${stock === 1 ? "tray" : "trays"} left this week.`;
       stockNote.hidden = false;
       stockNote.classList.add("in");
     } else {

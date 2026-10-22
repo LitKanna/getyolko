@@ -19,7 +19,4 @@ const SITE_CONFIG = {
     tray2: "",
     box: "",
   },
-
-  // How many trays you have this week. Shown as a limited-stock note.
-  traysAvailableThisWeek: 24,
 };
