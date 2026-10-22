@@ -14,7 +14,7 @@
                 },
     "repository":  {
                        "type":  "git",
-                       "url":  "git+https://github.com/LitKanna/Markett.git"
+                       "url":  "git+https://github.com/LitKanna/getyolko.git"
                    },
     "keywords":  [
 
@@ -22,9 +22,9 @@
     "author":  "",
     "license":  "ISC",
     "bugs":  {
-                 "url":  "https://github.com/LitKanna/Markett/issues"
+                 "url":  "https://github.com/LitKanna/getyolko/issues"
              },
-    "homepage":  "https://github.com/LitKanna/Markett#readme",
+    "homepage":  "https://github.com/LitKanna/getyolko#readme",
     "dependencies":  {
                          "playwright":  "^1.61.1"
                      }
