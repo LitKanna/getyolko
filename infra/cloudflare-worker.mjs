@@ -4573,6 +4573,18 @@ export default {
       return handleApi(request, env, url, ctx);
     }
 
+    // One canonical URL per page for search engines: /index.html -> /,
+    // /page.html -> /page, /page/ -> /page. Single 301, query string kept.
+    if (request.method === "GET" || request.method === "HEAD") {
+      let clean = url.pathname.replace(/\/+$/, "") || "/";
+      if (clean.endsWith(".html")) clean = clean.slice(0, -5);
+      if (clean === "/index") clean = "/";
+      if (clean !== url.pathname) {
+        url.pathname = clean;
+        return Response.redirect(url.toString(), 301);
+      }
+    }
+
     let path = url.pathname;
     if (path === "/" || path === "") path = "/index.html";
     const ext = path.includes(".") ? path.split(".").pop().toLowerCase() : "html";
@@ -4594,13 +4606,22 @@ export default {
     }
 
     if (!upstreamResp.ok) {
+      if (ext === "html") {
+        const notFound = await fetch(UPSTREAM_LIVE + "/404.html", upstreamInit);
+        if (notFound.ok) {
+          return new Response(notFound.body, {
+            status: 404,
+            headers: { "Content-Type": MIME.html, "Cache-Control": browserCacheControl("html", url) },
+          });
+        }
+      }
       return new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
     }
 
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "181",
+      "X-Yolko-Build": "182",
     };
     // Let browsers revalidate expired files with a cheap 304 instead of a full download.
     const etag = upstreamResp.headers.get("ETag");
@@ -4612,6 +4633,6 @@ export default {
       }
     }
 
-    return new Response(upstreamResp.body, { status: 200, headers });
+    return new Response(upstreamResp.body, { status: path === "/404.html" ? 404 : 200, headers });
   },
 };

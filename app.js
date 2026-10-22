@@ -190,7 +190,7 @@ function chalkHeroUrls(p) {
     primary: `assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}`,
     imgSrcset: `assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w`,
     webpSrcset: `assets/chalk-tray/${p}-640.webp?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.webp?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.webp?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.webp?v=${CHALK_ASSET_VER} 2048w`,
-    alt: `Fresh eggs · $${p}/tray at the YOLKO stall`,
+    alt: `Pace Farm 30-egg tray for $${p}, delivered in Sydney`,
   };
 }
 
@@ -198,22 +198,8 @@ function chalkOrderUrls(p) {
   return {
     primary: `assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}`,
     webpSrcset: `assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}`,
-    alt: `Fresh eggs · $${p}/tray`,
+    alt: `Pace Farm 30-egg tray for $${p}`,
   };
-}
-
-function preloadImage(url) {
-  return new Promise((resolve) => {
-    if (!url) { resolve(); return; }
-    const im = new Image();
-    im.decoding = "async";
-    im.onload = () => {
-      if (im.decode) im.decode().then(resolve, resolve);
-      else resolve();
-    };
-    im.onerror = () => resolve();
-    im.src = url;
-  });
 }
 
 function waitMs(ms) {
@@ -233,8 +219,8 @@ async function swapChalkPicture(pic, p) {
   const urls = kind === "hero" ? chalkHeroUrls(p) : chalkOrderUrls(p);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  await preloadImage(urls.primary);
-
+  // No JPG preload here: the browser picks the WebP size from srcset, and the
+  // hold frame below covers the old image until img.decode() resolves.
   // If a newer swap started, bail.
   if (pic.dataset.chalkSwapPending && pic.dataset.chalkSwapPending !== String(p)) return;
 
@@ -322,7 +308,7 @@ function buildHeroPicture(item, index) {
     const p = chalkPriceKey(BUNDLES.tray1.price);
     return `<picture class="showcase-photo${active}"${chalkAttr}>
       <source type="image/webp" srcset="assets/chalk-tray/${p}-640.webp?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.webp?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.webp?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.webp?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}">
-      <img${idAttr} src="assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}" srcset="assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}" alt="Fresh eggs · $${p}/tray at the YOLKO stall" width="1536" height="1536" data-chalk-showing="${p}"${loading} decoding="async">
+      <img${idAttr} src="assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}" srcset="assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}" alt="Pace Farm 30-egg tray for $${p}, delivered in Sydney" width="1536" height="1536" data-chalk-showing="${p}"${loading} decoding="async">
     </picture>`;
   }
   const src = heroSrcset(item);
@@ -344,7 +330,7 @@ function buildOrderPicture(item, index) {
     const p = chalkPriceKey(item.chalkPrice || BUNDLES.tray1.price);
     return `<picture class="order-tray-photo${active}"${chalkAttr}>
       <source type="image/webp" srcset="assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}">
-      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="Fresh eggs · $${p}/tray" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
+      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="Pace Farm 30-egg tray for $${p}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
     </picture>`;
   }
   const sq = item.square || {};
@@ -363,6 +349,9 @@ async function applyPublishedAssets(apiBase) {
     const data = await res.json();
     const published = Array.isArray(data.published) ? data.published : [];
     if (!published.length) return;
+    // A single chalk tray is what the HTML already renders. Rebuilding would
+    // swap out the hero <img> mid-load and push back LCP for no visual change.
+    if (published.length === 1 && published[0].kind === "chalk") return;
 
     const heroRoot = document.querySelector('.showcase-rotator[data-rotator="hero"]');
     const orderRoot = document.querySelector('.order-tray-rotator[data-rotator="order"]');
@@ -834,13 +823,6 @@ function applySettings(settings) {
 
   cacheTray1Price(p1);
   applyChalkPriceImage(p1);
-  // Warm nearby chalk frames so the next price tweak crossfades instantly.
-  [p1 - 1, p1 + 1, p1 - 2, p1 + 2]
-    .filter((n) => CHALK_PRICES.includes(n))
-    .forEach((n) => {
-      preloadImage(chalkHeroUrls(n).primary);
-      preloadImage(chalkOrderUrls(n).primary);
-    });
 
   // Hero
   const badge = document.querySelector(".badge-price");

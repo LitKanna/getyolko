@@ -1,24 +1,27 @@
 name: SEO IndexNow ping
 
+# Runs after each Worker deploy (that is when new pages actually go live),
+# and pings every URL in sitemap.xml so Bing and other IndexNow engines recrawl.
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "index.html"
-      - "sitemap.xml"
-      - "robots.txt"
-      - "8f3c2a1b9d4e7f6a8b2c1d0e9f8a7b6c.txt"
+  workflow_run:
+    workflows: ["Deploy Cloudflare Worker"]
+    types: [completed]
   workflow_dispatch:
 
 jobs:
   indexnow:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Ping IndexNow
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
-        run: |
-          KEY="${INDEXNOW_KEY:-8f3c2a1b9d4e7f6a8b2c1d0e9f8a7b6c}"
-          curl -sf -X POST "https://api.indexnow.org/indexnow" \
-            -H "Content-Type: application/json; charset=utf-8" \
-            -d "{\"host\":\"getyolko.com\",\"key\":\"${KEY}\",\"keyLocation\":\"https://getyolko.com/${KEY}.txt\",\"urlList\":[\"https://getyolko.com/\",\"https://getyolko.com/sitemap.xml\"]}"
+        run: node infra/seo-indexnow.mjs
