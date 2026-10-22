@@ -142,7 +142,9 @@ async function rememberOpenOrder(env, phone, orderId) {
   await env.DATA.put(openOrderKey(phone), orderId, { expirationTtl: 6 * 3600 });
 }
 
-async function clearOpenOrder(env, phone) {
+async function clearOpenOrder(env, phone, orderId) {
+  // A newer order for the same phone may own the pointer by now.
+  if (orderId && (await env.DATA.get(openOrderKey(phone)).catch(() => null)) !== orderId) return;
   await env.DATA.delete(openOrderKey(phone)).catch(() => null);
 }
 
@@ -549,6 +551,12 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
       body: params.toString(),
     }).then((r) => r.json()),
   ]);
+  const prevGone = prev?.error?.code === "resource_missing";
+  if (prevId && !prevGone && (!prev || prev.error)) {
+    // Can't tell if the old session was paid: don't risk overwriting a payment.
+    if (session?.id) runLater(ctx, expireStripeSession(env, session.id));
+    return { error: "checkout failed", detail: "please try again", status: 502 };
+  }
   if (prev?.payment_status === "paid") {
     // Already paid. `order` holds this request's edits, so never save it;
     // record the payment from a fresh copy only if the webhook clearly missed it.
@@ -556,11 +564,11 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
     if (mayRecordPaid(env, prev)) runLater(ctx, recordMissedPayment(env, order.id, prev));
     return { error: "already paid", alreadyPaid: true, status: 409 };
   }
-  if (prev?.status === "open") runLater(ctx, expireStripeSession(env, prevId));
   if (!session.url) {
     return { error: "checkout failed", detail: session.error?.message || null, status: 502 };
   }
 
+  if (prev?.status === "open") runLater(ctx, expireStripeSession(env, prevId));
   order.paymentStatus = "pending";
   order.sessionId = session.id;
   await env.DATA.put(order.id, JSON.stringify(order));
@@ -623,7 +631,7 @@ function isRefunded(order, session) {
   return (
     order?.paymentStatus === "refunded" ||
     Boolean(order?.stripe?.refundId) ||
-    Boolean(charge && typeof charge === "object" && (charge.refunded || Number(charge.amount_refunded) > 0))
+    Boolean(charge && typeof charge === "object" && charge.refunded === true)
   );
 }
 
@@ -685,14 +693,15 @@ function paidView(order, session) {
 async function markOrderPaid(env, order, session) {
   if (isRefunded(order, session)) return { order, newlyPaid: false, refunded: true };
   if (order.paymentStatus !== "paid") {
-    const before = { trays: traysFor(order), dozens: dozensFor(order) };
+    const held = order.stockHeld || { trays: traysFor(order), dozens: dozensFor(order) };
     alignOrderWithSession(order, session);
-    // Stock already held for the old items (admin confirmed first): move it.
-    if (order.stockTaken && (before.trays !== traysFor(order) || before.dozens !== dozensFor(order))) {
+    // Stock already held (admin confirmed first) for other items: move it.
+    if (order.stockTaken && (held.trays !== traysFor(order) || held.dozens !== dozensFor(order))) {
       const settings = await getSettings(env);
-      settings.traysAvailable = Math.max(0, settings.traysAvailable + before.trays - traysFor(order));
-      settings.dozensAvailable = Math.max(0, (settings.dozensAvailable || 0) + before.dozens - dozensFor(order));
+      settings.traysAvailable = Math.max(0, settings.traysAvailable + held.trays - traysFor(order));
+      settings.dozensAvailable = Math.max(0, (settings.dozensAvailable || 0) + held.dozens - dozensFor(order));
       await env.DATA.put("settings", JSON.stringify(settings));
+      order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
     }
     order.paymentStatus = "paid";
     order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
@@ -700,7 +709,7 @@ async function markOrderPaid(env, order, session) {
     if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
     await syncStock(env, order, order.status);
     await env.DATA.put(order.id, JSON.stringify(order));
-    if (order.phone) await clearOpenOrder(env, order.phone);
+    if (order.phone) await clearOpenOrder(env, order.phone, order.id);
     return { order, newlyPaid: true };
   }
   if (!order.stripe?.amountTotal) {
@@ -889,8 +898,9 @@ async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
   return result;
 }
 
-// Orders paid before order emails launched are never emailed retroactively.
-const ORDER_EMAIL_LAUNCH = Date.parse("2026-10-22T09:00:00Z");
+// Orders paid before this (when sends began writing the email:sent marker)
+// are never emailed retroactively.
+const ORDER_EMAIL_LAUNCH = Date.parse("2026-10-22T10:57:00Z");
 
 /**
  * Cron safety net (every 15 min). Both checks only touch payments at least
@@ -902,19 +912,24 @@ const ORDER_EMAIL_LAUNCH = Date.parse("2026-10-22T09:00:00Z");
 async function reconcileOrders(env) {
   if (env.STRIPE_KEY) {
     const since = Math.floor(Date.now() / 1000) - 26 * 3600;
-    const resp = await fetch(
+    const list = await fetch(
       `https://api.stripe.com/v1/checkout/sessions?status=complete&limit=100&created[gte]=${since}&expand[]=data.payment_intent.latest_charge`,
       { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
-    );
-    const list = await resp.json().catch(() => null);
+    ).then((r) => r.json()).catch(() => null);
     for (const session of list?.data || []) {
       const orderId = session?.metadata?.orderId;
       if (session.payment_status !== "paid" || !String(orderId || "").startsWith("order:")) continue;
       const age = paymentAgeSec(session);
       if (age === null || age < WEBHOOK_GRACE_SEC) continue;
-      const order = await env.DATA.get(orderId, "json").catch(() => null);
-      if (!order || order.paymentStatus === "paid" || isRefunded(order, session)) continue;
-      await recordMissedPayment(env, orderId, session);
+      try {
+        const order = await env.DATA.get(orderId, "json");
+        if (!order || order.paymentStatus === "paid" || isRefunded(order, session)) continue;
+        await recordMissedPayment(env, orderId, session);
+        // Each one writes the shared "settings" key; KV allows one write per second.
+        await new Promise((r) => setTimeout(r, 1100));
+      } catch (err) {
+        console.log("reconcile failed", orderId, String(err?.message || err));
+      }
     }
   }
 
@@ -933,7 +948,7 @@ async function reconcileOrders(env) {
       (ce.attempts || 0) < EMAIL_MAX_ATTEMPTS &&
       now - (Date.parse(ce.lastTriedAt || "") || 0) > 10 * 60000
     ) {
-      await maybeSendOrderEmail(env, id);
+      await maybeSendOrderEmail(env, id).catch((err) => console.log("email retry failed", id, String(err?.message || err)));
     }
   }
 }
@@ -966,10 +981,13 @@ async function syncStock(env, order, newStatus) {
     trayDelta = -traysFor(order);
     dozenDelta = -dozensFor(order);
     order.stockTaken = true;
+    order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
   } else if (!holds && order.stockTaken) {
-    trayDelta = traysFor(order);
-    dozenDelta = dozensFor(order);
+    // Release what was taken, even if the order's items were edited since.
+    trayDelta = order.stockHeld ? order.stockHeld.trays : traysFor(order);
+    dozenDelta = order.stockHeld ? order.stockHeld.dozens : dozensFor(order);
     order.stockTaken = false;
+    delete order.stockHeld;
   }
 
   if (trayDelta !== 0 || dozenDelta !== 0) {
@@ -1729,7 +1747,6 @@ async function handleApi(request, env, url, ctx) {
       }
     }
 
-    await rememberOpenOrder(env, phone, order.id);
     let result = await createCheckoutForOrder(env, order, settings, ctx);
     if (result.alreadyPaid) {
       // The reused order was paid in the meantime, so this is a new purchase.
@@ -1746,9 +1763,10 @@ async function handleApi(request, env, url, ctx) {
         createdAt: now.toISOString(),
       };
       await pushOrderIndex(env, order.id);
-      await rememberOpenOrder(env, phone, order.id);
       result = await createCheckoutForOrder(env, order, settings, ctx);
     }
+    // One write, with the final order id (KV allows one write per key per second).
+    await rememberOpenOrder(env, phone, order.id);
     if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
     return json({ ok: true, ...result });
   }
@@ -1963,7 +1981,7 @@ async function handleApi(request, env, url, ctx) {
     }
     return json({
       ok: true,
-      paid: session.payment_status === "paid",
+      paid: order.paymentStatus === "paid",
       paymentStatus: order.paymentStatus || "pending",
       stripe: order.stripe,
       cached: false,
