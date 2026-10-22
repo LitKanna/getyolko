@@ -910,7 +910,7 @@ function applySeoMeta(settings) {
   const pBox = BUNDLES.box.price;
   // Same wording as the static <title>/description in index.html, with live prices.
   const title = `Fresh Eggs Delivered in Sydney | 30 for $${p1} | YOLKO`;
-  const description = `Fresh Pace Farm eggs delivered across Sydney every Saturday. 30-egg tray $${p1}, two trays $${p2}, 180-egg box $${pBox}. Flat $5 delivery within 45 km of Flemington.`;
+  const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday. 30-egg tray $${p1}, two trays $${p2}, 180-egg box $${pBox}. Flat $5 delivery within 45 km.`;
   const ogDescription = description;
   const image = `https://getyolko.com/assets/chalk-tray/${priceKey}-1536.jpg?v=${CHALK_ASSET_VER}`;
   const imageAlt = `Fresh Pace Farm egg trays · $${p1}/tray`;
