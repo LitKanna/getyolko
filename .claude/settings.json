@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__github",
+      "mcp__claude-code-remote",
+      "mcp__hearthbot",
+      "mcp__Claude_Docs",
+      "mcp__Supabase"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf ~/*)",
+      "Bash(sudo rm -rf *)",
+      "Bash(git push --force origin main)",
+      "Bash(git push --force origin main *)",
+      "Bash(git push -f origin main)",
+      "Bash(git push -f origin main *)",
+      "Bash(git push origin +main)",
+      "Bash(git push --force-with-lease origin main)",
+      "Bash(git push --delete origin main)",
+      "Bash(git push origin --delete main)",
+      "Bash(git push origin :main)",
+      "mcp__github__delete_file",
+      "mcp__Supabase__pause_project",
+      "mcp__Supabase__delete_branch",
+      "mcp__Supabase__reset_branch"
+    ]
+  }
+}
