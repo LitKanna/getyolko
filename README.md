@@ -1,20 +1,12 @@
 # getyolko - YOLKO
 
-One-page marketing site for selling fresh egg trays with **Friday** and **Saturday** pickup at Paddy's Markets Flemington.
-
-## Bundles
-
-| Bundle | Eggs | Price |
-|---|---|---:|
-| 1 tray | 30 | $12 |
-| 2 trays | 60 | $23 |
-| Full box | 180 | $66 |
+Online store for fresh Pace Farm egg trays, delivered across Sydney on Saturday mornings
+(flat $5, within 45 km of Flemington). Prices are set live from the `/admin` dashboard.
 
 ## Configure (config.js)
 
 - `whatsappNumber` — enables a one-tap WhatsApp booking button
-- `stripeLinks` — Stripe Payment Links enable "Pay online now" buttons
-- `traysAvailableThisWeek` — limited-stock note under prices
+- Payments use Stripe Checkout via the Worker (`/api/checkout`); stock and prices come from `/admin`
 
 See `ads/setup-guide.md` for step-by-step setup, and `ads/` for
 ready-to-paste Facebook, Instagram, and Google ad campaigns.
@@ -35,18 +27,6 @@ Open [http://localhost:8080](http://localhost:8080) in your browser.
 ## Live website
 
 **https://getyolko.com/**
-
-## Pickup schedule
-
-| Day | Hours | Location |
-|-----|-------|----------|
-| **Friday** | 10:00 AM – 4:30 PM | Paddy's Markets Flemington, Building D |
-| **Saturday** | 6:00 AM – 2:00 PM | Paddy's Markets Flemington, Building D |
-
-## Pricing
-
-- 30-egg tray: **$12**
-- Payment on pickup (cash or card)
 
 ## How to share it
 
