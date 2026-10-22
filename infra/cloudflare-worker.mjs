@@ -1561,13 +1561,15 @@ async function handleApi(request, env, url, ctx) {
     if (!handled.includes(event.type)) return json({ received: true, ignored: event.type });
 
     const sid = event.data?.object?.id;
-    const orderId = event.data?.object?.metadata?.orderId;
-    if (!sid || !String(orderId || "").startsWith("order:")) {
-      return json({ received: true, ignored: "no order" });
-    }
-    // Re-fetch so we act on Stripe's current state with charge details expanded.
+    if (!sid) return json({ received: true, ignored: "no session" });
+    // Re-fetch so we act on Stripe's current state with charge details expanded,
+    // and take the order id from Stripe's copy rather than the event payload.
     const session = await fetchStripeSession(env, sid);
     if (session.error) return json({ error: session.error.message || "stripe error" }, 502);
+    const orderId = session.metadata?.orderId;
+    if (!String(orderId || "").startsWith("order:")) {
+      return json({ received: true, ignored: "no order" });
+    }
     if (session.payment_status !== "paid") return json({ received: true, pending: true });
 
     const order = await env.DATA.get(orderId, "json");
