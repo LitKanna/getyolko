@@ -731,6 +731,25 @@ function orderRef(order) {
   return String(order.id || "").slice(-6).toUpperCase();
 }
 
+const EMAIL_WA = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+
+function emailRow(label, value) {
+  return `<tr><td style="padding:6px 0;color:#6b6257">${htmlEscape(label)}</td><td style="padding:6px 0;text-align:right;color:#1f1a14">${htmlEscape(value)}</td></tr>`;
+}
+
+/** YOLKO email frame around inner table rows (same look for every customer email). */
+function emailShell(rows) {
+  return `<!doctype html><html><body style="margin:0;background:#faf6ef;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ef;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;padding:28px">
+<tr><td style="font-size:22px;font-weight:700;color:#1f1a14;letter-spacing:0.5px">YOLKO</td></tr>
+${rows}
+<tr><td style="padding-top:22px;font-size:14px;line-height:1.5;color:#6b6257">Questions or need to change something? Reply to this email or message us on <a href="${EMAIL_WA}" style="color:#b9770e">WhatsApp</a>.</td></tr>
+</table>
+<p style="font-size:12px;color:#9a8f80;margin-top:14px">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:#9a8f80">getyolko.com</a></p>
+</td></tr></table></body></html>`;
+}
+
 function buildOrderEmail(order) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
   const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
@@ -740,17 +759,11 @@ function buildOrderEmail(order) {
   const where = order.deliveryAddress || "Your delivery address";
   const ref = orderRef(order);
   const receipt = order.stripe?.receiptUrl || "";
-  const wa = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+  const wa = EMAIL_WA;
   const subject = `Your YOLKO order is confirmed (#${ref})`;
+  const row = emailRow;
 
-  const row = (label, value) =>
-    `<tr><td style="padding:6px 0;color:#6b6257">${htmlEscape(label)}</td><td style="padding:6px 0;text-align:right;color:#1f1a14">${htmlEscape(value)}</td></tr>`;
-
-  const html = `<!doctype html><html><body style="margin:0;background:#faf6ef;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ef;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;padding:28px">
-<tr><td style="font-size:22px;font-weight:700;color:#1f1a14;letter-spacing:0.5px">YOLKO</td></tr>
-<tr><td style="padding-top:18px;font-size:18px;color:#1f1a14">Thanks ${htmlEscape(first)}, your eggs are booked.</td></tr>
+  const html = emailShell(`<tr><td style="padding-top:18px;font-size:18px;color:#1f1a14">Thanks ${htmlEscape(first)}, your eggs are booked.</td></tr>
 <tr><td style="padding-top:8px;font-size:15px;line-height:1.5;color:#4a4238">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
 <tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;border-top:1px solid #eee5d8">
 ${row("Order", "#" + ref)}
@@ -760,11 +773,7 @@ ${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : ""
 <tr><td style="padding:10px 0;border-top:1px solid #eee5d8;font-weight:700;color:#1f1a14">Total paid</td><td style="padding:10px 0;border-top:1px solid #eee5d8;text-align:right;font-weight:700;color:#1f1a14">${htmlEscape(money(total))} AUD</td></tr>
 </table></td></tr>
 <tr><td style="padding-top:16px;font-size:15px;line-height:1.5;color:#4a4238"><strong style="color:#1f1a14">Delivery</strong><br>${htmlEscape(when)}<br>${htmlEscape(where)}</td></tr>
-${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:#f2a516;color:#1f1a14;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px">View receipt</a></td></tr>` : ""}
-<tr><td style="padding-top:22px;font-size:14px;line-height:1.5;color:#6b6257">Questions or need to change something? Reply to this email or message us on <a href="${wa}" style="color:#b9770e">WhatsApp</a>.</td></tr>
-</table>
-<p style="font-size:12px;color:#9a8f80;margin-top:14px">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:#9a8f80">getyolko.com</a></p>
-</td></tr></table></body></html>`;
+${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:#f2a516;color:#1f1a14;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px">View receipt</a></td></tr>` : ""}`);
 
   const text = [
     `Thanks ${first}, your eggs are booked.`,
@@ -786,15 +795,64 @@ ${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" s
   return { subject, html, text };
 }
 
+function buildRefundEmail(order, refund) {
+  const first = String(order.name || "").split(/\s+/)[0] || "there";
+  const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
+  const qty = Math.max(1, Number(order.quantity) || 1);
+  const ref = orderRef(order);
+  const amount = money(refund.amount);
+  const currency = String(refund.currency || "AUD").toUpperCase();
+  const paid = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
+  const partial = Number(refund.amount) + 0.001 < Number(paid);
+  const card = order.stripe?.cardLast4
+    ? `${order.stripe.cardBrand ? order.stripe.cardBrand.toUpperCase() + " " : ""}card ending ${order.stripe.cardLast4}`
+    : "your original payment method";
+  const subject = `Your YOLKO refund (#${ref})`;
+  const lead = partial
+    ? `We've refunded part of your order, ${amount} ${currency}.`
+    : `We've refunded your order in full, ${amount} ${currency}.`;
+  const timing = "Refunds usually take 5 to 10 business days to appear on your statement, depending on your bank.";
+
+  const html = emailShell(`<tr><td style="padding-top:18px;font-size:18px;color:#1f1a14">Hi ${htmlEscape(first)}, your refund is on its way.</td></tr>
+<tr><td style="padding-top:8px;font-size:15px;line-height:1.5;color:#4a4238">${htmlEscape(lead)} ${htmlEscape(timing)}</td></tr>
+<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;border-top:1px solid #eee5d8">
+${emailRow("Order", "#" + ref)}
+${emailRow("Item", `${qty} x ${item}`)}
+${emailRow("Refunded to", card)}
+<tr><td style="padding:10px 0;border-top:1px solid #eee5d8;font-weight:700;color:#1f1a14">Amount refunded</td><td style="padding:10px 0;border-top:1px solid #eee5d8;text-align:right;font-weight:700;color:#1f1a14">${htmlEscape(amount)} ${htmlEscape(currency)}</td></tr>
+</table></td></tr>`);
+
+  const text = [
+    `Hi ${first}, your refund is on its way.`,
+    "",
+    lead,
+    timing,
+    "",
+    `Order #${ref}`,
+    `${qty} x ${item}`,
+    `Refunded to: ${card}`,
+    `Amount refunded: ${amount} ${currency}`,
+    "",
+    `Questions? Reply to this email or WhatsApp us: ${EMAIL_WA}`,
+    "YOLKO · getyolko.com",
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 /** Send the confirmation via ZeptoMail. Returns { ok, skipped?, error? }. */
 async function sendOrderConfirmationEmail(env, order) {
+  return sendCustomerEmail(env, order, buildOrderEmail(order));
+}
+
+/** Send a YOLKO email to the order's customer via Zoho (CPaaS / ZeptoMail API). */
+async function sendCustomerEmail(env, order, { subject, html, text }, toOverride) {
   const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
   const from = String(env.ORDER_EMAIL_FROM || "").trim();
-  const to = String(order.stripe?.email || order.email || "").trim();
+  const to = String(toOverride || order.stripe?.email || order.email || "").trim();
   if (!token || !from) return { ok: false, skipped: true, reason: "email not configured" };
   if (!to) return { ok: false, skipped: true, reason: "no customer email" };
 
-  const { subject, html, text } = buildOrderEmail(order);
   const payload = {
     from: { address: from, name: STRIPE_BRAND },
     to: [{ email_address: { address: to, name: order.name || "" } }],
@@ -829,6 +887,90 @@ async function sendOrderConfirmationEmail(env, order) {
     return { ok: false, transient: resp.status >= 500 || resp.status === 429, error: String(error).slice(0, 300) };
   }
   return { ok: true, to, requestId: data?.request_id || null };
+}
+
+const refundEmailKey = (refundId) => `email:refund:${refundId}`;
+
+/**
+ * Email the customer about one refund, once. Each refund has a single sender:
+ * the admin Refund button for refunds it creates, the webhook for refunds
+ * made in the Stripe dashboard. The marker stops redeliveries resending.
+ */
+async function maybeSendRefundEmail(env, order, refund) {
+  if (!emailConfigured(env)) return { ok: false, skipped: true, reason: "email not configured" };
+  if (!refund?.id || !(Number(refund.amount) > 0)) return { ok: false, skipped: true, reason: "no refund" };
+  const key = refundEmailKey(refund.id);
+  if (await env.DATA.get(key)) return { ok: true, already: true };
+  let result = await sendCustomerEmail(env, order, buildRefundEmail(order, refund)).catch((err) => ({
+    ok: false,
+    error: String(err?.message || err),
+  }));
+  if (!result.ok && result.transient) {
+    await new Promise((r) => setTimeout(r, 2000));
+    result = await sendCustomerEmail(env, order, buildRefundEmail(order, refund)).catch((err) => ({ ok: false, error: String(err?.message || err) }));
+  }
+  if (result.ok) {
+    await env.DATA.put(key, JSON.stringify({ sentAt: new Date().toISOString(), to: result.to, orderId: order.id }))
+      .catch((err) => console.log("refund email marker failed", refund.id, String(err?.message || err)));
+  } else {
+    console.log("refund email not sent", order.id, refund.id, result.error || result.reason);
+  }
+  return result;
+}
+
+async function stripeGet(env, path) {
+  const resp = await fetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } });
+  return resp.json();
+}
+
+/**
+ * charge.refunded: record refunds made outside the admin (Stripe dashboard)
+ * and email the customer. Refunds created by /api/refund carry
+ * metadata.orderId; that path records and emails them itself.
+ */
+async function handleChargeRefunded(env, chargeId) {
+  if (!/^(ch|py)_/.test(String(chargeId || ""))) return { ignored: "no charge" };
+  const charge = await stripeGet(env, `charges/${encodeURIComponent(chargeId)}?expand[]=refunds`);
+  if (charge.error) return { error: charge.error.message || "stripe error" };
+  const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+  if (!piId) return { ignored: "no payment intent" };
+  const external = (charge.refunds?.data || []).filter(
+    (r) => !r.metadata?.orderId && r.status !== "failed" && r.status !== "canceled"
+  );
+  if (!external.length) return { ignored: "admin refund" };
+  const sessions = await stripeGet(env, `checkout/sessions?payment_intent=${encodeURIComponent(piId)}&limit=1`);
+  if (sessions.error) return { error: sessions.error.message || "stripe error" };
+  const orderId = sessions.data?.[0]?.metadata?.orderId;
+  if (!String(orderId || "").startsWith("order:")) return { ignored: "no order" };
+  const order = await env.DATA.get(orderId, "json");
+  if (!order) return { ignored: "order not found" };
+
+  const currency = String(charge.currency || "aud").toUpperCase();
+  const amountRefunded = Number(charge.amount_refunded) / 100;
+  if (charge.refunded === true && order.paymentStatus !== "refunded") {
+    order.paymentStatus = "refunded";
+    order.status = "cancelled";
+    order.stripe = {
+      ...(order.stripe || {}),
+      refundId: external[0].id,
+      refundStatus: external[0].status,
+      refundAmount: amountRefunded,
+      refundCurrency: currency,
+      refundedAt: new Date().toISOString(),
+      refundSource: "stripe",
+    };
+    await syncStock(env, order, "cancelled");
+    await env.DATA.put(orderId, JSON.stringify(order));
+  } else if (order.stripe?.amountRefunded !== amountRefunded) {
+    order.stripe = { ...(order.stripe || {}), amountRefunded, refundCurrency: currency };
+    await env.DATA.put(orderId, JSON.stringify(order));
+  }
+  let sent = 0;
+  for (const r of external) {
+    const res = await maybeSendRefundEmail(env, order, { id: r.id, amount: Number(r.amount) / 100, currency });
+    if (res.ok && !res.already) sent++;
+  }
+  return { orderId, refunds: external.length, emailsSent: sent };
 }
 
 /** Record a payment the live paths missed, from a fresh copy, and email the customer. */
@@ -1786,6 +1928,10 @@ async function handleApi(request, env, url, ctx) {
     if (!ok) return json({ error: "bad signature" }, 400);
 
     const event = JSON.parse(payload);
+    if (event.type === "charge.refunded") {
+      const result = await handleChargeRefunded(env, event.data?.object?.id);
+      return json({ received: true, ...result }, result.error ? 502 : 200);
+    }
     const handled = ["checkout.session.completed", "checkout.session.async_payment_succeeded"];
     if (!handled.includes(event.type)) return json({ received: true, ignored: event.type });
 
@@ -1819,6 +1965,37 @@ async function handleApi(request, env, url, ctx) {
     if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
     const result = await maybeSendOrderEmail(env, id, { force: true });
     return json(result, result.ok ? 200 : 502);
+  }
+
+  // Admin: send sample confirmation and refund emails to an address (no order changes)
+  if (url.pathname === "/api/admin/test-email" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => null);
+    const to = String(body?.to || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "bad email" }, 400);
+    const kinds = body?.kind === "refund" || body?.kind === "confirmation" ? [body.kind] : ["confirmation", "refund"];
+    const sample = {
+      id: "order:TEST:sample",
+      name: "Test Customer",
+      bundle: "tray2",
+      quantity: 1,
+      subtotal: 23,
+      deliveryFee: 5,
+      price: 28,
+      pickupDate: "Sat 25 Oct",
+      deliveryAddress: "1 Sample St, Burwood NSW 2134",
+      stripe: { amountTotal: 28, cardBrand: "visa", cardLast4: "4242", receiptUrl: "https://getyolko.com" },
+    };
+    const results = {};
+    for (const kind of kinds) {
+      const msg = kind === "refund"
+        ? buildRefundEmail(sample, { id: "re_test", amount: 28, currency: "AUD" })
+        : buildOrderEmail(sample);
+      msg.subject = `[TEST] ${msg.subject}`;
+      results[kind] = await sendCustomerEmail(env, sample, msg, to);
+    }
+    const ok = Object.values(results).every((r) => r.ok);
+    return json({ ok, results }, ok ? 200 : 502);
   }
 
   // Public: confirm payment after returning from Stripe
@@ -2029,7 +2206,10 @@ async function handleApi(request, env, url, ctx) {
 
     const refundParams = new URLSearchParams({
       reason: "requested_by_customer",
+      // metadata.orderId marks refunds made here: the charge.refunded webhook
+      // leaves those to this path (one sender per refund email).
       "metadata[orderId]": id,
+      "metadata[source]": "yolko-admin",
       "metadata[customerName]": String(order.name || "").slice(0, 80),
     });
     if (paymentIntentId) refundParams.set("payment_intent", paymentIntentId);
@@ -2076,6 +2256,11 @@ async function handleApi(request, env, url, ctx) {
     };
     const stock = await syncStock(env, order, "cancelled");
     await env.DATA.put(id, JSON.stringify(order));
+    runLater(ctx, maybeSendRefundEmail(env, order, {
+      id: refund.id,
+      amount: order.stripe.refundAmount,
+      currency: order.stripe.refundCurrency,
+    }));
 
     return json({
       ok: true,
@@ -2934,6 +3119,15 @@ input:focus, select:focus { outline:none; border-color:var(--orange); box-shadow
 
       <button onclick="saveSettings()" style="width:100%">Save changes</button><span class="msg" id="save-msg"></span>
       <p class="note">Saved changes show on the website within seconds.</p>
+    </div>
+
+    <div class="card">
+      <h2>Customer emails</h2>
+      <p class="ps-sub">Paid orders get a confirmation email and refunds get a refund email, from your Zoho sender. Send yourself a sample to check them.</p>
+      <div class="grid2">
+        <div style="grid-column:1/-1"><label>Send samples to</label><input id="test-email-to" type="email" placeholder="you@example.com"></div>
+      </div>
+      <button class="ghost" onclick="sendTestEmail()" style="width:100%">Send sample emails</button><span class="msg" id="test-email-msg"></span>
     </div>
     </div>
     </div>
@@ -3937,6 +4131,22 @@ $("box-cost") && $("box-cost").addEventListener("input", function() {
 });
 $("dozen-stock") && $("dozen-stock").addEventListener("input", updateDozenHint);
 
+async function sendTestEmail() {
+  const to = document.getElementById("test-email-to").value.trim();
+  const msg = document.getElementById("test-email-msg");
+  if (!to) { msg.textContent = "Enter an email address"; return; }
+  msg.textContent = "Sending...";
+  try {
+    const res = await fetch("/api/admin/test-email", { method: "POST", headers: authHeaders(), body: JSON.stringify({ to }) });
+    const d = await res.json().catch(() => ({}));
+    if (d.ok) { msg.textContent = "Sent. Check " + to; return; }
+    const errs = Object.entries(d.results || {}).filter(([, r]) => !r.ok).map(([k, r]) => k + ": " + (r.error || r.reason));
+    msg.textContent = "Not sent. " + (errs.join("; ") || d.error || "error");
+  } catch (e) {
+    msg.textContent = "Not sent. " + e.message;
+  }
+}
+
 async function saveSettings() {
   const dozenCosts = {};
   DOZEN_KEYS.forEach(function(k) {
@@ -4560,7 +4770,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "113",
+          "X-Yolko-Admin": "114",
         },
       });
     }
