@@ -2,10 +2,10 @@ import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./deli
 import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "546cb1a91c1afe649b9d9ceaa054b867d1ae57f1";
+const DEPLOY_SHA = "9cd6245448e50dded84945de2c64486baead0863";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
-const CHALK_ASSETS_SHA = "677ede9d579baaa94621d300d04b389de5e00cc6";
+const CHALK_ASSETS_SHA = "9cd6245448e50dded84945de2c64486baead0863";
 const UPSTREAM_LIVE = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_ASSETS = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_CHALK = `https://raw.githubusercontent.com/LitKanna/getyolko/${CHALK_ASSETS_SHA}`;
@@ -4348,7 +4348,7 @@ export default {
       headers: {
         "Content-Type": MIME[ext] || "application/octet-stream",
         "Cache-Control": browserCacheControl(ext, url),
-        "X-Yolko-Build": "178",
+        "X-Yolko-Build": "179",
       },
     });
   },
