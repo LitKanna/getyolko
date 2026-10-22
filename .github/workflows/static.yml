@@ -26,9 +26,7 @@ jobs:
       - name: Prepare site files
         run: |
           mkdir -p public
-          cp index.html styles-modern.css app.js config.js robots.txt sitemap.xml public/
-          cp egg-delivery-sydney.html egg-delivery-strathfield.html egg-delivery-homebush.html \
-             egg-delivery-burwood.html egg-delivery-parramatta.html egg-delivery-auburn.html public/
+          cp *.html styles-modern.css app.js config.js robots.txt sitemap.xml public/
           cp 8f3c2a1b9d4e7f6a8b2c1d0e9f8a7b6c.txt public/
           cp -r assets public/assets
           touch public/.nojekyll

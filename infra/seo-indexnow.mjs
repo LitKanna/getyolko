@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 /**
  * Ping IndexNow after site updates so Bing/Yandex crawl getyolko.com faster.
- * Usage: node infra/seo-indexnow.mjs [url ...]
+ * Usage: node infra/seo-indexnow.mjs [url ...]   (no args: every URL in sitemap.xml)
  * Key file must live at https://getyolko.com/{INDEXNOW_KEY}.txt
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 const HOST = "getyolko.com";
 const KEY = process.env.INDEXNOW_KEY || "8f3c2a1b9d4e7f6a8b2c1d0e9f8a7b6c";
-const DEFAULT_URLS = ["https://getyolko.com/", "https://getyolko.com/sitemap.xml"];
+
+// Default: every page listed in sitemap.xml.
+function sitemapUrls() {
+  const xml = readFileSync(fileURLToPath(new URL("../sitemap.xml", import.meta.url)), "utf8");
+  const urls = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].trim());
+  return urls.length ? urls : ["https://getyolko.com/"];
+}
+const DEFAULT_URLS = sitemapUrls();
 
 const urlList = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_URLS;
 
