@@ -906,8 +906,11 @@ function setMetaContent(attr, key, value) {
 function applySeoMeta(settings) {
   const p1 = BUNDLES.tray1.price;
   const priceKey = chalkPriceKey(p1);
-  const title = `YOLKO | 30 Eggs for $${p1} · Sydney`;
-  const description = `30 Pace Farm eggs for $${p1}. Fresh trays, delivered in Sydney.`;
+  const p2 = BUNDLES.tray2.price;
+  const pBox = BUNDLES.box.price;
+  // Same wording as the static <title>/description in index.html, with live prices.
+  const title = `Fresh Eggs Delivered in Sydney | 30 for $${p1} | YOLKO`;
+  const description = `Fresh Pace Farm eggs delivered across Sydney every Saturday. 30-egg tray $${p1}, two trays $${p2}, 180-egg box $${pBox}. Flat $5 delivery within 45 km of Flemington.`;
   const ogDescription = description;
   const image = `https://getyolko.com/assets/chalk-tray/${priceKey}-1536.jpg?v=${CHALK_ASSET_VER}`;
   const imageAlt = `Fresh Pace Farm egg trays · $${p1}/tray`;
@@ -934,11 +937,12 @@ function applySeoMeta(settings) {
   const graph = Array.isArray(data["@graph"]) ? data["@graph"] : [];
   const business = graph.find((n) => n && n["@id"] === "https://getyolko.com/#business");
   const product = graph.find((n) => n && n["@id"] === "https://getyolko.com/#product-tray");
+  const product2 = graph.find((n) => n && n["@id"] === "https://getyolko.com/#product-tray2");
 
   if (business) {
     business.image = [image];
-    business.description = `30 Pace Farm eggs for $${p1}. Fresh trays, delivered in Sydney.`;
-    business.priceRange = `$${p1}-$${BUNDLES.box.price}`;
+    business.description = `Fresh Pace Farm egg trays delivered to homes and cafés across Sydney on Saturday mornings. 30 eggs for $${p1}, delivery within 45 km of Flemington.`;
+    business.priceRange = `$${p1}-$${pBox}`;
     business.openingHoursSpecification = [{
       "@type": "OpeningHoursSpecification",
       dayOfWeek: "Saturday",
@@ -956,6 +960,12 @@ function applySeoMeta(settings) {
     product.offers.availability = "https://schema.org/InStock";
     product.offers.url = "https://getyolko.com/#order";
     product.offers.seller = { "@id": "https://getyolko.com/#business" };
+  }
+
+  if (product2 && product2.offers && typeof product2.offers === "object") {
+    product2.image = image;
+    product2.description = `Two 30-egg Pace Farm trays for $${p2}. Delivered Saturday mornings in Sydney.`;
+    product2.offers.price = Number(p2).toFixed(2);
   }
 
   script.textContent = JSON.stringify(data);
