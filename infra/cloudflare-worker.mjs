@@ -10,6 +10,15 @@ const UPSTREAM_LIVE = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEP
 const UPSTREAM_ASSETS = `https://raw.githubusercontent.com/LitKanna/getyolko/${DEPLOY_SHA}`;
 const UPSTREAM_CHALK = `https://raw.githubusercontent.com/LitKanna/getyolko/${CHALK_ASSETS_SHA}`;
 
+// HTML always revalidates. Hash-named fonts never change. Files requested with
+// ?v= get a long cache because the version is bumped whenever they change.
+function browserCacheControl(ext, url) {
+  if (ext === "html") return "no-cache";
+  if (url.pathname.startsWith("/assets/fonts/")) return "public, max-age=31536000, immutable";
+  if (url.searchParams.has("v")) return "public, max-age=2592000";
+  return "public, max-age=300";
+}
+
 const MIME = {
   html: "text/html; charset=utf-8",
   css: "text/css; charset=utf-8",
@@ -4318,17 +4327,16 @@ export default {
     const live = ext === "html" || ext === "css" || ext === "js";
     const chalkPath = path.startsWith("/assets/chalk-tray/");
     const upstreamBase = chalkPath ? UPSTREAM_CHALK : live ? UPSTREAM_LIVE : UPSTREAM_ASSETS;
-    const bust = live ? `?_${Date.now()}` : "";
-    let upstreamResp = await fetch(upstreamBase + path + bust, {
+    // Upstream URLs are pinned to a commit SHA, so their content never changes:
+    // cache successful responses at the edge instead of hitting GitHub per request.
+    const upstreamInit = {
       headers: { "User-Agent": "yolko-edge" },
-      cf: { cacheTtl: 0 },
-    });
+      cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 31536000, "404": 0, "500-599": 0 } },
+    };
+    let upstreamResp = await fetch(upstreamBase + path, upstreamInit);
 
     if (!upstreamResp.ok && chalkPath) {
-      upstreamResp = await fetch(UPSTREAM_ASSETS + path, {
-        headers: { "User-Agent": "yolko-edge" },
-        cf: { cacheTtl: 0 },
-      });
+      upstreamResp = await fetch(UPSTREAM_ASSETS + path, upstreamInit);
     }
 
     if (!upstreamResp.ok) {
@@ -4339,8 +4347,8 @@ export default {
       status: 200,
       headers: {
         "Content-Type": MIME[ext] || "application/octet-stream",
-        "Cache-Control": ext === "html" ? "no-store, no-cache, must-revalidate, max-age=0" : "public, max-age=60, must-revalidate",
-        "X-Yolko-Build": "177",
+        "Cache-Control": browserCacheControl(ext, url),
+        "X-Yolko-Build": "178",
       },
     });
   },

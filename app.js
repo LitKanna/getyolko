@@ -93,7 +93,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 /* ---------- Hero / order tray image auto-rotate ---------- */
 const rotatorTimers = [];
 const HERO_SIZES = "(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)";
-const ASSET_CACHE_VER = "111";
+const ASSET_CACHE_VER = "112";
 
 function clearImageRotators() {
   while (rotatorTimers.length) {
@@ -148,7 +148,7 @@ initImageRotators();
 
 /* Chalkboard hero swaps to match live tray1 price ($1-$30); dozens unchanged */
 const CHALK_PRICES = Array.from({ length: 30 }, (_, i) => i + 1);
-const CHALK_ASSET_VER = "111";
+const CHALK_ASSET_VER = "112";
 const TRAY1_PRICE_CACHE_KEY = "yolko.tray1Price";
 
 function chalkPriceKey(price) {
@@ -587,7 +587,7 @@ function syncFulfillmentUI() {
   }
 
   if (formNote) {
-    formNote.textContent = "Pay online for priority packing.";
+    formNote.textContent = "Secure card payment by Stripe.";
   }
   refreshSubmitPrice();
 }
@@ -705,13 +705,6 @@ function flagInvalid(input) {
     field.classList.remove("error");
     input.removeAttribute("aria-invalid");
   }, { once: true });
-}
-
-// Limited-stock note from config
-const traysLeft = Number(config.traysAvailableThisWeek);
-if (Number.isFinite(traysLeft) && traysLeft > 0) {
-  stockNote.textContent = `Only ${traysLeft} trays available this week. Book early.`;
-  stockNote.hidden = false;
 }
 
 /* ---------- Live prices and stock from the shop API ---------- */
@@ -895,7 +888,7 @@ function applySettings(settings) {
   const stock = Number(settings.traysAvailable);
   if (Number.isFinite(stock)) {
     if (stock > 0) {
-      stockNote.textContent = `Only ${stock} trays available this week. Book early.`;
+      stockNote.textContent = `${stock} trays left this week.`;
       stockNote.hidden = false;
       stockNote.classList.add("in");
     } else {
@@ -1097,7 +1090,7 @@ function applyPickup(pickup) {
       <article class="day-card">
         <p class="day-name">+$${DELIVERY_FEE}</p>
         <p class="day-time">Flat fee</p>
-        <p class="day-note">Checked at checkout</p>
+        <p class="day-note">Within 45&nbsp;km</p>
       </article>`;
   }
 
@@ -1108,15 +1101,15 @@ function applyPickup(pickup) {
 
   const stats = document.querySelectorAll(".hero-stats div");
   if (stats[2]) {
-    stats[2].querySelector("dt").textContent = "Weekly";
-    stats[2].querySelector("dd").textContent = "fresh drop";
+    stats[2].querySelector("dt").textContent = `+$${DELIVERY_FEE}`;
+    stats[2].querySelector("dd").textContent = "Sat delivery";
   }
 
   TICKER_ITEMS[2] = "Pace Farm trays";
   renderTicker();
 
   const ctaSpan = document.querySelector(".mobile-cta-text span");
-  if (ctaSpan) ctaSpan.textContent = "Order online";
+  if (ctaSpan) ctaSpan.textContent = "Saturday delivery";
 
   const buyBtn = document.getElementById("buynow-btn");
   if (buyBtn) buyBtn.disabled = false;

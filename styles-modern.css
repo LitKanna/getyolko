@@ -721,8 +721,8 @@ h3 {
 .price-card {
   position: relative;
   display: grid;
-  grid-template-columns: 62px minmax(180px, 0.8fr) minmax(220px, 1.3fr) 150px 150px;
-  gap: 22px;
+  grid-template-columns: 62px minmax(0, 1fr) auto 150px;
+  gap: clamp(22px, 3vw, 48px);
   align-items: center;
   padding: 26px 12px;
   border-bottom: 1px solid var(--line);
@@ -791,18 +791,6 @@ h3 {
 .featured .pack-note,
 .featured .price-per {
   color: rgba(23, 23, 20, 0.65);
-}
-
-.pack-detail {
-  margin: 0;
-  padding: 0;
-  color: var(--muted);
-  font-size: 13px;
-  list-style: none;
-}
-
-.pack-detail li + li {
-  margin-top: 4px;
 }
 
 .price-block {
@@ -908,34 +896,6 @@ h3 {
 
 .day-note {
   margin: 0;
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 11px;
-}
-
-.loc-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  margin-top: 30px;
-  padding: 18px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.24);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-.loc-pin {
-  color: var(--yellow);
-}
-
-.loc-text {
-  display: grid;
-}
-
-.loc-text strong {
-  font-size: 13px;
-}
-
-.loc-text span {
   color: rgba(255, 255, 255, 0.52);
   font-size: 11px;
 }
@@ -1956,7 +1916,7 @@ h3 {
   }
 
   .price-card {
-    grid-template-columns: 50px 1fr 1fr minmax(100px, 120px);
+    grid-template-columns: 50px 1fr auto;
   }
 
   .price-card .btn {
@@ -2101,10 +2061,6 @@ h3 {
     padding-inline: 8px;
   }
 
-  .pack-detail {
-    grid-column: 2 / -1;
-  }
-
   .price-block {
     grid-column: 3;
     grid-row: 1;
@@ -2129,14 +2085,6 @@ h3 {
   .day-card + .day-card {
     padding-left: 0;
     border-left: 0;
-  }
-
-  .loc-card {
-    grid-template-columns: auto 1fr;
-  }
-
-  .loc-card .btn {
-    grid-column: 1 / -1;
   }
 
   .steps-card {
@@ -2223,16 +2171,8 @@ h3 {
 
 /* Extra-narrow phones / landscape short viewports */
 @media (max-width: 400px) {
-  .hero-stats {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .hero-stats div + div {
-    padding-left: 0;
-    border-left: 0;
-    padding-top: 10px;
-    border-top: 1px solid var(--line);
+  .hero-stats dt {
+    font-size: clamp(20px, 6vw, 24px);
   }
 
   .picker {
