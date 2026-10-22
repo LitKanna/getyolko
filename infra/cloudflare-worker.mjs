@@ -518,6 +518,7 @@ async function createCheckoutForOrder(env, order, settings) {
     "line_items[0][quantity]": String(quantity),
     "metadata[orderId]": order.id,
     "metadata[bundle]": bundle,
+    "metadata[quantity]": String(quantity),
     "metadata[subtotal]": String(subtotal),
     "metadata[deliveryFee]": String(deliveryFee),
     success_url: "https://getyolko.com/?paid={CHECKOUT_SESSION_ID}",
@@ -529,6 +530,22 @@ async function createCheckoutForOrder(env, order, settings) {
     params.set("line_items[1][price_data][product_data][description]", "Flat fee on entire order");
     params.set("line_items[1][price_data][unit_amount]", String(Math.round(deliveryFee * 100)));
     params.set("line_items[1][quantity]", "1");
+  }
+
+  // One live session per order: a stale tab must not be able to pay for an
+  // order that has since been edited. If it was already paid, record that.
+  if (String(order.sessionId || "").startsWith("cs_")) {
+    const prev = await fetchStripeSession(env, order.sessionId).catch(() => null);
+    if (prev?.payment_status === "paid") {
+      await markOrderPaid(env, order, prev);
+      return { error: "already paid", status: 409 };
+    }
+    if (prev?.status === "open") {
+      await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(order.sessionId)}/expire`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
+      }).catch(() => null);
+    }
   }
 
   const resp = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -600,12 +617,46 @@ async function fetchStripeSession(env, sid) {
   return resp.json();
 }
 
+/** Refunds are terminal: a late webhook or success page must not revive them. */
+function isRefunded(order, session) {
+  const charge = session?.payment_intent?.latest_charge;
+  return (
+    order?.paymentStatus === "refunded" ||
+    Boolean(order?.stripe?.refundId) ||
+    Boolean(charge && typeof charge === "object" && (charge.refunded || Number(charge.amount_refunded) > 0))
+  );
+}
+
+/**
+ * The order can be edited after a Checkout Session was created (Reserve, or a
+ * retry that reused the order). Record what was actually paid for.
+ */
+function alignOrderWithSession(order, session) {
+  const md = session?.metadata || {};
+  if (BUNDLE_KEYS.includes(md.bundle)) order.bundle = md.bundle;
+  const qty = Math.floor(Number(md.quantity));
+  if (qty >= 1) order.quantity = qty;
+  if (md.subtotal !== undefined && Number.isFinite(Number(md.subtotal))) order.subtotal = Number(md.subtotal);
+  if (md.deliveryFee !== undefined && Number.isFinite(Number(md.deliveryFee))) order.deliveryFee = Number(md.deliveryFee);
+  const paid = Number(session?.amount_total) / 100;
+  if (Number.isFinite(paid)) order.price = paid;
+  if (session?.id) order.sessionId = session.id;
+  return order;
+}
+
+/** Order as it looks once this session is paid (no KV writes). */
+function paidView(order, session) {
+  const view = { ...order, paymentStatus: "paid", stripe: { ...(order.stripe || {}), ...stripeDetailsFromSession(session) } };
+  return alignOrderWithSession(view, session);
+}
+
 /** Idempotently mark an order paid from a paid Checkout Session. */
 async function markOrderPaid(env, order, session) {
+  if (isRefunded(order, session)) return { order, newlyPaid: false, refunded: true };
   if (order.paymentStatus !== "paid") {
+    alignOrderWithSession(order, session);
     order.paymentStatus = "paid";
-    order.sessionId = order.sessionId || session.id;
-    order.stripe = stripeDetailsFromSession(session);
+    order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
     // Paid customers jump the queue: auto-confirm and allocate trays.
     if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
     await syncStock(env, order, order.status);
@@ -614,7 +665,7 @@ async function markOrderPaid(env, order, session) {
     return { order, newlyPaid: true };
   }
   if (!order.stripe?.amountTotal) {
-    order.stripe = stripeDetailsFromSession(session);
+    order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
     await env.DATA.put(order.id, JSON.stringify(order));
   }
   return { order, newlyPaid: false };
@@ -709,50 +760,143 @@ async function sendOrderConfirmationEmail(env, order) {
     payload.bcc = [{ email_address: { address: notify, name: STRIPE_BRAND } }];
   }
 
-  const resp = await fetch(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL), {
-    method: "POST",
-    headers: {
-      Authorization: `Zoho-enczapikey ${token.replace(/^Zoho-enczapikey\s+/i, "")}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  let resp;
+  try {
+    resp = await fetch(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL), {
+      method: "POST",
+      headers: {
+        Authorization: `Zoho-enczapikey ${token.replace(/^Zoho-enczapikey\s+/i, "")}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    return { ok: false, transient: true, error: String(err?.message || err).slice(0, 300) };
+  }
   const data = await resp.json().catch(() => null);
   if (!resp.ok) {
     const error = data?.error?.details?.[0]?.message || data?.error?.message || `HTTP ${resp.status}`;
-    return { ok: false, error: String(error).slice(0, 300) };
+    return { ok: false, transient: resp.status >= 500 || resp.status === 429, error: String(error).slice(0, 300) };
   }
   return { ok: true, to, requestId: data?.request_id || null };
 }
 
+function emailConfigured(env) {
+  return Boolean(String(env.ZEPTOMAIL_TOKEN || "").trim() && String(env.ORDER_EMAIL_FROM || "").trim());
+}
+
+// Side-effect markers live in their own keys: whole-order writes from other
+// paths (possibly from a stale KV copy) must not erase them.
+const emailSentKey = (orderId) => `email:sent:${orderId}`;
+const metaSentKey = (orderId) => `meta:sent:${orderId}`;
+const SENT_MARKER_TTL = 90 * 24 * 3600;
+const EMAIL_MAX_ATTEMPTS = 4;
+
 /**
- * Send the confirmation once per order. Webhook and success page can both
- * call this; the short claim key stops a double send when they race.
+ * Send the confirmation once per order. The short claim key stops a double
+ * send when two paths race in the same location; the sent marker is the
+ * record of truth.
  */
 async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
+  if (!emailConfigured(env)) return { ok: false, skipped: true, reason: "email not configured" };
   const order = await env.DATA.get(orderId, "json");
   if (!order || order.paymentStatus !== "paid") return { ok: false, skipped: true, reason: "not paid" };
-  if (!force && order.confirmationEmail?.sentAt) return { ok: true, already: true };
   const claimKey = `email:claim:${orderId}`;
   if (!force) {
-    if (await env.DATA.get(claimKey)) return { ok: true, already: true };
+    if (order.status === "cancelled") return { ok: false, skipped: true, reason: "cancelled" };
+    if (order.confirmationEmail?.sentAt || (await env.DATA.get(emailSentKey(orderId)))) {
+      return { ok: true, already: true };
+    }
+    if (await env.DATA.get(claimKey)) return { ok: false, inProgress: true };
     await env.DATA.put(claimKey, "1", { expirationTtl: 120 });
   }
   const result = await sendOrderConfirmationEmail(env, order).catch((err) => ({
     ok: false,
+    transient: true,
     error: String(err?.message || err),
   }));
-  const fresh = (await env.DATA.get(orderId, "json")) || order;
-  fresh.confirmationEmail = result.ok
-    ? { sentAt: new Date().toISOString(), to: result.to, requestId: result.requestId }
-    : { ...(fresh.confirmationEmail || {}), lastError: result.error || result.reason, lastTriedAt: new Date().toISOString() };
-  await env.DATA.put(orderId, JSON.stringify(fresh));
+  const now = new Date().toISOString();
+  try {
+    if (result.ok) {
+      await env.DATA.put(
+        emailSentKey(orderId),
+        JSON.stringify({ sentAt: now, to: result.to, requestId: result.requestId }),
+        { expirationTtl: SENT_MARKER_TTL }
+      );
+    }
+    const fresh = (await env.DATA.get(orderId, "json")) || order;
+    const prev = fresh.confirmationEmail || {};
+    fresh.confirmationEmail = result.ok
+      ? { sentAt: now, to: result.to, requestId: result.requestId, attempts: (prev.attempts || 0) + 1 }
+      : { ...prev, lastError: result.error || result.reason, lastTriedAt: now, attempts: (prev.attempts || 0) + 1 };
+    await env.DATA.put(orderId, JSON.stringify(fresh));
+  } catch (err) {
+    // Bookkeeping only; never turn a sent email into a failure.
+    console.log("order email bookkeeping failed", orderId, String(err?.message || err));
+  }
   if (!result.ok) {
-    await env.DATA.delete(claimKey).catch(() => null);
+    if (!force) await env.DATA.delete(claimKey).catch(() => null);
     console.log("order email not sent", orderId, result.error || result.reason);
   }
   return result;
+}
+
+/**
+ * Cron safety net (every 15 min):
+ * 1. Orders still pending whose Checkout Session was paid, in case both the
+ *    webhook and the success page were missed (wrong webhook secret, closed tab).
+ * 2. Paid orders whose confirmation email failed, retried a few times.
+ * Runs well after the live paths, so KV copies have settled.
+ */
+async function reconcileOrders(env) {
+  const ids = (await getOrderIndex(env)).slice(0, 40);
+  const now = Date.now();
+  let stripeChecks = 0;
+  for (const id of ids) {
+    const order = await env.DATA.get(id, "json").catch(() => null);
+    if (!order) continue;
+    const touched = Date.parse(order.updatedAt || order.createdAt || "") || 0;
+    const ageMin = (now - touched) / 60000;
+
+    if (
+      env.STRIPE_KEY &&
+      order.paymentStatus === "pending" &&
+      String(order.sessionId || "").startsWith("cs_") &&
+      ageMin > 10 &&
+      ageMin < 26 * 60 &&
+      stripeChecks < 10
+    ) {
+      const doneKey = `stripe:closed:${order.sessionId}`;
+      if (await env.DATA.get(doneKey)) continue;
+      stripeChecks++;
+      const session = await fetchStripeSession(env, order.sessionId).catch(() => null);
+      if (!session || session.error) continue;
+      if (session.payment_status === "paid") {
+        const { refunded } = await markOrderPaid(env, order, session);
+        if (!refunded) await maybeSendOrderEmail(env, id);
+        console.log("reconciled paid order", id);
+      } else if (session.status === "expired") {
+        await env.DATA.put(doneKey, "1", { expirationTtl: 3 * 24 * 3600 });
+      }
+      continue;
+    }
+
+    const ce = order.confirmationEmail;
+    if (
+      emailConfigured(env) &&
+      order.paymentStatus === "paid" &&
+      order.status !== "cancelled" &&
+      ce?.lastError &&
+      !ce.sentAt &&
+      (ce.attempts || 0) < EMAIL_MAX_ATTEMPTS &&
+      now - (Date.parse(ce.lastTriedAt || "") || 0) > 10 * 60000 &&
+      ageMin < 3 * 24 * 60
+    ) {
+      await maybeSendOrderEmail(env, id);
+    }
+  }
 }
 
 // How many physical trays an order consumes (dozen packs do not use tray stock)
@@ -923,7 +1067,7 @@ async function sendMetaPurchase(env, order, opts = {}) {
   if (!order || order.paymentStatus !== "paid") {
     return { ok: false, skipped: true, reason: "not_paid" };
   }
-  if (order.metaPurchaseSent && !opts.force) {
+  if (!opts.force && (order.metaPurchaseSent || (await env.DATA.get(metaSentKey(order.id)).catch(() => null)))) {
     return { ok: true, skipped: true, reason: "already_sent", eventId: order.id };
   }
 
@@ -993,12 +1137,22 @@ async function sendMetaPurchase(env, order, opts = {}) {
   };
 }
 
-async function markMetaPurchaseSent(env, order, metaResult) {
+async function markMetaPurchaseSent(env, order, metaResult, { writeOrder = true } = {}) {
   if (!order?.id || !metaResult?.ok || metaResult.skipped) return order;
+  const sentAt = new Date().toISOString();
+  const eventId = metaResult.eventId || order.id;
+  await env.DATA.put(metaSentKey(order.id), JSON.stringify({ sentAt, eventId }), { expirationTtl: SENT_MARKER_TTL });
   order.metaPurchaseSent = true;
-  order.metaPurchaseSentAt = new Date().toISOString();
-  order.metaPurchaseEventId = metaResult.eventId || order.id;
-  await env.DATA.put(order.id, JSON.stringify(order));
+  order.metaPurchaseSentAt = sentAt;
+  order.metaPurchaseEventId = eventId;
+  if (writeOrder) {
+    // Patch a fresh copy so fields other paths wrote meanwhile survive.
+    const fresh = (await env.DATA.get(order.id, "json")) || order;
+    fresh.metaPurchaseSent = true;
+    fresh.metaPurchaseSentAt = sentAt;
+    fresh.metaPurchaseEventId = eventId;
+    await env.DATA.put(order.id, JSON.stringify(fresh));
+  }
   return order;
 }
 
@@ -1574,8 +1728,11 @@ async function handleApi(request, env, url, ctx) {
 
     const order = await env.DATA.get(orderId, "json");
     if (!order) return json({ received: true, ignored: "order not found" });
-    await markOrderPaid(env, order, session);
-    const email = await maybeSendOrderEmail(env, orderId);
+    const { refunded } = await markOrderPaid(env, order, session);
+    if (refunded) return json({ received: true, ignored: "refunded" });
+    // The paid state is saved; email problems are retried by the cron, not by
+    // making Stripe redeliver.
+    const email = await maybeSendOrderEmail(env, orderId).catch((err) => ({ ok: false, error: String(err?.message || err) }));
     return json({ received: true, email: { ok: !!email.ok, reason: email.reason || email.error || null } });
   }
 
@@ -1604,11 +1761,18 @@ async function handleApi(request, env, url, ctx) {
     if (paid && orderId) {
       let order = await env.DATA.get(orderId, "json");
       if (order) {
-        ({ order } = await markOrderPaid(env, order, session));
-        // Backup for the webhook: send the confirmation if it has not gone out.
-        if (!order.confirmationEmail?.sentAt) {
-          const job = maybeSendOrderEmail(env, orderId);
-          if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+        if (env.STRIPE_WEBHOOK_SECRET) {
+          // The webhook is the single writer of the paid state. It often runs in
+          // another Cloudflare location, and KV is eventually consistent, so a
+          // second writer here could double-count stock or overwrite its record.
+          if (!isRefunded(order, session)) order = paidView(order, session);
+        } else {
+          let newlyPaid;
+          ({ order, newlyPaid } = await markOrderPaid(env, order, session));
+          if (newlyPaid) {
+            const job = maybeSendOrderEmail(env, orderId);
+            if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+          }
         }
 
         // Meta CAPI Purchase (dedupe with browser Pixel via event_id = order.id)
@@ -1620,7 +1784,7 @@ async function handleApi(request, env, url, ctx) {
           fbc: fbc || undefined,
         });
         if (meta?.ok && !meta.skipped) {
-          order = await markMetaPurchaseSent(env, order, meta);
+          order = await markMetaPurchaseSent(env, order, meta, { writeOrder: !env.STRIPE_WEBHOOK_SECRET });
         }
         purchase = {
           eventId: order.id,
@@ -1728,12 +1892,12 @@ async function handleApi(request, env, url, ctx) {
     const session = await resp.json();
     if (session.error) return json({ error: session.error.message || "stripe error" }, 502);
 
-    order.stripe = stripeDetailsFromSession(session);
-    if (session.payment_status === "paid") {
-      order.paymentStatus = "paid";
-      if (order.status === "new") order.status = "confirmed";
+    if (session.payment_status === "paid" && order.paymentStatus !== "paid" && !isRefunded(order, session)) {
+      await markOrderPaid(env, order, session);
+    } else {
+      order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
+      await env.DATA.put(id, JSON.stringify(order));
     }
-    await env.DATA.put(id, JSON.stringify(order));
     return json({
       ok: true,
       paid: session.payment_status === "paid",
@@ -4278,6 +4442,11 @@ export default {
     ctx.waitUntil(
       runScheduledPoll(env).catch((err) => {
         console.log("price-watch poll failed", String(err?.message || err));
+      })
+    );
+    ctx.waitUntil(
+      reconcileOrders(env).catch((err) => {
+        console.log("order reconcile failed", String(err?.message || err));
       })
     );
   },
