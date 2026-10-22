@@ -142,7 +142,9 @@ async function rememberOpenOrder(env, phone, orderId) {
   await env.DATA.put(openOrderKey(phone), orderId, { expirationTtl: 6 * 3600 });
 }
 
-async function clearOpenOrder(env, phone) {
+async function clearOpenOrder(env, phone, orderId) {
+  // A newer order for the same phone may own the pointer by now.
+  if (orderId && (await env.DATA.get(openOrderKey(phone)).catch(() => null)) !== orderId) return;
   await env.DATA.delete(openOrderKey(phone)).catch(() => null);
 }
 
@@ -486,7 +488,7 @@ const BUNDLE_CHECKOUT_LABELS = {
 };
 
 /** Build Stripe Checkout Session for an order using live admin prices. */
-async function createCheckoutForOrder(env, order, settings) {
+async function createCheckoutForOrder(env, order, settings, ctx) {
   const quantity = Math.min(20, Math.max(1, Math.floor(Number(order.quantity)) || 1));
   const bundle = BUNDLE_KEYS.includes(order.bundle) ? order.bundle : null;
   if (!bundle || !Number.isFinite(Number(settings.prices[bundle]))) {
@@ -520,6 +522,7 @@ async function createCheckoutForOrder(env, order, settings) {
     "line_items[0][quantity]": String(quantity),
     "metadata[orderId]": order.id,
     "metadata[bundle]": bundle,
+    "metadata[quantity]": String(quantity),
     "metadata[subtotal]": String(subtotal),
     "metadata[deliveryFee]": String(deliveryFee),
     success_url: "https://getyolko.com/?paid={CHECKOUT_SESSION_ID}",
@@ -533,19 +536,39 @@ async function createCheckoutForOrder(env, order, settings) {
     params.set("line_items[1][quantity]", "1");
   }
 
-  const resp = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.STRIPE_KEY}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: params.toString(),
-  });
-  const session = await resp.json();
+  // One live session per order: a stale tab must not be able to pay for an
+  // order that has since been edited. Check the previous session alongside
+  // creating the new one so Buy now stays one round trip.
+  const prevId = String(order.sessionId || "").startsWith("cs_") ? order.sessionId : null;
+  const [prev, session] = await Promise.all([
+    prevId ? fetchStripeSession(env, prevId).catch(() => null) : null,
+    fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.STRIPE_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    }).then((r) => r.json()),
+  ]);
+  const prevGone = prev?.error?.code === "resource_missing";
+  if (prevId && !prevGone && (!prev || prev.error)) {
+    // Can't tell if the old session was paid: don't risk overwriting a payment.
+    if (session?.id) runLater(ctx, expireStripeSession(env, session.id));
+    return { error: "checkout failed", detail: "please try again", status: 502 };
+  }
+  if (prev?.payment_status === "paid") {
+    // Already paid. `order` holds this request's edits, so never save it;
+    // record the payment from a fresh copy only if the webhook clearly missed it.
+    if (session?.id) runLater(ctx, expireStripeSession(env, session.id));
+    if (mayRecordPaid(env, prev)) runLater(ctx, recordMissedPayment(env, order.id, prev));
+    return { error: "already paid", alreadyPaid: true, status: 409 };
+  }
   if (!session.url) {
     return { error: "checkout failed", detail: session.error?.message || null, status: 502 };
   }
 
+  if (prev?.status === "open") runLater(ctx, expireStripeSession(env, prevId));
   order.paymentStatus = "pending";
   order.sessionId = session.id;
   await env.DATA.put(order.id, JSON.stringify(order));
@@ -602,21 +625,95 @@ async function fetchStripeSession(env, sid) {
   return resp.json();
 }
 
+/** Refunds are terminal: a late webhook or success page must not revive them. */
+function isRefunded(order, session) {
+  const charge = session?.payment_intent?.latest_charge;
+  return (
+    order?.paymentStatus === "refunded" ||
+    Boolean(order?.stripe?.refundId) ||
+    Boolean(charge && typeof charge === "object" && charge.refunded === true)
+  );
+}
+
+/**
+ * The order can be edited after a Checkout Session was created (Reserve, or a
+ * retry that reused the order). Record what was actually paid for.
+ */
+function alignOrderWithSession(order, session) {
+  const md = session?.metadata || {};
+  if (session?.id) order.sessionId = session.id;
+  // Sessions created before metadata[quantity] existed can't be aligned safely.
+  const qty = Math.floor(Number(md.quantity));
+  if (!(qty >= 1) || !BUNDLE_KEYS.includes(md.bundle)) return order;
+  order.bundle = md.bundle;
+  order.quantity = qty;
+  if (md.subtotal !== undefined && Number.isFinite(Number(md.subtotal))) order.subtotal = Number(md.subtotal);
+  if (md.deliveryFee !== undefined && Number.isFinite(Number(md.deliveryFee))) order.deliveryFee = Number(md.deliveryFee);
+  const paid = Number(session?.amount_total) / 100;
+  if (Number.isFinite(paid)) order.price = paid;
+  return order;
+}
+
+// With the webhook configured, other paths only record a payment it has
+// clearly missed: one old enough that KV copies everywhere have settled.
+const WEBHOOK_GRACE_SEC = 600;
+
+function paymentAgeSec(session) {
+  const charge = session?.payment_intent?.latest_charge;
+  const created = charge && typeof charge === "object" ? Number(charge.created) : NaN;
+  return Number.isFinite(created) ? Date.now() / 1000 - created : null;
+}
+
+function mayRecordPaid(env, session) {
+  if (!env.STRIPE_WEBHOOK_SECRET) return true;
+  const age = paymentAgeSec(session);
+  return age !== null && age > WEBHOOK_GRACE_SEC;
+}
+
+function runLater(ctx, promise) {
+  const job = Promise.resolve(promise).catch((err) => console.log("background job failed", String(err?.message || err)));
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+  return job;
+}
+
+function expireStripeSession(env, sid) {
+  return fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sid)}/expire`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
+  });
+}
+
+/** Order as it looks once this session is paid (no KV writes). */
+function paidView(order, session) {
+  const view = { ...order, paymentStatus: "paid", stripe: { ...(order.stripe || {}), ...stripeDetailsFromSession(session) } };
+  return alignOrderWithSession(view, session);
+}
+
 /** Idempotently mark an order paid from a paid Checkout Session. */
 async function markOrderPaid(env, order, session) {
+  if (isRefunded(order, session)) return { order, newlyPaid: false, refunded: true };
   if (order.paymentStatus !== "paid") {
+    const held = order.stockHeld || { trays: traysFor(order), dozens: dozensFor(order) };
+    alignOrderWithSession(order, session);
+    // Stock already held (admin confirmed first) for other items: move it.
+    if (order.stockTaken && (held.trays !== traysFor(order) || held.dozens !== dozensFor(order))) {
+      const settings = await getSettings(env);
+      settings.traysAvailable = Math.max(0, settings.traysAvailable + held.trays - traysFor(order));
+      settings.dozensAvailable = Math.max(0, (settings.dozensAvailable || 0) + held.dozens - dozensFor(order));
+      await env.DATA.put("settings", JSON.stringify(settings));
+      order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
+    }
     order.paymentStatus = "paid";
-    order.sessionId = order.sessionId || session.id;
-    order.stripe = stripeDetailsFromSession(session);
+    order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
     // Paid customers jump the queue: auto-confirm and allocate trays.
     if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
     await syncStock(env, order, order.status);
     await env.DATA.put(order.id, JSON.stringify(order));
-    if (order.phone) await clearOpenOrder(env, order.phone);
+    if (order.phone) await clearOpenOrder(env, order.phone, order.id);
     return { order, newlyPaid: true };
   }
   if (!order.stripe?.amountTotal) {
-    order.stripe = stripeDetailsFromSession(session);
+    order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
     await env.DATA.put(order.id, JSON.stringify(order));
   }
   return { order, newlyPaid: false };
@@ -711,50 +808,149 @@ async function sendOrderConfirmationEmail(env, order) {
     payload.bcc = [{ email_address: { address: notify, name: STRIPE_BRAND } }];
   }
 
-  const resp = await fetch(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL), {
-    method: "POST",
-    headers: {
-      Authorization: `Zoho-enczapikey ${token.replace(/^Zoho-enczapikey\s+/i, "")}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  let resp;
+  try {
+    resp = await fetch(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL), {
+      method: "POST",
+      headers: {
+        Authorization: `Zoho-enczapikey ${token.replace(/^Zoho-enczapikey\s+/i, "")}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    return { ok: false, transient: true, error: String(err?.message || err).slice(0, 300) };
+  }
   const data = await resp.json().catch(() => null);
   if (!resp.ok) {
     const error = data?.error?.details?.[0]?.message || data?.error?.message || `HTTP ${resp.status}`;
-    return { ok: false, error: String(error).slice(0, 300) };
+    return { ok: false, transient: resp.status >= 500 || resp.status === 429, error: String(error).slice(0, 300) };
   }
   return { ok: true, to, requestId: data?.request_id || null };
 }
 
+/** Record a payment the live paths missed, from a fresh copy, and email the customer. */
+async function recordMissedPayment(env, orderId, session) {
+  const order = await env.DATA.get(orderId, "json");
+  if (!order) return null;
+  const result = await markOrderPaid(env, order, session);
+  if (result.newlyPaid) {
+    await maybeSendOrderEmail(env, orderId);
+    console.log("recorded missed payment", orderId);
+  }
+  return result;
+}
+
+function emailConfigured(env) {
+  return Boolean(String(env.ZEPTOMAIL_TOKEN || "").trim() && String(env.ORDER_EMAIL_FROM || "").trim());
+}
+
+// Side-effect markers live in their own keys: whole-order writes from other
+// paths (possibly from a stale KV copy) must not erase them.
+const emailSentKey = (orderId) => `email:sent:${orderId}`;
+const metaSentKey = (orderId) => `meta:sent:${orderId}`;
+const EMAIL_MAX_ATTEMPTS = 4;
+
 /**
- * Send the confirmation once per order. Webhook and success page can both
- * call this; the short claim key stops a double send when they race.
+ * Send the confirmation once per order. The short claim key stops a double
+ * send when two paths race in the same location; the sent marker is the
+ * record of truth.
  */
 async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
+  if (!emailConfigured(env)) return { ok: false, skipped: true, reason: "email not configured" };
   const order = await env.DATA.get(orderId, "json");
   if (!order || order.paymentStatus !== "paid") return { ok: false, skipped: true, reason: "not paid" };
-  if (!force && order.confirmationEmail?.sentAt) return { ok: true, already: true };
   const claimKey = `email:claim:${orderId}`;
   if (!force) {
-    if (await env.DATA.get(claimKey)) return { ok: true, already: true };
+    if (order.status === "cancelled") return { ok: false, skipped: true, reason: "cancelled" };
+    if (order.confirmationEmail?.sentAt || (await env.DATA.get(emailSentKey(orderId)))) {
+      return { ok: true, already: true };
+    }
+    if (await env.DATA.get(claimKey)) return { ok: false, inProgress: true };
     await env.DATA.put(claimKey, "1", { expirationTtl: 120 });
   }
   const result = await sendOrderConfirmationEmail(env, order).catch((err) => ({
     ok: false,
+    transient: true,
     error: String(err?.message || err),
   }));
-  const fresh = (await env.DATA.get(orderId, "json")) || order;
-  fresh.confirmationEmail = result.ok
-    ? { sentAt: new Date().toISOString(), to: result.to, requestId: result.requestId }
-    : { ...(fresh.confirmationEmail || {}), lastError: result.error || result.reason, lastTriedAt: new Date().toISOString() };
-  await env.DATA.put(orderId, JSON.stringify(fresh));
+  const now = new Date().toISOString();
+  try {
+    if (result.ok) {
+      await env.DATA.put(emailSentKey(orderId), JSON.stringify({ sentAt: now, to: result.to, requestId: result.requestId }));
+    }
+    const fresh = (await env.DATA.get(orderId, "json")) || order;
+    const prev = fresh.confirmationEmail || {};
+    fresh.confirmationEmail = result.ok
+      ? { sentAt: now, to: result.to, requestId: result.requestId, attempts: (prev.attempts || 0) + 1 }
+      : { ...prev, lastError: result.error || result.reason, lastTriedAt: now, attempts: (prev.attempts || 0) + 1 };
+    await env.DATA.put(orderId, JSON.stringify(fresh));
+  } catch (err) {
+    // Bookkeeping only; never turn a sent email into a failure.
+    console.log("order email bookkeeping failed", orderId, String(err?.message || err));
+  }
   if (!result.ok) {
-    await env.DATA.delete(claimKey).catch(() => null);
+    if (!force) await env.DATA.delete(claimKey).catch(() => null);
     console.log("order email not sent", orderId, result.error || result.reason);
   }
   return result;
+}
+
+// Orders paid before this (when sends began writing the email:sent marker)
+// are never emailed retroactively.
+const ORDER_EMAIL_LAUNCH = Date.parse("2026-10-22T10:57:00Z");
+
+/**
+ * Cron safety net (every 15 min). Both checks only touch payments at least
+ * WEBHOOK_GRACE_SEC old, so they never race the live webhook.
+ * 1. Paid Checkout Sessions (last 26 h) whose order is still unpaid: the
+ *    webhook was missed (wrong secret, outage) and so was the success page.
+ * 2. Recent paid orders with no confirmation email yet: retried a few times.
+ */
+async function reconcileOrders(env) {
+  if (env.STRIPE_KEY) {
+    const since = Math.floor(Date.now() / 1000) - 26 * 3600;
+    const list = await fetch(
+      `https://api.stripe.com/v1/checkout/sessions?status=complete&limit=100&created[gte]=${since}&expand[]=data.payment_intent.latest_charge`,
+      { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
+    ).then((r) => r.json()).catch(() => null);
+    for (const session of list?.data || []) {
+      const orderId = session?.metadata?.orderId;
+      if (session.payment_status !== "paid" || !String(orderId || "").startsWith("order:")) continue;
+      const age = paymentAgeSec(session);
+      if (age === null || age < WEBHOOK_GRACE_SEC) continue;
+      try {
+        const order = await env.DATA.get(orderId, "json");
+        if (!order || order.paymentStatus === "paid" || isRefunded(order, session)) continue;
+        await recordMissedPayment(env, orderId, session);
+        // Each one writes the shared "settings" key; KV allows one write per second.
+        await new Promise((r) => setTimeout(r, 1100));
+      } catch (err) {
+        console.log("reconcile failed", orderId, String(err?.message || err));
+      }
+    }
+  }
+
+  if (!emailConfigured(env)) return;
+  const now = Date.now();
+  for (const id of (await getOrderIndex(env)).slice(0, 40)) {
+    const order = await env.DATA.get(id, "json").catch(() => null);
+    if (!order || order.paymentStatus !== "paid" || order.status === "cancelled") continue;
+    const ce = order.confirmationEmail || {};
+    const paidAt = Date.parse(order.stripe?.paidAt || "") || 0;
+    if (
+      !ce.sentAt &&
+      paidAt > ORDER_EMAIL_LAUNCH &&
+      now - paidAt > WEBHOOK_GRACE_SEC * 1000 &&
+      now - paidAt < 3 * 24 * 3600 * 1000 &&
+      (ce.attempts || 0) < EMAIL_MAX_ATTEMPTS &&
+      now - (Date.parse(ce.lastTriedAt || "") || 0) > 10 * 60000
+    ) {
+      await maybeSendOrderEmail(env, id).catch((err) => console.log("email retry failed", id, String(err?.message || err)));
+    }
+  }
 }
 
 // How many physical trays an order consumes (dozen packs do not use tray stock)
@@ -785,10 +981,13 @@ async function syncStock(env, order, newStatus) {
     trayDelta = -traysFor(order);
     dozenDelta = -dozensFor(order);
     order.stockTaken = true;
+    order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
   } else if (!holds && order.stockTaken) {
-    trayDelta = traysFor(order);
-    dozenDelta = dozensFor(order);
+    // Release what was taken, even if the order's items were edited since.
+    trayDelta = order.stockHeld ? order.stockHeld.trays : traysFor(order);
+    dozenDelta = order.stockHeld ? order.stockHeld.dozens : dozensFor(order);
     order.stockTaken = false;
+    delete order.stockHeld;
   }
 
   if (trayDelta !== 0 || dozenDelta !== 0) {
@@ -925,7 +1124,7 @@ async function sendMetaPurchase(env, order, opts = {}) {
   if (!order || order.paymentStatus !== "paid") {
     return { ok: false, skipped: true, reason: "not_paid" };
   }
-  if (order.metaPurchaseSent && !opts.force) {
+  if (!opts.force && (order.metaPurchaseSent || (await env.DATA.get(metaSentKey(order.id)).catch(() => null)))) {
     return { ok: true, skipped: true, reason: "already_sent", eventId: order.id };
   }
 
@@ -995,12 +1194,22 @@ async function sendMetaPurchase(env, order, opts = {}) {
   };
 }
 
-async function markMetaPurchaseSent(env, order, metaResult) {
+async function markMetaPurchaseSent(env, order, metaResult, { writeOrder = true } = {}) {
   if (!order?.id || !metaResult?.ok || metaResult.skipped) return order;
+  const sentAt = new Date().toISOString();
+  const eventId = metaResult.eventId || order.id;
+  await env.DATA.put(metaSentKey(order.id), JSON.stringify({ sentAt, eventId }));
   order.metaPurchaseSent = true;
-  order.metaPurchaseSentAt = new Date().toISOString();
-  order.metaPurchaseEventId = metaResult.eventId || order.id;
-  await env.DATA.put(order.id, JSON.stringify(order));
+  order.metaPurchaseSentAt = sentAt;
+  order.metaPurchaseEventId = eventId;
+  if (writeOrder) {
+    // Patch a fresh copy so fields other paths wrote meanwhile survive.
+    const fresh = (await env.DATA.get(order.id, "json")) || order;
+    fresh.metaPurchaseSent = true;
+    fresh.metaPurchaseSentAt = sentAt;
+    fresh.metaPurchaseEventId = eventId;
+    await env.DATA.put(order.id, JSON.stringify(fresh));
+  }
   return order;
 }
 
@@ -1382,7 +1591,7 @@ async function handleApi(request, env, url, ctx) {
     maybeEnsureStripeBranding(env, ctx);
 
     const settings = await getSettings(env);
-    const result = await createCheckoutForOrder(env, order, settings);
+    const result = await createCheckoutForOrder(env, order, settings, ctx);
     if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
     return json(result);
   }
@@ -1538,8 +1747,26 @@ async function handleApi(request, env, url, ctx) {
       }
     }
 
+    let result = await createCheckoutForOrder(env, order, settings, ctx);
+    if (result.alreadyPaid) {
+      // The reused order was paid in the meantime, so this is a new purchase.
+      const now = new Date();
+      const {
+        sessionId: _s, paymentStatus: _p, stripe: _st, stockTaken: _t, updatedAt: _u,
+        confirmationEmail: _c, metaPurchaseSent: _m, metaPurchaseSentAt: _ma, metaPurchaseEventId: _me,
+        ...details
+      } = order;
+      order = {
+        ...details,
+        id: `order:${now.toISOString()}:${Math.random().toString(36).slice(2, 8)}`,
+        status: "new",
+        createdAt: now.toISOString(),
+      };
+      await pushOrderIndex(env, order.id);
+      result = await createCheckoutForOrder(env, order, settings, ctx);
+    }
+    // One write, with the final order id (KV allows one write per key per second).
     await rememberOpenOrder(env, phone, order.id);
-    const result = await createCheckoutForOrder(env, order, settings);
     if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
     return json({ ok: true, ...result });
   }
@@ -1576,8 +1803,11 @@ async function handleApi(request, env, url, ctx) {
 
     const order = await env.DATA.get(orderId, "json");
     if (!order) return json({ received: true, ignored: "order not found" });
-    await markOrderPaid(env, order, session);
-    const email = await maybeSendOrderEmail(env, orderId);
+    const { refunded } = await markOrderPaid(env, order, session);
+    if (refunded) return json({ received: true, ignored: "refunded" });
+    // The paid state is saved; email problems are retried by the cron, not by
+    // making Stripe redeliver.
+    const email = await maybeSendOrderEmail(env, orderId).catch((err) => ({ ok: false, error: String(err?.message || err) }));
     return json({ received: true, email: { ok: !!email.ok, reason: email.reason || email.error || null } });
   }
 
@@ -1606,11 +1836,18 @@ async function handleApi(request, env, url, ctx) {
     if (paid && orderId) {
       let order = await env.DATA.get(orderId, "json");
       if (order) {
-        ({ order } = await markOrderPaid(env, order, session));
-        // Backup for the webhook: send the confirmation if it has not gone out.
-        if (!order.confirmationEmail?.sentAt) {
-          const job = maybeSendOrderEmail(env, orderId);
-          if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+        if (env.STRIPE_WEBHOOK_SECRET) {
+          // The webhook is the single writer of the paid state. It often runs in
+          // another Cloudflare location, and KV is eventually consistent, so a
+          // second writer here could double-count stock or overwrite its record.
+          if (!isRefunded(order, session)) order = paidView(order, session);
+        } else {
+          let newlyPaid;
+          ({ order, newlyPaid } = await markOrderPaid(env, order, session));
+          if (newlyPaid) {
+            const job = maybeSendOrderEmail(env, orderId);
+            if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+          }
         }
 
         // Meta CAPI Purchase (dedupe with browser Pixel via event_id = order.id)
@@ -1622,7 +1859,7 @@ async function handleApi(request, env, url, ctx) {
           fbc: fbc || undefined,
         });
         if (meta?.ok && !meta.skipped) {
-          order = await markMetaPurchaseSent(env, order, meta);
+          order = await markMetaPurchaseSent(env, order, meta, { writeOrder: !env.STRIPE_WEBHOOK_SECRET });
         }
         purchase = {
           eventId: order.id,
@@ -1665,11 +1902,12 @@ async function handleApi(request, env, url, ctx) {
     if (meta?.ok && !meta.skipped) {
       order = await markMetaPurchaseSent(env, order, meta);
     }
+    const marker = order.metaPurchaseSent ? null : await env.DATA.get(metaSentKey(id), "json").catch(() => null);
     return json({
       ok: !!meta?.ok,
       orderId: id,
-      metaPurchaseSent: !!order.metaPurchaseSent,
-      metaPurchaseSentAt: order.metaPurchaseSentAt || null,
+      metaPurchaseSent: !!order.metaPurchaseSent || !!marker,
+      metaPurchaseSentAt: order.metaPurchaseSentAt || marker?.sentAt || null,
       ...meta,
       pixelId: metaPixelId(env),
     });
@@ -1709,7 +1947,7 @@ async function handleApi(request, env, url, ctx) {
     if (!env.STRIPE_KEY) return json({ error: "payments not configured" }, 503);
     const id = String(url.searchParams.get("id") || "");
     if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
-    const order = await env.DATA.get(id, "json");
+    let order = await env.DATA.get(id, "json");
     if (!order) return json({ error: "not found" }, 404);
     if (!order.sessionId) return json({ error: "no stripe session" }, 404);
 
@@ -1730,15 +1968,20 @@ async function handleApi(request, env, url, ctx) {
     const session = await resp.json();
     if (session.error) return json({ error: session.error.message || "stripe error" }, 502);
 
-    order.stripe = stripeDetailsFromSession(session);
-    if (session.payment_status === "paid") {
-      order.paymentStatus = "paid";
-      if (order.status === "new") order.status = "confirmed";
+    if (session.payment_status === "paid" && order.paymentStatus !== "paid" && !isRefunded(order, session)) {
+      if (mayRecordPaid(env, session)) {
+        order = (await recordMissedPayment(env, id, session))?.order || order;
+      } else {
+        // Recent payment: the webhook records it; this copy may be stale.
+        order = paidView(order, session);
+      }
+    } else {
+      order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
+      await env.DATA.put(id, JSON.stringify(order));
     }
-    await env.DATA.put(id, JSON.stringify(order));
     return json({
       ok: true,
-      paid: session.payment_status === "paid",
+      paid: order.paymentStatus === "paid",
       paymentStatus: order.paymentStatus || "pending",
       stripe: order.stripe,
       cached: false,
@@ -4280,6 +4523,11 @@ export default {
     ctx.waitUntil(
       runScheduledPoll(env).catch((err) => {
         console.log("price-watch poll failed", String(err?.message || err));
+      })
+    );
+    ctx.waitUntil(
+      reconcileOrders(env).catch((err) => {
+        console.log("order reconcile failed", String(err?.message || err));
       })
     );
   },
