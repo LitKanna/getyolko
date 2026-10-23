@@ -23,7 +23,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "143";
+const CSS_V = "144";
 const FONTS_V = "77";
 const IMG_V = "112";
 
@@ -408,18 +408,19 @@ ${links}
 function crumbsNav(trail) {
   const parts = trail.map(([name, p], i) =>
     i === trail.length - 1
-      ? `      <span aria-current="page">${name}</span>`
-      : `      <a href="${p}">${name}</a>\n      <span class="crumbs-sep" aria-hidden="true">/</span>`
+      ? `          <span aria-current="page">${name}</span>`
+      : `          <a href="${p}">${name}</a>\n          <span class="crumbs-sep" aria-hidden="true">/</span>`
   );
-  return `  <div class="wrap">
-    <nav class="crumbs" aria-label="Breadcrumb">
+  return `      <div class="wrap">
+        <nav class="crumbs" aria-label="Breadcrumb">
 ${parts.join("\n")}
-    </nav>
-  </div>`;
+        </nav>
+      </div>`;
 }
 
-function heroSection({ kicker, h1, sub, cta = "Order now", alt = HERO_ALT }) {
+function heroSection({ trail, kicker, h1, sub, cta = "Order now", alt = HERO_ALT }) {
   return `    <section class="hero">
+${crumbsNav(trail)}
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <p class="hero-kicker">${kicker}</p>
@@ -620,9 +621,9 @@ function suburbPage(s) {
     faqPage(path, faqs),
     BUSINESS_REF,
   ];
-  const body = `${crumbsNav(trail)}
-  <main>
+  const body = `  <main>
 ${heroSection({
+    trail,
     kicker: `${s.name} ${s.postcode} · ${s.region}`,
     h1: `Egg delivery<br><span>in ${s.name}</span>`,
     sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
@@ -683,9 +684,9 @@ function sydneyPage() {
               <span>${s.postcode} · ${s.region}</span>
             </a>
           </li>`).join("\n");
-  const body = `${crumbsNav(trail)}
-  <main>
+  const body = `  <main>
 ${heroSection({
+    trail,
     kicker: "Sydney-wide",
     h1: "Egg delivery<br><span>across Sydney</span>",
     sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning anywhere within 45&nbsp;km. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
@@ -733,9 +734,9 @@ function bulkPage() {
     ["Full box", 180, PRICE.box],
     ["10 boxes", 1800, PRICE.box * 10],
   ];
-  const body = `${crumbsNav(trail)}
-  <main>
+  const body = `  <main>
 ${heroSection({
+    trail,
     kicker: "Full box · 180 eggs",
     h1: "Bulk eggs<br><span>in Sydney</span>",
     sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about 40¢ an egg. Delivered Saturday morning, flat <strong>$${PRICE.delivery}</strong>.`,
@@ -806,9 +807,9 @@ function areasPage(existingHtml) {
   if (start === -1 || end === -1) throw new Error("areas markers not found in egg-delivery-areas.html");
   const list = existingHtml.slice(start, end + endMarker.length);
 
-  const body = `${crumbsNav(trail)}
-  <main>
+  const body = `  <main>
 ${heroSection({
+    trail,
     kicker: "Sydney · 45 km",
     h1: "Every suburb<br><span>we deliver to</span>",
     sub: `Nearly 700 Sydney suburbs get Saturday morning egg delivery for a flat <strong>$${PRICE.delivery}</strong>.`,
