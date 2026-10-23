@@ -306,10 +306,15 @@ h3 {
   border-bottom: 1px solid var(--line);
 }
 
+/* Copy sizes to its text and the photo to its square, and the pair is centred
+   in the wrap, so a wide screen never opens an empty gap between them. */
 .hero-grid {
+  /* Square photo size: capped by width and by the visible height. */
+  --hero-photo: min(560px, calc(var(--frame-h) - var(--topbar-h) - 112px));
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: clamp(24px, 2.8vw, 36px);
+  grid-template-columns: minmax(0, max-content) min(var(--hero-photo), 50%);
+  justify-content: center;
+  gap: clamp(32px, 3.5vw, 48px);
   align-items: stretch;
 }
 
@@ -387,11 +392,9 @@ h3 {
 
 .showcase-card {
   position: relative;
-  /* Square fills the media column; short viewports cap via width so ratio holds */
-  width: min(100%, calc(var(--frame-h) - var(--topbar-h) - 112px));
-  max-width: 560px;
+  /* Square fills the photo column; --hero-photo on .hero-grid sets its size */
+  width: 100%;
   aspect-ratio: 1 / 1;
-  margin-left: auto; /* sit against the copy gap, not the outer edge */
   overflow: hidden;
   border-radius: calc(var(--radius) + 2px);
   background: #1a1a18;
@@ -440,7 +443,8 @@ h3 {
 }
 
 /* Soft hold-frame while chalk price image swaps: never flash the dark card bg */
-.showcase-photo > img.chalk-hold {
+.showcase-photo > img.chalk-hold,
+.order-tray-photo > img.chalk-hold {
   position: absolute;
   inset: 0;
   z-index: 4;
@@ -457,12 +461,18 @@ h3 {
   object-position: left 20% top 12%;
 }
 
-.showcase-photo > img.chalk-hold.is-fading {
+.order-tray-photo > img.chalk-hold {
+  object-position: center;
+}
+
+.showcase-photo > img.chalk-hold.is-fading,
+.order-tray-photo > img.chalk-hold.is-fading {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .showcase-photo > img.chalk-hold {
+  .showcase-photo > img.chalk-hold,
+  .order-tray-photo > img.chalk-hold {
     transition: none;
   }
 }
@@ -608,6 +618,72 @@ h3 {
   margin-bottom: 30px;
   color: var(--muted);
   font-size: 15px;
+}
+
+.order-tray-note {
+  width: min(100%, clamp(180px, 38vw, 380px));
+  max-width: none;
+}
+
+.order-tray-rotator {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #1a1a18;
+  aspect-ratio: 1;
+}
+
+.order-tray-photo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+  pointer-events: none;
+}
+
+.order-tray-photo.is-leaving {
+  z-index: 1;
+  opacity: 0;
+}
+
+.order-tray-photo.is-active {
+  opacity: 1;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.order-tray-photo img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 600ms var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .order-tray-photo {
+    transition: none;
+  }
+
+  .order-tray-note:hover .order-tray-photo.is-active img {
+    transform: none;
+  }
+}
+
+.order-tray-note p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.order-tray-note strong {
+  color: var(--ink);
 }
 
 .order-form {
@@ -1322,6 +1398,19 @@ h3 {
 
   .order-copy {
     position: static;
+    display: grid;
+    grid-template-columns: 1fr minmax(140px, 320px);
+    gap: clamp(20px, 3vw, 36px);
+    align-items: end;
+  }
+
+  .order-copy > p {
+    grid-column: 1;
+  }
+
+  .order-tray-note {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 
@@ -1391,6 +1480,10 @@ h3 {
 
   .order-copy h2 {
     font-size: clamp(40px, 12vw + 1vh, 76px);
+  }
+
+  .order-tray-note {
+    max-width: none;
   }
 
   .order-form {
@@ -1471,12 +1564,8 @@ h3 {
   }
 
   .hero-grid {
-    gap: clamp(18px, 2.2vw, 28px);
-  }
-
-  .showcase-card {
-    width: min(100%, calc(var(--frame-h) - var(--topbar-h) - 88px));
-    max-width: 480px;
+    --hero-photo: min(480px, calc(var(--frame-h) - var(--topbar-h) - 88px));
+    gap: clamp(32px, 3.5vw, 48px);
   }
 
   .hero h1 {
@@ -1490,9 +1579,8 @@ h3 {
 }
 
 @media (max-height: 700px) and (min-width: 901px) {
-  .showcase-card {
-    width: min(100%, calc(var(--frame-h) - var(--topbar-h) - 72px));
-    max-width: 400px;
+  .hero-grid {
+    --hero-photo: min(400px, calc(var(--frame-h) - var(--topbar-h) - 72px));
   }
 
   .hero h1 {
@@ -1562,8 +1650,8 @@ body.local .hero-sub {
   max-width: 46ch;
 }
 
-body.local .showcase-card {
-  width: min(100%, 420px);
+body.local .hero-grid {
+  --hero-photo: 420px;
 }
 
 .crumbs {

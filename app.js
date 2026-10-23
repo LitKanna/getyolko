@@ -90,7 +90,7 @@ function clearOpenCheckout() {
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* ---------- Hero tray image auto-rotate ---------- */
+/* ---------- Hero / order tray image auto-rotate ---------- */
 const rotatorTimers = [];
 const HERO_SIZES = "(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)";
 const ASSET_CACHE_VER = "112";
@@ -108,7 +108,7 @@ function initImageRotators() {
   if (reducedMotion) return;
 
   document.querySelectorAll("[data-rotator]").forEach((root) => {
-    const slides = [...root.querySelectorAll(".showcase-photo")];
+    const slides = [...root.querySelectorAll(".showcase-photo, .order-tray-photo")];
     if (slides.length < 2) return;
 
     let index = slides.findIndex((slide) => slide.classList.contains("is-active"));
@@ -117,8 +117,8 @@ function initImageRotators() {
       slides[0].classList.add("is-active");
     }
 
-    const intervalMs = 12000;
-    const offsetMs = 0;
+    const intervalMs = root.dataset.rotator === "order" ? 14000 : 12000;
+    const offsetMs = root.dataset.rotator === "order" ? 3500 : 0;
     const fadeMs = 900;
     const state = { timeoutId: 0, intervalId: 0 };
 
@@ -198,6 +198,14 @@ function chalkHeroUrls(p) {
   };
 }
 
+function chalkOrderUrls(p) {
+  return {
+    primary: `assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}`,
+    webpSrcset: `assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}`,
+    alt: chalkAlt(p),
+  };
+}
+
 function waitMs(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -205,13 +213,14 @@ function waitMs(ms) {
 let chalkSwapToken = 0;
 
 async function swapChalkPicture(pic, p) {
+  const kind = pic.getAttribute("data-chalk-price");
   const source = pic.querySelector("source:not([data-chalk-hold])");
   const img = pic.querySelector("img:not([data-chalk-hold])");
   if (!img) return;
 
   if (img.dataset.chalkShowing === String(p)) return;
 
-  const urls = chalkHeroUrls(p);
+  const urls = kind === "hero" ? chalkHeroUrls(p) : chalkOrderUrls(p);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // No JPG preload here: the browser picks the WebP size from srcset, and the
@@ -228,15 +237,21 @@ async function swapChalkPicture(pic, p) {
   hold.classList.add("chalk-hold");
   pic.appendChild(hold);
 
-  if (source) {
-    source.srcset = urls.webpSrcset;
-    source.sizes = HERO_SIZES;
+  if (kind === "hero") {
+    if (source) {
+      source.srcset = urls.webpSrcset;
+      source.sizes = HERO_SIZES;
+    }
+    img.src = urls.primary;
+    img.srcset = urls.imgSrcset;
+    img.sizes = HERO_SIZES;
+    img.width = 1536;
+    img.height = 1536;
+  } else {
+    if (source) source.srcset = urls.webpSrcset;
+    img.src = urls.primary;
+    img.removeAttribute("srcset");
   }
-  img.src = urls.primary;
-  img.srcset = urls.imgSrcset;
-  img.sizes = HERO_SIZES;
-  img.width = 1536;
-  img.height = 1536;
   img.alt = urls.alt;
   img.dataset.chalkShowing = String(p);
 
@@ -310,6 +325,27 @@ function buildHeroPicture(item, index) {
     </picture>`;
 }
 
+function buildOrderPicture(item, index) {
+  const isChalk = item.kind === "chalk";
+  const active = index === 0 ? " is-active" : "";
+  const chalkAttr = isChalk ? ' data-chalk-price="order"' : "";
+  const idAttr = index === 0 ? ' id="order-tray-img"' : "";
+  if (isChalk) {
+    const p = chalkPriceKey(item.chalkPrice || BUNDLES.tray1.price);
+    return `<picture class="order-tray-photo${active}"${chalkAttr}>
+      <source type="image/webp" srcset="assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}">
+      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="${chalkAlt(p)}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
+    </picture>`;
+  }
+  const sq = item.square || {};
+  const jpg = withVer(sq.jpg || item.preview);
+  const webp = sq.webp ? withVer(sq.webp) : "";
+  return `<picture class="order-tray-photo${active}">
+      ${webp ? `<source type="image/webp" srcset="${webp}">` : ""}
+      <img${idAttr} src="${jpg}" alt="" width="560" height="560" loading="lazy" decoding="async">
+    </picture>`;
+}
+
 async function applyPublishedAssets(apiBase) {
   try {
     const res = await fetch(`${apiBase}/api/assets`, { credentials: "omit" });
@@ -322,7 +358,9 @@ async function applyPublishedAssets(apiBase) {
     if (published.length === 1 && published[0].kind === "chalk") return;
 
     const heroRoot = document.querySelector('.showcase-rotator[data-rotator="hero"]');
+    const orderRoot = document.querySelector('.order-tray-rotator[data-rotator="order"]');
     if (heroRoot) heroRoot.innerHTML = published.map(buildHeroPicture).join("");
+    if (orderRoot) orderRoot.innerHTML = published.map(buildOrderPicture).join("");
     applyChalkPriceImage(BUNDLES.tray1.price);
     initImageRotators();
   } catch (_) {
