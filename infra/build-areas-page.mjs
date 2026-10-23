@@ -24,13 +24,6 @@ const SUBURB_PAGES = [
 const NOT_A_SUBURB = /\b(dc|bc|mc|milpo|lpo|centre|university|westfield|square|plaza|mall|aerodrome|metro)\b/i;
 const SKIP_NAMES = new Set(["Wentworth Port", "Sydney South"]);
 
-const BANDS = [
-  { max: 10, label: "Under 10 km", open: true },
-  { max: 20, label: "10 to 20 km" },
-  { max: 30, label: "20 to 30 km" },
-  { max: 45, label: "30 to 45 km" },
-];
-
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -40,13 +33,14 @@ const rows = SUBURBS
   .map((s) => ({ ...s, q: quoteDelivery({ lat: s.lat, lng: s.lng, name: s.name, crossing: s.crossing }) }))
   .filter((s) => s.q.deliver);
 
-let prev = 0;
-const blocks = BANDS.map((band) => {
-  const inBand = rows
-    .filter((s) => s.q.roadKmEstimate > prev && s.q.roadKmEstimate <= band.max)
+// A to Z, one collapsed group per letter: people look for their suburb by name,
+// and the search box above the list opens the groups that match.
+const letters = [...new Set(rows.map((s) => s.name[0].toUpperCase()))].sort();
+const blocks = letters.map((letter) => {
+  const inGroup = rows
+    .filter((s) => s.name[0].toUpperCase() === letter)
     .sort((a, b) => a.name.localeCompare(b.name));
-  prev = band.max;
-  const items = inBand.map((s) => {
+  const items = inGroup.map((s) => {
     const pc = s.postcodes && s.postcodes.length ? ` <small>${esc(s.postcodes.join(", "))}</small>` : "";
     if (SUBURB_PAGES.includes(s.name)) {
       const slug = s.name.toLowerCase().replace(/[^a-z]+/g, "-");
@@ -55,8 +49,8 @@ const blocks = BANDS.map((band) => {
     return `            <li>${esc(s.name)}${pc}</li>`;
   });
   return [
-    `        <details class="area-band"${band.open ? " open" : ""}>`,
-    `          <summary>${band.label} <span>${inBand.length} suburbs</span></summary>`,
+    `        <details class="area-band">`,
+    `          <summary>${letter} <span>${inGroup.length} ${inGroup.length === 1 ? "suburb" : "suburbs"}</span></summary>`,
     `          <ul class="areas-list">`,
     ...items,
     `          </ul>`,
@@ -77,4 +71,4 @@ const out =
   html.slice(end);
 
 writeFileSync(PAGE, out);
-console.log(`egg-delivery-areas.html: ${rows.length} suburbs in ${BANDS.length} bands`);
+console.log(`egg-delivery-areas.html: ${rows.length} suburbs in ${letters.length} letter groups`);

@@ -185,12 +185,16 @@ function withVer(path) {
   return `${clean}${clean.includes("?") ? "&" : "?"}v=${ASSET_CACHE_VER}`;
 }
 
+function chalkAlt(p) {
+  return `Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $${p} a tray`;
+}
+
 function chalkHeroUrls(p) {
   return {
     primary: `assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}`,
     imgSrcset: `assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w`,
     webpSrcset: `assets/chalk-tray/${p}-640.webp?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.webp?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.webp?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.webp?v=${CHALK_ASSET_VER} 2048w`,
-    alt: `Pace Farm 30-egg tray for $${p}, delivered in Sydney`,
+    alt: chalkAlt(p),
   };
 }
 
@@ -198,7 +202,7 @@ function chalkOrderUrls(p) {
   return {
     primary: `assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}`,
     webpSrcset: `assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}`,
-    alt: `Pace Farm 30-egg tray for $${p}`,
+    alt: chalkAlt(p),
   };
 }
 
@@ -308,7 +312,7 @@ function buildHeroPicture(item, index) {
     const p = chalkPriceKey(BUNDLES.tray1.price);
     return `<picture class="showcase-photo${active}"${chalkAttr}>
       <source type="image/webp" srcset="assets/chalk-tray/${p}-640.webp?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.webp?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.webp?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.webp?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}">
-      <img${idAttr} src="assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}" srcset="assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}" alt="Pace Farm 30-egg tray for $${p}, delivered in Sydney" width="1536" height="1536" data-chalk-showing="${p}"${loading} decoding="async">
+      <img${idAttr} src="assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER}" srcset="assets/chalk-tray/${p}-640.jpg?v=${CHALK_ASSET_VER} 640w, assets/chalk-tray/${p}-928.jpg?v=${CHALK_ASSET_VER} 928w, assets/chalk-tray/${p}-1536.jpg?v=${CHALK_ASSET_VER} 1536w, assets/chalk-tray/${p}-2048.jpg?v=${CHALK_ASSET_VER} 2048w" sizes="${HERO_SIZES}" alt="${chalkAlt(p)}" width="1536" height="1536" data-chalk-showing="${p}"${loading} decoding="async">
     </picture>`;
   }
   const src = heroSrcset(item);
@@ -330,7 +334,7 @@ function buildOrderPicture(item, index) {
     const p = chalkPriceKey(item.chalkPrice || BUNDLES.tray1.price);
     return `<picture class="order-tray-photo${active}"${chalkAttr}>
       <source type="image/webp" srcset="assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}">
-      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="Pace Farm 30-egg tray for $${p}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
+      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="${chalkAlt(p)}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
     </picture>`;
   }
   const sq = item.square || {};
@@ -366,42 +370,6 @@ async function applyPublishedAssets(apiBase) {
 
 applyChalkPriceImage(BUNDLES.tray1.price);
 
-/* ---------- Ticker: always covers the screen, loops seamlessly ---------- */
-const TICKER_ITEMS = [
-  "Fresh eggs every week",
-  "30 eggs for $13",
-  "Pace Farm trays",
-  "Book online",
-];
-
-function renderTicker() {
-  const track = document.getElementById("ticker-track");
-  if (!track) return;
-
-  const dot = '<i>\u2B24</i>';
-  const base = TICKER_ITEMS.map((t) => `<span>${t}</span>${dot}`).join("");
-
-  // Measure one copy, then repeat until each half is wider than the screen,
-  // so the tail never leaves an empty gap before the loop restarts.
-  track.innerHTML = `<div class="ticker-half">${base}</div>`;
-  const half = track.firstElementChild;
-  const copies = Math.max(1, Math.ceil(window.innerWidth / Math.max(1, half.scrollWidth)));
-  const filled = base.repeat(copies);
-  track.innerHTML = `<div class="ticker-half">${filled}</div><div class="ticker-half">${filled}</div>`;
-
-  // Constant scroll speed regardless of content length
-  const speed = 65; // px per second
-  track.style.animationDuration = `${Math.round(track.firstElementChild.scrollWidth / speed)}s`;
-}
-
-renderTicker();
-
-let tickerResizeTimer;
-window.addEventListener("resize", () => {
-  clearTimeout(tickerResizeTimer);
-  tickerResizeTimer = setTimeout(renderTicker, 250);
-});
-
 /* ---------- Scroll effects, throttled to one update per frame ---------- */
 const topbar = document.querySelector(".topbar");
 let scrollTicking = false;
@@ -418,42 +386,6 @@ window.addEventListener("scroll", () => {
     requestAnimationFrame(onScrollFrame);
   }
 }, { passive: true });
-
-/* ---------- Scroll reveal ---------- */
-const revealTargets = document.querySelectorAll(
-  ".section-head, .price-card, .day-card, .steps, .trust-row p, .order-copy, .order-form, .faq details, .stock-note"
-);
-
-revealTargets.forEach((el, i) => {
-  el.classList.add("reveal");
-  el.style.setProperty("--reveal-delay", `${(i % 4) * 70}ms`);
-});
-
-if (!reducedMotion && "IntersectionObserver" in window) {
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("in");
-        io.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.15, rootMargin: "0px 0px -40px 0px" });
-
-  revealTargets.forEach((el) => io.observe(el));
-} else {
-  revealTargets.forEach((el) => el.classList.add("in"));
-}
-
-/* ---------- Cursor-following glow on price cards ---------- */
-if (!reducedMotion && window.matchMedia("(hover: hover)").matches) {
-  document.querySelectorAll(".price-card").forEach((card) => {
-    card.addEventListener("pointermove", (e) => {
-      const rect = card.getBoundingClientRect();
-      card.style.setProperty("--mx", `${e.clientX - rect.left}px`);
-      card.style.setProperty("--my", `${e.clientY - rect.top}px`);
-    });
-  });
-}
 
 /* ---------- Sticky mobile booking bar ---------- */
 const mobileCta = document.getElementById("mobile-cta");
@@ -833,9 +765,7 @@ function applySettings(settings) {
   const leadStrong = document.querySelector(".hero-sub strong");
   if (leadStrong) leadStrong.textContent = `$${p1}`;
 
-  // Ticker and mobile bar
-  TICKER_ITEMS[1] = `30 eggs for $${p1}`;
-  renderTicker();
+  // Mobile bar
   const ctaStrong = document.querySelector(".mobile-cta-text strong");
   if (ctaStrong) ctaStrong.textContent = `30 eggs · $${p1}`;
 
@@ -872,11 +802,9 @@ function applySettings(settings) {
     if (stock > 0) {
       stockNote.textContent = `${stock} ${stock === 1 ? "tray" : "trays"} left this week.`;
       stockNote.hidden = false;
-      stockNote.classList.add("in");
     } else {
       stockNote.textContent = "Sold out this week. Check back Wednesday.";
       stockNote.hidden = false;
-      stockNote.classList.add("in");
     }
   }
 
@@ -913,7 +841,7 @@ function applySeoMeta(settings) {
   const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday. 30-egg tray $${p1}, two trays $${p2}, 180-egg box $${pBox}. Flat $5 delivery within 45 km.`;
   const ogDescription = description;
   const image = `https://getyolko.com/assets/chalk-tray/${priceKey}-1536.jpg?v=${CHALK_ASSET_VER}`;
-  const imageAlt = `Fresh Pace Farm egg trays · $${p1}/tray`;
+  const imageAlt = chalkAlt(priceKey);
 
   document.title = title;
   setMetaContent("name", "description", description);
@@ -938,35 +866,27 @@ function applySeoMeta(settings) {
   const business = graph.find((n) => n && n["@id"] === "https://getyolko.com/#business");
   const product = graph.find((n) => n && n["@id"] === "https://getyolko.com/#product-tray");
   const product2 = graph.find((n) => n && n["@id"] === "https://getyolko.com/#product-tray2");
+  const productBox = graph.find((n) => n && n["@id"] === "https://getyolko.com/bulk-eggs-sydney#product-box");
 
   if (business) {
     business.image = [image];
-    business.description = `Fresh Pace Farm egg trays delivered to homes and cafés across Sydney on Saturday mornings. 30 eggs for $${p1}, delivery within 45 km of Flemington.`;
+    business.description = `Fresh Pace Farm egg trays delivered to homes and cafés across Sydney on Saturday mornings. 30 eggs for $${p1}, flat $${DELIVERY_FEE} delivery within 45 km.`;
     business.priceRange = `$${p1}-$${pBox}`;
-    business.openingHoursSpecification = [{
-      "@type": "OpeningHoursSpecification",
-      dayOfWeek: "Saturday",
-      opens: "07:00",
-      closes: "12:00",
-    }];
   }
 
-  if (product) {
-    product.image = image;
-    product.description = `30 fresh Pace Farm eggs for $${p1}. Delivered in Sydney.`;
-    if (!product.offers || typeof product.offers !== "object") product.offers = { "@type": "Offer" };
-    product.offers.price = Number(p1).toFixed(2);
-    product.offers.priceCurrency = "AUD";
-    product.offers.availability = "https://schema.org/InStock";
-    product.offers.url = "https://getyolko.com/#order";
-    product.offers.seller = { "@id": "https://getyolko.com/#business" };
-  }
-
-  if (product2 && product2.offers && typeof product2.offers === "object") {
-    product2.image = image;
-    product2.description = `Two 30-egg Pace Farm trays for $${p2}. Delivered Saturday mornings in Sydney.`;
-    product2.offers.price = Number(p2).toFixed(2);
-  }
+  // Same wording as infra/build-pages.mjs, with live prices.
+  const soldOut = Number(settings.traysAvailable) === 0;
+  [
+    [product, p1, `30 fresh Pace Farm eggs for $${p1}. Delivered Saturday mornings in Sydney.`],
+    [product2, p2, `Two 30-egg Pace Farm trays for $${p2}. Delivered Saturday mornings in Sydney.`],
+    [productBox, pBox, `Six 30-egg Pace Farm XL cage trays, 180 eggs, for $${pBox}. Saturday delivery across Sydney.`],
+  ].forEach(([node, price, text]) => {
+    if (!node || !node.offers || typeof node.offers !== "object") return;
+    node.image = [image];
+    node.description = text;
+    node.offers.price = Number(price).toFixed(2);
+    node.offers.availability = soldOut ? "https://schema.org/OutOfStock" : "https://schema.org/InStock";
+  });
 
   script.textContent = JSON.stringify(data);
 }
@@ -975,22 +895,18 @@ const PRODUCT_TYPES = {
   "1.75": {
     shortSpec: "Cage · Extra large · 1.75kg",
     faq: "Pace Farm cage eggs, 30 to a tray (1.75kg). The same supermarket brand, for less.",
-    alt: "Cage eggs · 1.75kg tray",
   },
   "1.5": {
     shortSpec: "Cage · Large · 1.5kg",
     faq: "Pace Farm cage eggs, 30 to a tray (1.5kg). The same supermarket brand, for less.",
-    alt: "Cage eggs · 1.5kg tray",
   },
   "fr-700": {
     shortSpec: "Free range · 700g",
     faq: "Pace Farm free range eggs, 700g pack. The same brand you'll find in the big supermarkets, for less.",
-    alt: "Free range · 700g Pace Farm eggs",
   },
   "fr-600": {
     shortSpec: "Free range · 600g",
     faq: "Pace Farm free range eggs, 600g pack. The same brand you'll find in the big supermarkets, for less.",
-    alt: "Free range · 600g Pace Farm eggs",
   },
 };
 
@@ -1001,10 +917,6 @@ function applyProductType(key) {
   // Price cards use quantity/audience copy (not product-weight lines).
   const faqEggs = document.getElementById("faq-eggs");
   if (faqEggs) faqEggs.textContent = product.faq;
-  const heroImg = document.getElementById("hero-tray-img");
-  if (heroImg) heroImg.alt = `${product.alt}, fresh Pace Farm tray`;
-  const orderImg = document.getElementById("order-tray-img");
-  if (orderImg) orderImg.alt = product.alt;
 }
 
 function formatTime(hhmm) {
@@ -1097,9 +1009,6 @@ function applyPickup(pickup) {
     stats[2].querySelector("dd").textContent = "Sat delivery";
   }
 
-  TICKER_ITEMS[2] = "Pace Farm trays";
-  renderTicker();
-
   const ctaSpan = document.querySelector(".mobile-cta-text span");
   if (ctaSpan) ctaSpan.textContent = "Saturday delivery";
 
@@ -1150,7 +1059,7 @@ if (paidSession && paidSession.startsWith("cs_")) {
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
       if (d && d.paid) {
-        showToast("Payment received! Your eggs are locked in. See you at the market. 🥚");
+        showToast("Payment received. Your eggs are booked for Saturday delivery.");
         trackMetaPurchase(d.purchase);
       }
     })
@@ -1471,7 +1380,7 @@ function showConfirmation(b) {
   receipt.order.textContent = b.orderLabel;
   receipt.pickup.textContent = isDelivery
     ? `Saturday ${b.pickupDate} delivery · ${b.deliveryAddress}`
-    : `${b.pickupDay} ${b.pickupDate} at Paddy's Markets Flemington`;
+    : `${b.pickupDay} ${b.pickupDate}`;
   receipt.total.textContent = `$${b.total}`;
 
   const hint = document.querySelector(".done-hint");
@@ -1541,7 +1450,7 @@ async function startBuyNow() {
       return;
     }
     if (result?.error === "delivery_range") {
-      failBuy(result.message || "We only deliver within 45 km of our hub.");
+      failBuy(result.message || "We only deliver within 45 km.");
       return;
     }
     if (result?.error === "delivery_address") {

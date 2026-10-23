@@ -4622,6 +4622,9 @@ export default {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
       "X-Yolko-Build": "186",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Strict-Transport-Security": "max-age=31536000",
     };
     // Let browsers revalidate expired files with a cheap 304 instead of a full download.
     const etag = upstreamResp.headers.get("ETag");
