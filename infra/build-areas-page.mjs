@@ -23,6 +23,8 @@ const SUBURB_PAGES = [
 // Postcode-dataset rows that are mail centres, malls, or bad data, not places people live.
 const NOT_A_SUBURB = /\b(dc|bc|mc|milpo|lpo|centre|university|westfield|square|plaza|mall|aerodrome|metro)\b/i;
 const SKIP_NAMES = new Set(["Wentworth Port", "Sydney South"]);
+// 2129 is the Sydney Markets postcode. Checkout still accepts it, but it is never shown.
+const HIDDEN_POSTCODES = new Set(["2129"]);
 
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -41,7 +43,8 @@ const blocks = letters.map((letter) => {
     .filter((s) => s.name[0].toUpperCase() === letter)
     .sort((a, b) => a.name.localeCompare(b.name));
   const items = inGroup.map((s) => {
-    const pc = s.postcodes && s.postcodes.length ? ` <small>${esc(s.postcodes.join(", "))}</small>` : "";
+    const shown = (s.postcodes || []).filter((code) => !HIDDEN_POSTCODES.has(code));
+    const pc = shown.length ? ` <small>${esc(shown.join(", "))}</small>` : "";
     if (SUBURB_PAGES.includes(s.name)) {
       const slug = s.name.toLowerCase().replace(/[^a-z]+/g, "-");
       return `            <li><a href="/egg-delivery-${slug}">${esc(s.name)}${pc}</a></li>`;

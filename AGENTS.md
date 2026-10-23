@@ -22,6 +22,14 @@ python3 -m http.server 8080
 
 Then open http://localhost:8080. No install is required just to view/use the site.
 
+### Generated pages (non-obvious)
+The suburb pages (`egg-delivery-*.html`), `egg-delivery-sydney.html`, `bulk-eggs-sydney.html`,
+`egg-delivery-areas.html`, `404.html`, `sitemap.xml`, and the JSON-LD and FAQ blocks inside
+`index.html` are generated. Edit `infra/build-pages.mjs` (copy, prices, `CSS_V`, structured data)
+or `infra/build-areas-page.mjs` (the A to Z suburb list), then run
+`node infra/build-pages.mjs && node infra/build-areas-page.mjs`. Never put the Sydney Markets
+address or its 2129 postcode on any page: YOLKO is a home-based, service-area business.
+
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into
 `--vvh` / `--app-height` before paint. Hero/showcase CSS uses `--frame-h` from that,

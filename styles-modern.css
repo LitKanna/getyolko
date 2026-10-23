@@ -294,7 +294,6 @@ h3 {
   transition: transform 180ms var(--ease);
 }
 
-
 /* Hero: dense first-screen composition inside the page wrap.
    CRITICAL: do not set width:100% on .hero-grid — it shares the node with
    .wrap and would override the max-width, stretching copy|image to the
@@ -317,17 +316,16 @@ h3 {
 .hero-copy {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   min-width: 0;
   padding: 0;
   /* Contribute 0 to row sizing so the square image alone sets the height,
-     then stretch to that height — keeps stats from pushing past the image. */
+     then stretch to that height and centre the copy beside it. */
   height: 0;
   min-height: 100%;
 }
 
-.hero-kicker,
-.section-label {
+.hero-kicker {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -338,7 +336,6 @@ h3 {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-
 
 .hero h1 {
   /* Wide enough for "FRESH EGGS," / "TO YOUR DOOR." (HTML <br> sets the break). */
@@ -378,44 +375,6 @@ h3 {
 .hero-cta .btn {
   min-height: 48px;
   padding-inline: 22px;
-}
-
-.hero-stats {
-  max-width: 380px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-  /* Pin to bottom of the stretched copy column (= image bottom) */
-  margin-top: auto;
-  padding-top: clamp(14px, 2 * var(--vvh), 20px);
-  border-top: 1px solid var(--line);
-}
-
-.hero-stats div {
-  min-width: 0;
-  padding-right: 18px;
-}
-
-.hero-stats div + div {
-  padding-left: 18px;
-  border-left: 1px solid var(--line);
-}
-
-.hero-stats dt {
-  margin-bottom: 3px;
-  font-family: var(--display);
-  font-size: clamp(20px, 2.2vw, 28px);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  transition: color 180ms ease, transform 180ms var(--ease);
-}
-
-
-.hero-stats dd {
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .hero-showcase {
@@ -481,8 +440,7 @@ h3 {
 }
 
 /* Soft hold-frame while chalk price image swaps: never flash the dark card bg */
-.showcase-photo > img.chalk-hold,
-.order-tray-photo > img.chalk-hold {
+.showcase-photo > img.chalk-hold {
   position: absolute;
   inset: 0;
   z-index: 4;
@@ -499,22 +457,15 @@ h3 {
   object-position: left 20% top 12%;
 }
 
-.order-tray-photo > img.chalk-hold {
-  object-position: center;
-}
-
-.showcase-photo > img.chalk-hold.is-fading,
-.order-tray-photo > img.chalk-hold.is-fading {
+.showcase-photo > img.chalk-hold.is-fading {
   opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .showcase-photo > img.chalk-hold,
-  .order-tray-photo > img.chalk-hold {
+  .showcase-photo > img.chalk-hold {
     transition: none;
   }
 }
-
 
 @media (prefers-reduced-motion: reduce) {
   .showcase-photo {
@@ -528,65 +479,6 @@ h3 {
 
 .showcase-price {
   display: none !important;
-}
-
-.showcase-tag {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  /* Above chalk-hold (z-index 4) and slide fades — otherwise the badge
-     disappears/flickers during price swaps and Chrome backdrop sampling. */
-  z-index: 5;
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid rgba(23, 23, 20, 0.18);
-  border-radius: 4px;
-  /* Solid frosted look without backdrop-filter: Chrome flickers glass
-     badges when the layer underneath is mid opacity/transform animation. */
-  background: rgba(255, 255, 255, 0.94);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-/* Proof strip */
-.trust {
-  border-bottom: 1px solid var(--line);
-  background: var(--paper);
-}
-
-.trust-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.trust-row p {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  padding: 26px 22px;
-  transition: background 180ms ease;
-}
-
-.trust-row p:first-child {
-  padding-left: 0;
-}
-
-.trust-row p + p {
-  border-left: 1px solid var(--line);
-}
-
-
-.trust-row strong {
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.trust-row span {
-  color: var(--muted);
-  font-size: 11px;
 }
 
 /* Section headers */
@@ -618,256 +510,15 @@ h3 {
   font-size: 16px;
 }
 
-/* Bundles: deliberately a list, not a row of generic SaaS cards */
-.prices {
-  padding: var(--section-pad) 0;
-}
-
-.price-grid {
-  border-top: 1px solid var(--ink);
-}
-
-.dozen-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  border-top: 0;
-  margin-top: 8px;
-}
-
-.price-card.compact {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 18px 16px;
-  border: 1px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
-  background: var(--paper);
-  min-height: 0;
-}
-
-
-.price-card.compact .price-big {
-  font-size: clamp(28px, 4vw, 40px);
-}
-
-.price-card.compact .btn {
-  width: 100%;
-  justify-content: center;
-}
-
-@media (max-width: 800px) {
-  .dozen-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 520px) {
-  .dozen-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.price-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 150px;
-  gap: clamp(22px, 3vw, 48px);
-  align-items: center;
-  padding: 26px 12px;
-  border-bottom: 1px solid var(--line);
-  transition: padding 220ms var(--ease), background 220ms ease;
-}
-
-
-.price-card.featured {
-  background: var(--yellow);
-}
-
-
-.pack-title {
-  min-width: 0;
-}
-
-.price-card h3 {
-  margin: 0;
-  font-size: clamp(24px, 2.5vw, 34px);
-  font-weight: 800;
-}
-
-.pack-note {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.featured .pack-note,
-.featured .price-per {
-  color: rgba(23, 23, 20, 0.65);
-}
-
-.price-block {
-  text-align: right;
-}
-
-.price-big {
-  margin: 0;
-  font-family: var(--display);
-  font-size: clamp(40px, 4vw, 58px);
-  font-weight: 800;
-  line-height: 0.9;
-  letter-spacing: -0.055em;
-}
-
-.price-per {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.price-card .btn {
-  justify-self: end;
-}
-
 .stock-note {
   width: fit-content;
-  margin: 28px 0 0;
+  margin: -8px 0 0;
   padding: 10px 12px;
   border-left: 4px solid var(--orange);
   background: var(--paper);
   font-size: 12px;
   font-weight: 800;
 }
-
-/* Pickup */
-.pickup {
-  padding: var(--section-pad) 0;
-  color: var(--white);
-  background: var(--ink);
-}
-
-.pickup-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(min(100%, 280px), 0.85fr);
-  gap: clamp(32px, 6vw, 80px);
-  align-items: start;
-}
-
-.pickup .section-label,
-.pickup .section-head p {
-  color: rgba(255, 255, 255, 0.58);
-}
-
-.pickup .section-head {
-  margin-bottom: 44px;
-}
-
-.pickup .section-head h2 {
-  max-width: 8ch;
-}
-
-.day-cards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-.day-card {
-  padding: 24px 20px 24px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.24);
-  transition: padding 180ms var(--ease), color 180ms ease;
-}
-
-.day-card + .day-card {
-  padding-left: 24px;
-  border-left: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-
-.day-name {
-  margin-bottom: 8px;
-  color: var(--yellow);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
-.day-time {
-  margin-bottom: 6px;
-  font-family: var(--display);
-  font-size: clamp(22px, 2.4vw, 31px);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-}
-
-.day-note {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 11px;
-}
-
-.pickup .btn-ghost {
-  color: var(--white);
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-.pickup .btn-ghost:hover {
-  color: var(--ink);
-  border-color: var(--white);
-  background: var(--white);
-}
-
-.steps-card {
-  padding: 40px;
-  border-radius: 10px;
-  color: var(--ink);
-  background: var(--yellow);
-}
-
-.steps-title {
-  margin-bottom: 32px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.steps {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: steps;
-}
-
-.steps li {
-  position: relative;
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 16px;
-  align-items: center;
-  padding: 18px 0;
-  border-top: 1px solid rgba(23, 23, 20, 0.22);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.steps li span {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  font-family: var(--display);
-  font-weight: 800;
-  transition: color 180ms ease, background 180ms ease, transform 180ms var(--ease);
-}
-
 
 /* Delivery areas (SEO + clarity) */
 .areas {
@@ -957,73 +608,6 @@ h3 {
   margin-bottom: 30px;
   color: var(--muted);
   font-size: 15px;
-}
-
-.order-tray-note {
-  width: min(100%, clamp(180px, 38vw, 380px));
-  max-width: none;
-}
-
-.order-tray-rotator {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  border-radius: var(--radius);
-  background: #1a1a18;
-  aspect-ratio: 1;
-}
-
-.order-tray-photo {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  opacity: 0;
-  transition: opacity 900ms var(--ease);
-  pointer-events: none;
-}
-
-.order-tray-photo.is-leaving {
-  z-index: 1;
-  opacity: 0;
-}
-
-.order-tray-photo.is-active {
-  opacity: 1;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.order-tray-photo img {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: center;
-  transition: transform 600ms var(--ease);
-}
-
-
-@media (prefers-reduced-motion: reduce) {
-  .order-tray-photo {
-    transition: none;
-  }
-
-  .order-tray-note:hover .order-tray-photo.is-active img {
-    transform: none;
-  }
-}
-
-.order-tray-note p {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.order-tray-note strong {
-  color: var(--ink);
 }
 
 .order-form {
@@ -1721,10 +1305,6 @@ h3 {
     padding-top: 0;
   }
 
-  .hero-stats {
-    margin-top: clamp(18px, 3vw, 28px);
-  }
-
   .hero h1 {
     max-width: 14ch;
   }
@@ -1735,16 +1315,6 @@ h3 {
     margin-inline: auto;
   }
 
-  .price-card {
-    grid-template-columns: 1fr auto;
-  }
-
-  .price-card .btn {
-    grid-column: 1 / -1;
-    justify-self: stretch;
-  }
-
-  .pickup-grid,
   .order-grid {
     grid-template-columns: 1fr;
     gap: clamp(28px, 5vw, 56px);
@@ -1752,19 +1322,6 @@ h3 {
 
   .order-copy {
     position: static;
-    display: grid;
-    grid-template-columns: 1fr minmax(140px, 320px);
-    gap: clamp(20px, 3vw, 36px);
-    align-items: end;
-  }
-
-  .order-copy > p {
-    grid-column: 1;
-  }
-
-  .order-tray-note {
-    grid-column: 2;
-    grid-row: 1 / span 2;
   }
 }
 
@@ -1810,49 +1367,8 @@ h3 {
     font-size: clamp(14px, 3.6vw, 16px);
   }
 
-  .hero-stats {
-    padding-top: clamp(12px, 2.5svh, 20px);
-  }
-
-  .hero-stats div {
-    padding-right: 10px;
-  }
-
-  .hero-stats div + div {
-    padding-left: 10px;
-  }
-
-  .hero-stats dd {
-    font-size: 9px;
-  }
-
   .showcase-card {
     max-width: min(100%, 440px);
-  }
-
-  .showcase-tag {
-    top: clamp(10px, 3vw, 14px);
-    right: clamp(10px, 3vw, 14px);
-  }
-
-  .trust-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .trust-row p {
-    padding: clamp(14px, 3vw, 20px) clamp(10px, 2.5vw, 14px);
-  }
-
-  .trust-row p:first-child {
-    padding-left: clamp(10px, 2.5vw, 14px);
-  }
-
-  .trust-row p:nth-child(3) {
-    border-left: 0;
-  }
-
-  .trust-row p:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
   }
 
   .section-head {
@@ -1864,47 +1380,9 @@ h3 {
     font-size: clamp(36px, 11vw + 1vh, 72px);
   }
 
-  .prices,
-  .pickup,
   .order,
   .faq {
     padding-block: var(--section-pad);
-  }
-
-  .price-card {
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    padding: 22px 5px;
-  }
-
-  .price-block {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .price-big {
-    font-size: clamp(28px, 8vw, 38px);
-  }
-
-  .price-card .btn {
-    grid-column: 1 / -1;
-  }
-
-  .pickup-grid {
-    gap: clamp(28px, 5vw, 46px);
-  }
-
-  .day-cards {
-    grid-template-columns: 1fr;
-  }
-
-  .day-card + .day-card {
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .steps-card {
-    padding: clamp(20px, 4vw, 28px) clamp(16px, 3.5vw, 24px);
   }
 
   .order-copy {
@@ -1913,10 +1391,6 @@ h3 {
 
   .order-copy h2 {
     font-size: clamp(40px, 12vw + 1vh, 76px);
-  }
-
-  .order-tray-note {
-    max-width: none;
   }
 
   .order-form {
@@ -1984,9 +1458,6 @@ h3 {
 
 /* Extra-narrow phones / landscape short viewports */
 @media (max-width: 400px) {
-  .hero-stats dt {
-    font-size: clamp(20px, 6vw, 24px);
-  }
 
   .picker {
     grid-template-columns: 1fr 1fr;
@@ -2016,15 +1487,6 @@ h3 {
   .hero-sub {
     margin-bottom: 14px;
   }
-
-  .hero-stats {
-    /* keep margin-top: auto so bottom still locks to image */
-    padding-top: 12px;
-  }
-
-  .hero-stats dt {
-    font-size: clamp(16px, 2vw, 22px);
-  }
 }
 
 @media (max-height: 700px) and (min-width: 901px) {
@@ -2035,10 +1497,6 @@ h3 {
 
   .hero h1 {
     font-size: clamp(34px, 3.2vw + 1.8 * var(--vvh), 56px);
-  }
-
-  .hero-stats {
-    display: none;
   }
 
   .hero-grid {
@@ -2070,10 +1528,6 @@ h3 {
   .hero-sub {
     margin-bottom: 14px;
     font-size: clamp(13px, 3.4vw, 15px);
-  }
-
-  .hero-stats {
-    padding-top: 10px;
   }
 
   .showcase-card {

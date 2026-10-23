@@ -90,7 +90,7 @@ function clearOpenCheckout() {
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* ---------- Hero / order tray image auto-rotate ---------- */
+/* ---------- Hero tray image auto-rotate ---------- */
 const rotatorTimers = [];
 const HERO_SIZES = "(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)";
 const ASSET_CACHE_VER = "112";
@@ -108,7 +108,7 @@ function initImageRotators() {
   if (reducedMotion) return;
 
   document.querySelectorAll("[data-rotator]").forEach((root) => {
-    const slides = [...root.querySelectorAll(".showcase-photo, .order-tray-photo")];
+    const slides = [...root.querySelectorAll(".showcase-photo")];
     if (slides.length < 2) return;
 
     let index = slides.findIndex((slide) => slide.classList.contains("is-active"));
@@ -117,8 +117,8 @@ function initImageRotators() {
       slides[0].classList.add("is-active");
     }
 
-    const intervalMs = root.dataset.rotator === "order" ? 14000 : 12000;
-    const offsetMs = root.dataset.rotator === "order" ? 3500 : 0;
+    const intervalMs = 12000;
+    const offsetMs = 0;
     const fadeMs = 900;
     const state = { timeoutId: 0, intervalId: 0 };
 
@@ -198,14 +198,6 @@ function chalkHeroUrls(p) {
   };
 }
 
-function chalkOrderUrls(p) {
-  return {
-    primary: `assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}`,
-    webpSrcset: `assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}`,
-    alt: chalkAlt(p),
-  };
-}
-
 function waitMs(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -213,14 +205,13 @@ function waitMs(ms) {
 let chalkSwapToken = 0;
 
 async function swapChalkPicture(pic, p) {
-  const kind = pic.getAttribute("data-chalk-price");
   const source = pic.querySelector("source:not([data-chalk-hold])");
   const img = pic.querySelector("img:not([data-chalk-hold])");
   if (!img) return;
 
   if (img.dataset.chalkShowing === String(p)) return;
 
-  const urls = kind === "hero" ? chalkHeroUrls(p) : chalkOrderUrls(p);
+  const urls = chalkHeroUrls(p);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // No JPG preload here: the browser picks the WebP size from srcset, and the
@@ -237,21 +228,15 @@ async function swapChalkPicture(pic, p) {
   hold.classList.add("chalk-hold");
   pic.appendChild(hold);
 
-  if (kind === "hero") {
-    if (source) {
-      source.srcset = urls.webpSrcset;
-      source.sizes = HERO_SIZES;
-    }
-    img.src = urls.primary;
-    img.srcset = urls.imgSrcset;
-    img.sizes = HERO_SIZES;
-    img.width = 1536;
-    img.height = 1536;
-  } else {
-    if (source) source.srcset = urls.webpSrcset;
-    img.src = urls.primary;
-    img.removeAttribute("srcset");
+  if (source) {
+    source.srcset = urls.webpSrcset;
+    source.sizes = HERO_SIZES;
   }
+  img.src = urls.primary;
+  img.srcset = urls.imgSrcset;
+  img.sizes = HERO_SIZES;
+  img.width = 1536;
+  img.height = 1536;
   img.alt = urls.alt;
   img.dataset.chalkShowing = String(p);
 
@@ -325,27 +310,6 @@ function buildHeroPicture(item, index) {
     </picture>`;
 }
 
-function buildOrderPicture(item, index) {
-  const isChalk = item.kind === "chalk";
-  const active = index === 0 ? " is-active" : "";
-  const chalkAttr = isChalk ? ' data-chalk-price="order"' : "";
-  const idAttr = index === 0 ? ' id="order-tray-img"' : "";
-  if (isChalk) {
-    const p = chalkPriceKey(item.chalkPrice || BUNDLES.tray1.price);
-    return `<picture class="order-tray-photo${active}"${chalkAttr}>
-      <source type="image/webp" srcset="assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}">
-      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="${chalkAlt(p)}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
-    </picture>`;
-  }
-  const sq = item.square || {};
-  const jpg = withVer(sq.jpg || item.preview);
-  const webp = sq.webp ? withVer(sq.webp) : "";
-  return `<picture class="order-tray-photo${active}">
-      ${webp ? `<source type="image/webp" srcset="${webp}">` : ""}
-      <img${idAttr} src="${jpg}" alt="" width="560" height="560" loading="lazy" decoding="async">
-    </picture>`;
-}
-
 async function applyPublishedAssets(apiBase) {
   try {
     const res = await fetch(`${apiBase}/api/assets`, { credentials: "omit" });
@@ -358,9 +322,7 @@ async function applyPublishedAssets(apiBase) {
     if (published.length === 1 && published[0].kind === "chalk") return;
 
     const heroRoot = document.querySelector('.showcase-rotator[data-rotator="hero"]');
-    const orderRoot = document.querySelector('.order-tray-rotator[data-rotator="order"]');
     if (heroRoot) heroRoot.innerHTML = published.map(buildHeroPicture).join("");
-    if (orderRoot) orderRoot.innerHTML = published.map(buildOrderPicture).join("");
     applyChalkPriceImage(BUNDLES.tray1.price);
     initImageRotators();
   } catch (_) {
@@ -416,14 +378,6 @@ const DELIVERY_FEE = 5;
 function currentFulfillment() {
   // Storefront is delivery-only (no market pickup).
   return "delivery";
-}
-
-function setBundle(key) {
-  const radio = document.querySelector(`input[name="bundle"][value="${key}"]`);
-  if (radio) {
-    radio.checked = true;
-    refreshSubmitPrice();
-  }
 }
 
 function currentPickupDay() {
@@ -724,8 +678,6 @@ const DOZEN_PUBLIC_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "f
 /** Dozen packs stay off the public site until admin sets stock > 0. */
 function applyDozenVisibility(settings) {
   const live = Number(settings.dozensAvailable) > 0;
-  const block = document.getElementById("dozen-block");
-  if (block) block.hidden = !live;
   document.querySelectorAll("[data-dozen-picker]").forEach((el) => {
     el.hidden = !live;
   });
@@ -751,17 +703,11 @@ function applySettings(settings) {
   });
 
   const p1 = BUNDLES.tray1.price;
-  const perEgg = Math.round((p1 / 30) * 100);
 
   cacheTray1Price(p1);
   applyChalkPriceImage(p1);
 
   // Hero
-  const badge = document.querySelector(".badge-price");
-  if (badge) badge.textContent = `$${p1}`;
-  const stats = document.querySelectorAll(".hero-stats dt");
-  if (stats[0]) stats[0].textContent = `$${p1}`;
-  if (stats[1]) stats[1].innerHTML = `${perEgg}&cent;`;
   const leadStrong = document.querySelector(".hero-sub strong");
   if (leadStrong) leadStrong.textContent = `$${p1}`;
 
@@ -769,30 +715,10 @@ function applySettings(settings) {
   const ctaStrong = document.querySelector(".mobile-cta-text strong");
   if (ctaStrong) ctaStrong.textContent = `30 eggs · $${p1}`;
 
-  // Price cards: trays only (dozen cards use #price-* ids)
-  const trayCards = document.querySelectorAll(".price-grid:not(.dozen-grid) .price-big");
-  const trayPers = document.querySelectorAll(".price-grid:not(.dozen-grid) .price-per");
-  if (trayCards[0]) trayCards[0].textContent = `$${BUNDLES.tray1.price}`;
-  if (trayCards[1]) trayCards[1].textContent = `$${BUNDLES.tray2.price}`;
-  if (trayCards[2]) trayCards[2].textContent = `$${BUNDLES.box.price}`;
-  const perEgg2 = Math.round((BUNDLES.tray2.price / 60) * 100);
-  const perEggBox = Math.round((BUNDLES.box.price / 180) * 100);
-  if (trayPers[0]) trayPers[0].innerHTML = `30 eggs · ${perEgg}&cent; each`;
-  if (trayPers[1]) trayPers[1].innerHTML = `60 eggs · ${perEgg2}&cent; each`;
-  if (trayPers[2]) trayPers[2].innerHTML = `180 eggs · ${perEggBox}&cent; each`;
-
   // Form options and submit chip
-  const bpTray1 = document.getElementById("bp-tray1");
-  const bpTray2 = document.getElementById("bp-tray2");
-  const bpBox = document.getElementById("bp-box");
-  if (bpTray1) bpTray1.textContent = `$${BUNDLES.tray1.price}`;
-  if (bpTray2) bpTray2.textContent = `$${BUNDLES.tray2.price}`;
-  if (bpBox) bpBox.textContent = `$${BUNDLES.box.price}`;
   BUNDLE_KEYS.forEach((key) => {
     const el = document.getElementById("bp-" + key);
     if (el) el.textContent = "$" + BUNDLES[key].price;
-    const card = document.getElementById("price-" + key);
-    if (card) card.textContent = "$" + BUNDLES[key].price;
   });
   refreshSubmitPrice();
 
@@ -893,28 +819,21 @@ function applySeoMeta(settings) {
 
 const PRODUCT_TYPES = {
   "1.75": {
-    shortSpec: "Cage · Extra large · 1.75kg",
     faq: "Pace Farm cage eggs, 30 to a tray (1.75kg). The same supermarket brand, for less.",
   },
   "1.5": {
-    shortSpec: "Cage · Large · 1.5kg",
     faq: "Pace Farm cage eggs, 30 to a tray (1.5kg). The same supermarket brand, for less.",
   },
   "fr-700": {
-    shortSpec: "Free range · 700g",
     faq: "Pace Farm free range eggs, 700g pack. The same brand you'll find in the big supermarkets, for less.",
   },
   "fr-600": {
-    shortSpec: "Free range · 600g",
     faq: "Pace Farm free range eggs, 600g pack. The same brand you'll find in the big supermarkets, for less.",
   },
 };
 
 function applyProductType(key) {
   const product = PRODUCT_TYPES[key] || PRODUCT_TYPES["1.75"];
-  const traySpec = document.getElementById("tray-spec");
-  if (traySpec) traySpec.textContent = product.shortSpec;
-  // Price cards use quantity/audience copy (not product-weight lines).
   const faqEggs = document.getElementById("faq-eggs");
   if (faqEggs) faqEggs.textContent = product.faq;
 }
@@ -980,34 +899,6 @@ function applyPickupDaysOnly(pickup) {
 
 function applyPickup(pickup) {
   window.__YOLKO_PICKUP = pickup;
-
-  // Delivery section cards: keep policy details here only.
-  const cardsBox = document.querySelector(".day-cards");
-  if (cardsBox) {
-    const satDate = nextPickupDate("Saturday");
-    cardsBox.innerHTML = `
-      <article class="day-card">
-        <p class="day-name">Saturday ${satDate}</p>
-        <p class="day-time">Morning delivery</p>
-        <p class="day-note">Book by Friday night</p>
-      </article>
-      <article class="day-card">
-        <p class="day-name">+$${DELIVERY_FEE}</p>
-        <p class="day-time">Flat fee</p>
-        <p class="day-note">Within 45&nbsp;km</p>
-      </article>`;
-  }
-
-  const pickupTitle = document.getElementById("pickup-title");
-  if (pickupTitle) {
-    pickupTitle.innerHTML = "Saturday.<br>To your door.";
-  }
-
-  const stats = document.querySelectorAll(".hero-stats div");
-  if (stats[2]) {
-    stats[2].querySelector("dt").textContent = `+$${DELIVERY_FEE}`;
-    stats[2].querySelector("dd").textContent = "Sat delivery";
-  }
 
   const ctaSpan = document.querySelector(".mobile-cta-text span");
   if (ctaSpan) ctaSpan.textContent = "Saturday delivery";
@@ -1078,13 +969,6 @@ function showToast(text) {
     setTimeout(() => toast.remove(), 400);
   }, 6000);
 }
-
-// Price-card buttons preselect the bundle in the form
-document.querySelectorAll("[data-bundle]").forEach((link) => {
-  link.addEventListener("click", () => {
-    setBundle(link.dataset.bundle);
-  });
-});
 
 // Validate the form and collect the booking; returns null after flagging errors
 function collectBooking() {

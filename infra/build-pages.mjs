@@ -378,14 +378,16 @@ ${META_PIXEL}
 }
 
 const NAV = [
-  ["Prices", "/#prices"],
   ["Delivery", "/egg-delivery-sydney"],
   ["Areas", "/egg-delivery-areas"],
+  ["Bulk eggs", "/bulk-eggs-sydney"],
   ["FAQ", "#faq"],
 ];
 
 function header(path) {
   const links = NAV.map(([label, href]) => {
+    // The 404 page has no FAQ of its own.
+    if (href === "#faq" && path === "/404") href = "/#faq";
     const current = href === path ? ' aria-current="page"' : "";
     return `        <a href="${href}"${current}>${label}</a>`;
   }).join("\n");
@@ -425,7 +427,6 @@ function heroSection({ kicker, h1, sub, cta = "Order now", alt = HERO_ALT }) {
           <p class="hero-sub">${sub}</p>
           <div class="hero-cta">
             <a class="btn btn-solid" href="/#order">${cta}</a>
-            <a class="btn btn-ghost" href="/#prices">See prices</a>
           </div>
         </div>
         <div class="hero-showcase">
@@ -521,9 +522,8 @@ function footer(path) {
         </div>
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
-          <a href="/#prices">Prices</a>
-          <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
           <a href="/#order">Order now</a>
+          <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
