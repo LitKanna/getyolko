@@ -30,6 +30,12 @@ or `infra/build-areas-page.mjs` (the A to Z suburb list), then run
 `node infra/build-pages.mjs && node infra/build-areas-page.mjs`. Never put the Sydney Markets
 address or its 2129 postcode on any page: YOLKO is a home-based, service-area business.
 
+### Look (Kanna's choice, Oct 2026)
+"Quiet local shop": one font (Plus Jakarta Sans), black text on an ivory page, normal-size
+sentence-case headings with no trailing full stop, no orange. Yolk yellow only on the logo
+dot and the Order / Buy buttons (`.btn-solid`); selected options get a black outline, not a
+fill. Never change, swap or re-crop the site images.
+
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into
 `--vvh` / `--app-height` before paint. Hero/showcase CSS uses `--frame-h` from that,

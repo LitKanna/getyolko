@@ -23,7 +23,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "144";
+const CSS_V = "145";
 const FONTS_V = "77";
 const IMG_V = "112";
 
@@ -338,7 +338,7 @@ function head({ path, title, description, graph, index = true, hero = true }) {
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
   <meta name="robots" content="${robots}">
-  <meta name="theme-color" content="#ffd32a">
+  <meta name="theme-color" content="#faf7f0">
   <meta name="geo.region" content="AU-NSW">
   <meta name="geo.placename" content="Sydney">
 
@@ -363,7 +363,6 @@ ${index ? `\n  <link rel="canonical" href="${url}">` : ""}
   <link rel="sitemap" type="application/xml" href="/sitemap.xml">
   <link rel="icon" type="image/svg+xml" href="${a("assets/favicon.svg")}">
   <link rel="apple-touch-icon" href="${a("assets/yolko-app-icon-1024.png")}">
-  <link rel="preload" as="font" type="font/woff2" href="${a("assets/fonts/3y9K6as8bTXq_nANBjzKo3IeZx8z6up5BeSl9D4dj_x9PpZBMlGIInE.woff2")}" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="${a("assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2")}" crossorigin>${hero ? `
   <link rel="preload" as="image" type="image/webp" imagesrcset="${heroSrcset("webp")}" imagesizes="${HERO_SIZES}" fetchpriority="high">` : ""}
   <link rel="stylesheet" href="${a(`assets/fonts.css?v=${FONTS_V}`)}">
@@ -625,7 +624,7 @@ function suburbPage(s) {
 ${heroSection({
     trail,
     kicker: `${s.name} ${s.postcode} · ${s.region}`,
-    h1: `Egg delivery<br><span>in ${s.name}</span>`,
+    h1: `Egg delivery<br>in ${s.name}`,
     sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
     alt: `${HERO_ALT}. Delivered to ${s.name}`,
   })}
@@ -688,7 +687,7 @@ function sydneyPage() {
 ${heroSection({
     trail,
     kicker: "Sydney-wide",
-    h1: "Egg delivery<br><span>across Sydney</span>",
+    h1: "Egg delivery<br>across Sydney",
     sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning anywhere within 45&nbsp;km. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
   })}
 
@@ -738,7 +737,7 @@ function bulkPage() {
 ${heroSection({
     trail,
     kicker: "Full box · 180 eggs",
-    h1: "Bulk eggs<br><span>in Sydney</span>",
+    h1: "Bulk eggs<br>in Sydney",
     sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about 40¢ an egg. Delivered Saturday morning, flat <strong>$${PRICE.delivery}</strong>.`,
     cta: "Order a box",
     alt: `${HERO_ALT}. Six trays make a 180-egg box`,
@@ -811,7 +810,7 @@ function areasPage(existingHtml) {
 ${heroSection({
     trail,
     kicker: "Sydney · 45 km",
-    h1: "Every suburb<br><span>we deliver to</span>",
+    h1: "Every suburb<br>we deliver to",
     sub: `Nearly 700 Sydney suburbs get Saturday morning egg delivery for a flat <strong>$${PRICE.delivery}</strong>.`,
   })}
 
