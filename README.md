@@ -6,7 +6,7 @@ Online store for fresh Pace Farm egg trays, delivered across Sydney on Saturday 
 ## Configure (config.js)
 
 After editing `config.js`, `app.js` or `styles-modern.css`, bump its `?v=` in `index.html`
-(and the `egg-delivery-*.html` pages for the stylesheet) so browsers fetch the new file.
+(and `CSS_V` in `infra/build-pages.mjs` for the stylesheet, then rerun it) so browsers fetch the new file.
 
 - `whatsappNumber` — enables a one-tap WhatsApp booking button
 - Payments use Stripe Checkout via the Worker (`/api/checkout`); stock and prices come from `/admin`
