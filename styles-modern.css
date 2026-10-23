@@ -306,6 +306,15 @@ h3 {
   border-bottom: 1px solid var(--line);
 }
 
+/* Homepage: the hero fills the first screen below the top bar, so the order
+   form starts below the fold instead of peeking in at the bottom edge. */
+#top > .hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(var(--frame-h) - var(--topbar-h));
+}
+
 /* Copy sizes to its text and the photo to its square, and the pair is centred
    in the wrap, so a wide screen never opens an empty gap between them. */
 .hero-grid {
