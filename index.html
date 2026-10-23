@@ -80,7 +80,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=141">
+  <link rel="stylesheet" href="styles-modern.css?v=142">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -629,6 +629,36 @@
         <div class="order-copy">
           <h2>Buy eggs.</h2>
           <p>Order by Friday night. We deliver Saturday morning, anywhere within 45&nbsp;km, for a flat $5.</p>
+
+          <div class="order-tray-note">
+            <div class="order-tray-rotator" data-rotator="order" aria-hidden="true">
+              <picture class="order-tray-photo is-active" data-chalk-price="order">
+                <source type="image/webp">
+                <img id="order-tray-img" width="560" height="560" loading="lazy" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray">
+              </picture>
+              <script>
+              (function () {
+                var FALLBACK = 13, VER = "112", MIN = 1, MAX = 30;
+                var p = (window.__YOLKO_TRAY1 >= MIN && window.__YOLKO_TRAY1 <= MAX) ? window.__YOLKO_TRAY1 : FALLBACK;
+                try {
+                  var c = Math.round(Number(localStorage.getItem("yolko.tray1Price")));
+                  if (c >= MIN && c <= MAX) p = c;
+                } catch (e) {}
+                window.__YOLKO_TRAY1 = p;
+                var pic = document.currentScript.previousElementSibling;
+                var source = pic && pic.querySelector("source");
+                var img = pic && pic.querySelector("img");
+                if (source) source.srcset = "assets/chalk-tray/" + p + "-square-560.webp?v=" + VER;
+                if (img) {
+                  img.src = "assets/chalk-tray/" + p + "-square-560.jpg?v=" + VER;
+                  img.alt = "Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $" + p + " a tray";
+                  img.dataset.chalkShowing = String(p);
+                }
+              })();
+              </script>
+            </div>
+            <p><strong>30 eggs</strong> a tray · Pace Farm</p>
+          </div>
         </div>
 
         <form id="order-form" class="order-form">
@@ -947,6 +977,6 @@
   </footer>
 
   <script src="config.js?v=89"></script>
-  <script src="app.js?v=145"></script>
+  <script src="app.js?v=146"></script>
 </body>
 </html>
