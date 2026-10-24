@@ -308,8 +308,8 @@ p {
 }
 
 /* The hero fills the first screen below the top bar, so the next section
-   starts below the fold instead of peeking in at the bottom edge. Landing
-   pages keep their breadcrumbs at the top; the grid centres in the rest. */
+   starts below the fold instead of peeking in at the bottom edge. The grid
+   (breadcrumbs included, on landing pages) centres in that height. */
 #top > .hero,
 body.local .hero {
   display: flex;
@@ -324,17 +324,16 @@ body.local .hero > .hero-grid {
 
 .hero .crumbs {
   padding-top: 0;
-  margin-bottom: clamp(16px, 2.4 * var(--vvh), 28px);
+  margin-bottom: clamp(14px, 2 * var(--vvh), 22px);
 }
 
-/* Copy sizes to its text and the photo to its square, and the pair is centred
-   in the wrap, so a wide screen never opens an empty gap between them. */
+/* Copy starts at the wrap's left edge and the photo ends at its right edge,
+   so the hero lines up with the header and every section below it. */
 .hero-grid {
   /* Square photo size: capped by width and by the visible height. */
   --hero-photo: min(560px, calc(var(--frame-h) - var(--topbar-h) - 112px));
   display: grid;
-  grid-template-columns: minmax(0, max-content) min(var(--hero-photo), 50%);
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr) min(var(--hero-photo), 50%);
   gap: clamp(32px, 3.5vw, 48px);
   align-items: stretch;
 }
