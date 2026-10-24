@@ -23,7 +23,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "145";
+const CSS_V = "146";
 const FONTS_V = "77";
 const IMG_V = "112";
 
@@ -407,21 +407,19 @@ ${links}
 function crumbsNav(trail) {
   const parts = trail.map(([name, p], i) =>
     i === trail.length - 1
-      ? `          <span aria-current="page">${name}</span>`
-      : `          <a href="${p}">${name}</a>\n          <span class="crumbs-sep" aria-hidden="true">/</span>`
+      ? `            <span aria-current="page">${name}</span>`
+      : `            <a href="${p}">${name}</a>\n            <span class="crumbs-sep" aria-hidden="true">/</span>`
   );
-  return `      <div class="wrap">
-        <nav class="crumbs" aria-label="Breadcrumb">
+  return `          <nav class="crumbs" aria-label="Breadcrumb">
 ${parts.join("\n")}
-        </nav>
-      </div>`;
+          </nav>`;
 }
 
 function heroSection({ trail, kicker, h1, sub, cta = "Order now", alt = HERO_ALT }) {
   return `    <section class="hero">
-${crumbsNav(trail)}
       <div class="wrap hero-grid">
         <div class="hero-copy">
+${crumbsNav(trail)}
           <p class="hero-kicker">${kicker}</p>
           <h1>${h1}</h1>
           <p class="hero-sub">${sub}</p>
