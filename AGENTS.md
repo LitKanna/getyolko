@@ -65,6 +65,10 @@ email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN
 (defaults to Zoho CPaaS `https://cpaas.zoho.com/v1.1/email`; same API as ZeptoMail). Without them the webhook
 returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
 sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
+Refunds email the customer once per refund (`email:refund:<refundId>` marker): the admin Refund
+button sends for refunds it creates (tagged `metadata.orderId`), and the webhook's
+`charge.refunded` handler records and emails refunds made in the Stripe dashboard. Admin
+"Customer emails" card (`POST /api/admin/test-email {to}`) sends sample emails without touching orders.
 
 ### No lint / test / build tooling
 There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder
