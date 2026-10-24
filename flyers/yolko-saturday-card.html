@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YOLKO — Saturday Delivery Flyer Card</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #fff6dc;
+      --red: #e31b23;
+      --yellow: #ffd200;
+      --blue: #0057b8;
+      --green: #008a3c;
+      --green-deep: #0a6b38;
+      --green-soft: #d9f0e2;
+      --ink: #14301f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #d8d2c4;
+      padding: 24px;
+      font-family: "Nunito", "Outfit", system-ui, sans-serif;
+    }
+
+    body.export {
+      margin: 0;
+      padding: 0;
+      min-height: 0;
+      display: block;
+      background: #fff;
+    }
+
+    body.export .card {
+      box-shadow: none;
+    }
+
+    /* Print card: 1080 × 1620 @1x (Instagram portrait / A5-ish) */
+    .card {
+      position: relative;
+      width: 1080px;
+      height: 1620px;
+      overflow: hidden;
+      background: var(--cream);
+      color: var(--ink);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    }
+
+    .wave {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .wave-tl {
+      top: -60px;
+      left: -110px;
+      width: 460px;
+      height: 320px;
+      background: var(--green);
+      border-radius: 0 0 78% 52% / 0 0 88% 70%;
+      transform: rotate(-6deg);
+    }
+
+    .wave-tr {
+      top: -90px;
+      right: -120px;
+      width: 420px;
+      height: 300px;
+      background: var(--yellow);
+      border-radius: 0 0 58% 80% / 0 0 70% 90%;
+      transform: rotate(8deg);
+    }
+
+    .wave-ml {
+      top: 270px;
+      left: -150px;
+      width: 320px;
+      height: 460px;
+      background: var(--red);
+      border-radius: 62% 78% 58% 72%;
+      transform: rotate(12deg);
+    }
+
+    .wave-ml-2 {
+      top: 400px;
+      left: -90px;
+      width: 240px;
+      height: 320px;
+      background: var(--green);
+      border-radius: 68% 52% 64% 48%;
+      transform: rotate(-8deg);
+    }
+
+    .wave-mr {
+      top: 280px;
+      right: -160px;
+      width: 340px;
+      height: 440px;
+      background: var(--yellow);
+      border-radius: 48% 70% 58% 66%;
+      transform: rotate(-10deg);
+    }
+
+    .wave-mr-2 {
+      top: 430px;
+      right: -100px;
+      width: 250px;
+      height: 340px;
+      background: var(--blue);
+      border-radius: 60% 48% 70% 55%;
+      transform: rotate(14deg);
+    }
+
+    .hen {
+      position: absolute;
+      top: 54px;
+      left: 72px;
+      width: 86px;
+      height: 86px;
+      color: #fff;
+    }
+
+    .spark {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fff;
+    }
+    .spark.y { background: var(--yellow); }
+    .spark.s1 { top: 340px; left: 210px; }
+    .spark.s2 { top: 520px; left: 180px; width: 8px; height: 8px; }
+    .spark.s3 { top: 360px; right: 200px; }
+    .spark.s4 { top: 560px; right: 170px; width: 7px; height: 7px; background: var(--yellow); }
+
+    .slash {
+      position: absolute;
+      width: 18px;
+      height: 4px;
+      background: #fff;
+      border-radius: 2px;
+      transform: rotate(-35deg);
+    }
+    .slash.a { top: 470px; left: 200px; }
+    .slash.b { top: 490px; right: 195px; background: var(--yellow); }
+
+    .brand-block {
+      position: relative;
+      z-index: 2;
+      padding-top: 88px;
+      text-align: center;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0;
+      font-family: "Outfit", sans-serif;
+      font-weight: 900;
+      font-size: 118px;
+      letter-spacing: -0.03em;
+      line-height: 0.9;
+    }
+
+    .logo .c-g { color: var(--green); }
+    .logo .c-y { color: var(--yellow); }
+    .logo .c-b { color: var(--blue); }
+    .logo .c-r { color: var(--red); }
+
+    .logo .yolk {
+      position: relative;
+      display: inline-block;
+      color: var(--yellow);
+    }
+
+    .logo .yolk::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 52%;
+      width: 0.42em;
+      height: 0.42em;
+      border-radius: 50%;
+      background: #fff;
+      transform: translate(-50%, -50%);
+    }
+
+    .logo .yolk .rays {
+      position: absolute;
+      left: 50%;
+      top: -0.08em;
+      width: 0.7em;
+      height: 0.35em;
+      transform: translateX(-50%);
+    }
+
+    .logo .yolk .rays i {
+      position: absolute;
+      bottom: 0;
+      width: 3px;
+      height: 14px;
+      background: var(--yellow);
+      border-radius: 2px;
+    }
+    .logo .yolk .rays i:nth-child(1) { left: 50%; transform: translateX(-50%) rotate(-28deg); height: 12px; }
+    .logo .yolk .rays i:nth-child(2) { left: 50%; transform: translateX(-50%); height: 16px; }
+    .logo .yolk .rays i:nth-child(3) { left: 50%; transform: translateX(-50%) rotate(28deg); height: 12px; }
+
+    .tagline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 14px;
+      color: var(--green-deep);
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: 0.14em;
+    }
+
+    .tagline::before,
+    .tagline::after {
+      content: "";
+      width: 56px;
+      height: 3px;
+      background: var(--yellow);
+      border-radius: 2px;
+    }
+
+    .offer {
+      position: relative;
+      z-index: 2;
+      margin-top: 34px;
+      text-align: center;
+    }
+
+    .offer h1 {
+      font-family: "Outfit", sans-serif;
+      font-weight: 900;
+      font-size: 92px;
+      letter-spacing: -0.03em;
+      line-height: 0.95;
+    }
+
+    .offer h1 .n { color: var(--red); }
+    .offer h1 .t { color: var(--blue); }
+
+    .pill {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 12px 28px;
+      border-radius: 999px;
+      background: var(--green-deep);
+      color: #fff;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: 0.08em;
+    }
+
+    .tray-wrap {
+      position: relative;
+      z-index: 2;
+      width: 620px;
+      margin: 28px auto 0;
+      filter: drop-shadow(0 18px 28px rgba(20, 48, 31, 0.18));
+    }
+
+    .tray-wrap img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 18px;
+    }
+
+    .services {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr 1px 1fr;
+      align-items: start;
+      gap: 0 18px;
+      width: 860px;
+      margin: 34px auto 0;
+      color: var(--blue);
+      text-align: center;
+    }
+
+    .services .divider {
+      width: 1px;
+      height: 78px;
+      margin-top: 8px;
+      background: rgba(0, 87, 184, 0.28);
+      justify-self: center;
+    }
+
+    .svc svg {
+      display: block;
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 10px;
+      stroke: var(--blue);
+      fill: none;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .svc p {
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.06em;
+      line-height: 1.25;
+    }
+
+    .cta-box {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap: 28px;
+      align-items: center;
+      width: 900px;
+      margin: 36px auto 0;
+      padding: 28px 32px;
+      border: 4px solid var(--green);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .deliver-row {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .truck-badge {
+      width: 78px;
+      height: 78px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .deliver-copy .small {
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+    }
+
+    .deliver-copy .big {
+      margin-top: 2px;
+      color: var(--red);
+      font-family: "Outfit", sans-serif;
+      font-weight: 900;
+      font-size: 42px;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .deliver-copy .rule {
+      width: 100%;
+      height: 2px;
+      margin: 14px 0 10px;
+      background: rgba(0, 138, 60, 0.35);
+    }
+
+    .deliver-copy .sub {
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .qr-col {
+      text-align: center;
+    }
+
+    .qr-col img {
+      width: 168px;
+      height: 168px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 8px;
+      border-radius: 8px;
+    }
+
+    .scan {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 8px 22px;
+      border-radius: 999px;
+      background: var(--green);
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+    }
+
+    .url {
+      margin-top: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #222;
+    }
+
+    .footer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      background: var(--green-deep);
+      color: #fff;
+    }
+
+    .dots {
+      display: grid;
+      grid-template-columns: repeat(4, 10px);
+      gap: 8px;
+    }
+
+    .dots i {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .foot-brand {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .nest {
+      width: 54px;
+      height: 54px;
+    }
+
+    .foot-text {
+      padding-left: 18px;
+      border-left: 2px solid rgba(255, 255, 255, 0.55);
+    }
+
+    .foot-text strong {
+      display: block;
+      font-family: "Outfit", sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.08em;
+      line-height: 1;
+    }
+
+    .foot-text span {
+      display: block;
+      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      opacity: 0.92;
+    }
+  </style>
+</head>
+<body>
+  <article class="card" id="flyer" aria-label="YOLKO Saturday delivery flyer">
+    <div class="wave wave-tl"></div>
+    <div class="wave wave-tr"></div>
+    <div class="wave wave-ml"></div>
+    <div class="wave wave-ml-2"></div>
+    <div class="wave wave-mr"></div>
+    <div class="wave wave-mr-2"></div>
+
+    <svg class="hen" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M18 40c2-10 10-16 18-16 6 0 12 3 15 8 4 6 3 14-2 18-4 4-10 5-16 4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="40" cy="28" r="2.2" fill="currentColor"/>
+      <path d="M33 22c2-5 7-8 12-7M28 44c-6 2-12 1-16-3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M22 48h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>
+
+    <i class="spark s1"></i>
+    <i class="spark s2"></i>
+    <i class="spark y s3"></i>
+    <i class="spark s4"></i>
+    <i class="slash a"></i>
+    <i class="slash b"></i>
+
+    <header class="brand-block">
+      <div class="logo" aria-label="Yolko">
+        <span class="c-g">Y</span><span class="c-y">o</span><span class="c-b">l</span><span class="c-r">k</span><span class="yolk">o<span class="rays" aria-hidden="true"><i></i><i></i><i></i></span></span>
+      </div>
+      <p class="tagline">FRESH EGGS. BETTER EVERY DAY.</p>
+    </header>
+
+    <section class="offer">
+      <h1><span class="n">30</span> <span class="t">FRESH EGGS</span></h1>
+      <p class="pill">30 PACK | CAGE EGGS</p>
+    </section>
+
+    <div class="tray-wrap">
+      <img src="assets/tray-multicolor.png" alt="Tray of 30 fresh brown eggs" width="1200" height="1200">
+    </div>
+
+    <section class="services" aria-label="Who we deliver to">
+      <div class="svc">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 22 L24 10 L40 22 V40 H8 Z"/><path d="M18 40 V28 H30 V40"/></svg>
+        <p>DELIVERED<br>TO HOMES</p>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <div class="svc">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M16 20h14c4 0 7 3 7 7s-3 7-7 7H16V20z"/>
+          <path d="M16 34h14"/>
+          <path d="M20 14c0-3 2-5 4-5M26 14c0-3 2-5 4-5M32 14c0-3 2-5 4-5"/>
+        </svg>
+        <p>DELIVERED<br>TO CAFES</p>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <div class="svc">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="34" rx="14" ry="5"/><path d="M10 34c0-8 6-14 14-14s14 6 14 14"/><path d="M24 12v8"/><circle cx="24" cy="10" r="2.5"/></svg>
+        <p>DELIVERED<br>TO RESTAURANTS</p>
+      </div>
+    </section>
+
+    <section class="cta-box">
+      <div class="deliver-row">
+        <div class="truck-badge" aria-hidden="true">
+          <svg width="42" height="42" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 30h28V16H4z"/>
+            <path d="M32 22h8l4 6v2H32z"/>
+            <circle cx="14" cy="34" r="3.5"/>
+            <circle cx="36" cy="34" r="3.5"/>
+          </svg>
+        </div>
+        <div class="deliver-copy">
+          <p class="small">WE DELIVER</p>
+          <p class="big">EVERY SATURDAY</p>
+          <div class="rule"></div>
+          <p class="sub">Fresh eggs, on time. Every Saturday.</p>
+        </div>
+      </div>
+      <div class="qr-col">
+        <img src="assets/qr-getyolko.png" alt="QR code to getyolko.com" width="290" height="290">
+        <p class="scan">SCAN ME</p>
+        <p class="url">Visit getyolko.com</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="dots" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i>
+      </div>
+      <div class="foot-brand">
+        <svg class="nest" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <ellipse cx="32" cy="40" rx="18" ry="10" stroke="#fff" stroke-width="3"/>
+          <path d="M16 38c4 6 12 10 16 10s12-4 16-10" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="32" cy="28" rx="10" ry="13" fill="#fff"/>
+        </svg>
+        <div class="foot-text">
+          <strong>YOLKO</strong>
+          <span>GOOD EGGS. HAPPY YOU.</span>
+        </div>
+      </div>
+    </footer>
+  </article>
+  <script>
+    if (new URLSearchParams(location.search).has("export")) {
+      document.body.classList.add("export");
+    }
+  </script>
+</body>
+</html>
