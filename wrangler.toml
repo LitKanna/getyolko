@@ -1,4 +1,4 @@
-name = "yolko-site"
+name = "yolkomarket"
 main = "infra/cloudflare-worker.mjs"
 compatibility_date = "2026-06-01"
 account_id = "3af91e3294583af96a50ed10fef9c3b3"
