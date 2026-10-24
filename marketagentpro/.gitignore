@@ -1,0 +1,19 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/secrets.toml
+data/
+cache/
+Logs/
+dist/
+build/
+*.log
+.DS_Store
+.idea/
+.vscode/
+command.txt
+option related.txt
+to do.txt

@@ -1,0 +1,10 @@
+ts	phase	decision	why	evidence	result
+2026-09-10T04:51:40Z	frame	wrote pstack-models.mdc with session-available slugs	setup-pstack defaults used grok-4.6-fast-xhigh which is not in this session list so I remapped to cursor-grok-4.6-xhigh-fast	/home/ubuntu/.cursor/rules/pstack-models.mdc	written
+2026-09-10T04:51:40Z	frame	treat MarketAgentPro as the target not the YOLKO site	the prompt names MarketAgentPro (1).exe and faz/23532259 while this workspace is litkanna/markett with no exe	run-info name MarketAgentPro login issue; gh repo Lazyend123/marketagentpro_modular	open
+2026-09-10T04:53:54Z	frame	user said access their device to check the exe	they named C:\Users\Marut\Desktop\MarketAgentPro (1).exe as the surface	follow-up message	open
+2026-09-10T04:54:14Z	frame	cannot open the Windows desktop path	this run is a Linux cloud VM and list-self-hosted-workers returned zero workers	cursor-cloud list-self-hosted-workers empty; path C:\Users\Marut\Desktop\MarketAgentPro (1).exe	NOT VERIFIED on user device
+2026-09-10T04:54:14Z	harness	use the public GitHub MarketAgentPro.exe and its source as the closest artifact	the Desktop (1).exe name matches a second download of MarketAgentPro.exe	/tmp/mapro/release/MarketAgentPro.exe	INCONCLUSIVE that it is byte-identical to the user file
+2026-09-10T04:55:24Z	root-cause	public MarketAgentPro.exe has no login module and no faz password	extracted app.py matches the GitHub source and strings find no login, username, password, or 23532259	/tmp/mapro/extracted/MarketAgentPro.exe_extracted/app.py	verified on public exe, INCONCLUSIVE on user Desktop copy
+2026-09-10T04:55:24Z	harness	login verifier accepts faz/23532259 and rejects bad passwords	pure check_credentials is the gate the UI calls	marketagentpro/scripts/verify_login.py	tests green
+2026-09-10T05:08:43Z	verify	AppTest signs faz in and rejects a wrong password	Streamlit AppTest submits the same Sign in form the UI uses	/opt/cursor/artifacts/verify_login_ui.txt	tests green
+2026-09-10T05:08:43Z	verify	could not drive the user Windows exe	no self-hosted worker and computerUse could not start	list-self-hosted-workers empty	NOT VERIFIED on user device
