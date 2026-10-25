@@ -2791,7 +2791,7 @@ function zohoSheet() {
 function zohoHelp(which) {
   const content = {
     sending: ["Sending isn’t set up", "<p>The Worker needs the Zoho CPaaS send key saved as the secret <code>ZEPTOMAIL_TOKEN</code>, and the sender address as <code>ORDER_EMAIL_FROM</code>.</p>"],
-    delivery: ["Delivery status", "<p>Zoho tells the shop when an order email is delivered, opened or bounced, by calling getyolko.com/api/zoho/email-events.</p><p>It needs the secret <code>ZOHO_WEBHOOK_TOKEN</code> on the Worker, and a webhook in Zoho’s Transactional Emails settings that sends the same token in its Authorization header. Until then, a failed send still shows as Failed, with Zoho’s reason.</p>"],
+    delivery: ["Delivery status", "<p>Zoho tells the shop when an order email is delivered, opened or bounced, by calling getyolko.com/api/zoho/email-events.</p><p>It needs a webhook in Zoho CPaaS (Agents, agent_1, Webhooks) pointing at that address, with every email event ticked. This shows Connected after Zoho’s first update. Until then, a failed send still shows as Failed, with Zoho’s reason.</p>"],
     inbox: ["Connecting the mailbox", "<p>The Worker needs a Zoho API client, saved as the secrets <code>ZOHO_CLIENT_ID</code> and <code>ZOHO_CLIENT_SECRET</code>, with the redirect address <code>https://getyolko.com/api/zoho/callback</code>.</p><p>Then Connect Zoho Mail appears here. Sign in once and orders@getyolko.com shows in the Inbox and Sent tabs.</p>"],
   }[which] || ["", ""];
   openModal({ title: content[0], html: content[1], actions: [{ label: "Got it", kind: "primary", value: true }] });

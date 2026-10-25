@@ -1207,7 +1207,7 @@ async function emailStatus(env) {
   return {
     sending: { connected: emailConfigured(env), from: String(env.ORDER_EMAIL_FROM || "").trim() || null, host, replyTo: SHOP_EMAIL },
     inbox,
-    deliveryLogs: { connected: Boolean(String(env.ZOHO_WEBHOOK_TOKEN || "").trim()), lastEventAt: lastEventAt || null },
+    deliveryLogs: { connected: Boolean(lastEventAt), lastEventAt: lastEventAt || null },
   };
 }
 
@@ -2472,19 +2472,12 @@ async function handleApi(request, env, url, ctx) {
   }
 
   // Zoho CPaaS webhooks: delivered, opened, clicked, bounced and spam reports for order emails.
-  // Zoho sends ZOHO_WEBHOOK_TOKEN back as the Authorization header we set on the webhook.
+  // Zoho calls this without credentials, so an event only counts when its request_id or email
+  // reference matches an email this Worker sent (the email:req:<id> keys written at send time).
   if (url.pathname === "/api/zoho/email-events") {
     if (request.method === "GET" || request.method === "HEAD") return json({ ok: true });
     if (request.method !== "POST") return json({ error: "method" }, 405);
-    const want = String(env.ZOHO_WEBHOOK_TOKEN || "").trim();
-    if (!want) return json({ error: "not configured" }, 503);
-    const got = String(request.headers.get("Authorization") || url.searchParams.get("token") || "").replace(/^Bearer\s+/i, "").trim();
-    const a = new TextEncoder().encode(got);
-    const b = new TextEncoder().encode(want);
-    let diff = a.length ^ b.length;
-    for (let i = 0; i < b.length; i++) diff |= (a[i] || 0) ^ b[i];
-    if (diff !== 0) return json({ error: "unauthorised" }, 401);
-    const raw = await request.text();
+    const raw = (await request.text()).slice(0, 262144);
     let payload = null;
     try {
       payload = JSON.parse(raw);
@@ -2499,10 +2492,10 @@ async function handleApi(request, env, url, ctx) {
     }
     if (!payload || typeof payload !== "object") return json({ ok: true, ignored: "unreadable" });
     const names = [].concat(payload.event_name || []);
-    const messages = [].concat(payload.event_message || []);
+    const messages = [].concat(payload.event_message || []).slice(0, 50);
     let applied = 0;
     for (const [i, m] of messages.entries()) {
-      const datas = [].concat(m?.event_data || []);
+      const datas = [].concat(m?.event_data || []).slice(0, 20);
       const info = m?.email_info || {};
       for (const d of datas.length ? datas : [{}]) {
         const kind = normalizeEmailEvent(d?.object || names[i] || names[0]);
@@ -2522,7 +2515,7 @@ async function handleApi(request, env, url, ctx) {
         applied++;
       }
     }
-    await env.DATA.put("email:events:last", new Date().toISOString());
+    if (names.length) await env.DATA.put("email:events:last", new Date().toISOString());
     return json({ ok: true, applied });
   }
 
