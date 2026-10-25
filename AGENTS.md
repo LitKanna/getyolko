@@ -5,8 +5,8 @@
 ### Copy style (hard rule)
 Never use em dashes (`-`) anywhere on the website or in storefront/admin UI copy.
 Prefer a period, comma, colon, or hyphen (`-`) instead. Same for docs you add to this repo
-when they are user-facing; avoid reintroducing `-` in `index.html`, `app.js`, or Worker
-`ADMIN_HTML` strings.
+when they are user-facing; avoid reintroducing `-` in `index.html`, `app.js`, or the admin
+page `infra/admin.html` (served by the Worker at `/admin`).
 
 ### What this repo is
 YOLKO (`getyolko`) is a single **static, one-page marketing/ordering website** for selling
@@ -65,6 +65,11 @@ email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN
 (defaults to Zoho CPaaS `https://cpaas.zoho.com/v1.1/email`; same API as ZeptoMail). Without them the webhook
 returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
 sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
+The admin Emails page uses `GET /api/admin/emails`, `GET /api/admin/email-preview?id=` and
+`POST /api/admin/test-email {to}`. Its Inbox tab reads the Zoho Mail mailbox only once the
+secrets `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `ZOHO_REFRESH_TOKEN` are set (a Zoho Self
+Client with `ZohoMail.accounts.READ`, `ZohoMail.folders.READ`, `ZohoMail.messages.READ`); the
+CPaaS send key can't read mail or delivery logs.
 
 ### No lint / test / build tooling
 There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder

@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - "infra/cloudflare-worker.mjs"
+      - "infra/admin.html"
       - "infra/delivery-zones.mjs"
       - "infra/nsw-suburb-centroids.mjs"
       - "wrangler.toml"

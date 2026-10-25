@@ -1,5 +1,7 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
+// The admin page lives in its own file; wrangler bundles .html as a text module.
+import ADMIN_HTML from "./admin.html";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
 const DEPLOY_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -786,8 +788,11 @@ ${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" s
   return { subject, html, text };
 }
 
-/** Send the confirmation via ZeptoMail. Returns { ok, skipped?, error? }. */
-async function sendOrderConfirmationEmail(env, order) {
+/**
+ * Send the confirmation via ZeptoMail. Returns { ok, skipped?, error? }.
+ * test: admin sample send, marked [Test] in the subject and never copied to the shop.
+ */
+async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
   const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
   const from = String(env.ORDER_EMAIL_FROM || "").trim();
   const to = String(order.stripe?.email || order.email || "").trim();
@@ -799,12 +804,12 @@ async function sendOrderConfirmationEmail(env, order) {
     from: { address: from, name: STRIPE_BRAND },
     to: [{ email_address: { address: to, name: order.name || "" } }],
     reply_to: [{ address: STRIPE_SUPPORT_EMAIL, name: STRIPE_BRAND }],
-    subject,
+    subject: test ? `[Test] ${subject}` : subject,
     htmlbody: html,
     textbody: text,
   };
   const notify = String(env.ORDER_NOTIFY_EMAIL || "").trim();
-  if (notify && notify.toLowerCase() !== to.toLowerCase()) {
+  if (!test && notify && notify.toLowerCase() !== to.toLowerCase()) {
     payload.bcc = [{ email_address: { address: notify, name: STRIPE_BRAND } }];
   }
 
@@ -901,6 +906,121 @@ async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
 // Orders paid before this (when sends began writing the email:sent marker)
 // are never emailed retroactively.
 const ORDER_EMAIL_LAUNCH = Date.parse("2026-10-22T10:57:00Z");
+
+/** One row of the admin Emails page: what happened to this order's confirmation. */
+function orderEmailEntry(order, marker) {
+  const ce = order.confirmationEmail || {};
+  const sentAt = ce.sentAt || marker?.sentAt || null;
+  const to = String(ce.to || marker?.to || order.stripe?.email || order.email || "").trim();
+  const paidAt = order.stripe?.paidAt || null;
+  let status = "not_sent";
+  let reason = null;
+  if (sentAt) status = "sent";
+  else if (ce.lastError) {
+    status = "failed";
+    reason = String(ce.lastError);
+  } else if (!to) reason = "no_email";
+  else if (!(Date.parse(paidAt || "") > ORDER_EMAIL_LAUNCH)) reason = "before_launch";
+  else reason = "pending";
+  return {
+    orderId: order.id,
+    ref: orderRef(order),
+    name: order.name || "",
+    to,
+    status,
+    reason,
+    sentAt,
+    requestId: ce.requestId || marker?.requestId || null,
+    attempts: ce.attempts || 0,
+    lastTriedAt: ce.lastTriedAt || null,
+    paidAt,
+    createdAt: order.createdAt || null,
+    subject: `Your YOLKO order is confirmed (#${orderRef(order)})`,
+    orderStatus: order.status,
+    paymentStatus: order.paymentStatus,
+  };
+}
+
+// Optional Zoho Mail read access, for the admin inbox. Secrets: ZOHO_CLIENT_ID,
+// ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN from a Zoho Self Client with the scopes
+// ZohoMail.accounts.READ, ZohoMail.folders.READ and ZohoMail.messages.READ.
+// Optional: ZOHO_ACCOUNTS_URL / ZOHO_MAIL_URL (other data centres), ZOHO_MAIL_ACCOUNT_ID.
+function zohoMailConfigured(env) {
+  return Boolean(
+    String(env.ZOHO_CLIENT_ID || "").trim() &&
+      String(env.ZOHO_CLIENT_SECRET || "").trim() &&
+      String(env.ZOHO_REFRESH_TOKEN || "").trim()
+  );
+}
+
+/** Which email features are switched on, from which secrets exist (never their values). */
+function emailStatus(env) {
+  let host = "";
+  try {
+    host = new URL(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL)).host;
+  } catch {}
+  return {
+    sending: { connected: emailConfigured(env), from: String(env.ORDER_EMAIL_FROM || "").trim() || null, host, replyTo: STRIPE_SUPPORT_EMAIL },
+    inbox: { connected: zohoMailConfigured(env) },
+    // The CPaaS send key can't read delivery logs; that needs separate Zoho OAuth access.
+    deliveryLogs: { connected: false },
+  };
+}
+
+// Per isolate only. Tokens are secrets, so they never go to KV.
+let zohoToken = null;
+let zohoAccount = null;
+
+async function zohoAccessToken(env) {
+  if (zohoToken && zohoToken.exp > Date.now() + 60000) return zohoToken.token;
+  const base = String(env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com").replace(/\/+$/, "");
+  const resp = await fetch(`${base}/oauth/v2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: String(env.ZOHO_REFRESH_TOKEN).trim(),
+      client_id: String(env.ZOHO_CLIENT_ID).trim(),
+      client_secret: String(env.ZOHO_CLIENT_SECRET).trim(),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await resp.json().catch(() => null);
+  // Zoho answers some failures with HTTP 200 and an error field.
+  if (!resp.ok || !data?.access_token) {
+    throw new Error(`Zoho sign-in failed${data?.error ? `: ${data.error}` : ` (HTTP ${resp.status})`}`);
+  }
+  zohoToken = { token: data.access_token, exp: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+  return zohoToken.token;
+}
+
+async function zohoMailFetch(env, path) {
+  const token = await zohoAccessToken(env);
+  const base = String(env.ZOHO_MAIL_URL || "https://mail.zoho.com").replace(/\/+$/, "");
+  const resp = await fetch(`${base}/api${path}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await resp.json().catch(() => null);
+  if (resp.status === 401) zohoToken = null;
+  if (!resp.ok) throw new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`));
+  return data;
+}
+
+async function zohoMailAccount(env) {
+  const fixed = String(env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
+  if (fixed) return { accountId: fixed, address: null };
+  if (zohoAccount) return zohoAccount;
+  const data = await zohoMailFetch(env, "/accounts");
+  const acct = (Array.isArray(data?.data) ? data.data : [])[0];
+  if (!acct?.accountId) throw new Error("No Zoho Mail account for this login");
+  zohoAccount = { accountId: String(acct.accountId), address: acct.primaryEmailAddress || acct.mailboxAddress || null };
+  return zohoAccount;
+}
+
+function decodeMailEntities(s) {
+  return String(s || "").replace(/&(lt|gt|quot|amp|#39);/g, (_, e) => ({ lt: "<", gt: ">", quot: '"', amp: "&", "#39": "'" }[e]));
+}
 
 /**
  * Cron safety net (every 15 min). Both checks only touch payments at least
@@ -1821,6 +1941,112 @@ async function handleApi(request, env, url, ctx) {
     return json(result, result.ok ? 200 : 502);
   }
 
+  // Admin: every paid order's confirmation email and whether it went out
+  if (url.pathname === "/api/admin/emails" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const ids = await getOrderIndex(env);
+    const orders = (await Promise.all(ids.map((id) => env.DATA.get(id, "json").catch(() => null)))).filter(
+      (o) => o && typeof o === "object" && (o.paymentStatus === "paid" || o.paymentStatus === "refunded")
+    );
+    // The sent marker survives whole-order writes from stale copies, so check it too.
+    const markers = await Promise.all(
+      orders.map((o) => (o.confirmationEmail?.sentAt ? null : env.DATA.get(emailSentKey(o.id), "json").catch(() => null)))
+    );
+    const when = (e) => e.sentAt || e.lastTriedAt || e.paidAt || e.createdAt || "";
+    const emails = orders.map((o, i) => orderEmailEntry(o, markers[i])).sort((a, b) => String(when(b)).localeCompare(String(when(a))));
+    return json({ ok: true, emails, status: emailStatus(env) });
+  }
+
+  // Admin: the confirmation email for one order, rebuilt exactly as it is sent
+  if (url.pathname === "/api/admin/email-preview" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const id = String(url.searchParams.get("id") || "");
+    if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
+    const order = await env.DATA.get(id, "json");
+    if (!order) return json({ error: "Order not found" }, 404);
+    const { subject, html, text } = buildOrderEmail(order);
+    return json({
+      ok: true,
+      subject,
+      html,
+      text,
+      to: String(order.confirmationEmail?.to || order.stripe?.email || order.email || "").trim() || null,
+      toName: order.name || "",
+      from: String(env.ORDER_EMAIL_FROM || "").trim() || null,
+      fromName: STRIPE_BRAND,
+      replyTo: STRIPE_SUPPORT_EMAIL,
+      sent: Boolean(order.confirmationEmail?.sentAt),
+    });
+  }
+
+  // Admin: send a sample confirmation to any address (one a minute)
+  if (url.pathname === "/api/admin/test-email" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    if (!emailConfigured(env)) return json({ ok: false, error: "Email sending isn't set up" }, 503);
+    const body = await request.json().catch(() => null);
+    const to = String(body?.to || "").trim();
+    if (to.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ ok: false, error: "Enter a valid email address" }, 400);
+    if (await env.DATA.get("email:test:recent")) return json({ ok: false, error: "One test a minute. Try again shortly" }, 429);
+    await env.DATA.put("email:test:recent", "1", { expirationTtl: 60 });
+    const settings = await getSettings(env);
+    const subtotal = Number(settings.prices?.tray2) || 0;
+    const sample = {
+      id: "order:test-sample",
+      name: "Test",
+      bundle: "tray2",
+      quantity: 1,
+      subtotal,
+      deliveryFee: SITE_DELIVERY_FEE,
+      price: subtotal + SITE_DELIVERY_FEE,
+      deliveryAddress: "1 Example St, Sydney NSW",
+      stripe: { email: to },
+    };
+    const result = await sendOrderConfirmationEmail(env, sample, { test: true });
+    return json(result, result.ok ? 200 : 502);
+  }
+
+  // Admin: recent mail in the Zoho mailbox (only once Zoho Mail read access is set up)
+  if (url.pathname === "/api/admin/inbox" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    if (!zohoMailConfigured(env)) return json({ ok: true, connected: false, messages: [] });
+    try {
+      const acct = await zohoMailAccount(env);
+      const limit = Math.min(100, Math.max(1, Math.floor(Number(url.searchParams.get("limit")) || 30)));
+      const data = await zohoMailFetch(env, `/accounts/${encodeURIComponent(acct.accountId)}/messages/view?limit=${limit}&sortorder=false`);
+      const messages = (Array.isArray(data?.data) ? data.data : []).map((m) => ({
+        messageId: String(m.messageId || ""),
+        folderId: String(m.folderId || ""),
+        subject: decodeMailEntities(m.subject),
+        from: decodeMailEntities(m.fromAddress),
+        fromName: decodeMailEntities(m.sender),
+        to: decodeMailEntities(m.toAddress),
+        summary: decodeMailEntities(m.summary),
+        receivedAt: Number(m.receivedTime) ? new Date(Number(m.receivedTime)).toISOString() : null,
+        unread: String(m.status) === "0",
+        hasAttachment: String(m.hasAttachment) === "1",
+      }));
+      return json({ ok: true, connected: true, account: acct.address, messages });
+    } catch (err) {
+      return json({ ok: false, connected: true, error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: one message from the Zoho mailbox
+  if (url.pathname === "/api/admin/inbox/message" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    if (!zohoMailConfigured(env)) return json({ error: "Zoho Mail isn't connected" }, 503);
+    const folderId = String(url.searchParams.get("folderId") || "");
+    const messageId = String(url.searchParams.get("messageId") || "");
+    if (!/^\d{1,30}$/.test(folderId) || !/^\d{1,30}$/.test(messageId)) return json({ error: "bad message" }, 400);
+    try {
+      const acct = await zohoMailAccount(env);
+      const data = await zohoMailFetch(env, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/content`);
+      return json({ ok: true, html: String(data?.data?.content || "") });
+    } catch (err) {
+      return json({ ok: false, error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
   // Public: confirm payment after returning from Stripe
   if (url.pathname === "/api/confirm-payment" && request.method === "GET") {
     if (!env.STRIPE_KEY) return json({ error: "payments not configured" }, 503);
@@ -2395,2126 +2621,6 @@ async function handleApi(request, env, url, ctx) {
   return json({ error: "not found" }, 404);
 }
 
-const ADMIN_HTML = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#ffd32a">
-<title>YOLKO Admin</title>
-<link rel="stylesheet" href="/assets/fonts.css?v=76">
-<style>
-:root {
-  --canvas:#f2f0ea; --paper:#fffefb; --ink:#171714; --muted:#6d6b64;
-  --line:rgba(23,23,20,.16); --yellow:#ffd32a; --orange:#f6532f;
-  --green:#15734c; --green-soft:#e8f3ed; --blue:#1d4f91; --blue-soft:#e2ecf9;
-  --red:#b32323; --red-soft:#f7e0dd; --warn:#fff3b0;
-  --display:"Bricolage Grotesque","Arial Black",sans-serif;
-  --body:"Plus Jakarta Sans",system-ui,sans-serif;
-}
-*,*::before,*::after { box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
-body { margin:0; font-family:var(--body); background:var(--canvas); color:var(--ink); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
-.wrap { max-width:640px; margin:0 auto; padding:18px 14px 70px; }
-
-@media (min-width:760px) {
-  .wrap { max-width:920px; padding:26px 24px 80px; }
-  #orders { display:flex; flex-direction:column; gap:0; }
-  .stat b { font-size:26px; }
-  .card { padding:26px 24px; }
-}
-@media (min-width:1024px) {
-  .wrap { max-width:1200px; padding:32px 28px 90px; }
-  .cols { display:grid; grid-template-columns:1.55fr 1fr; gap:18px; align-items:start; }
-  .cols > .card { margin-bottom:0; }
-  .cols > .card:last-child { position:sticky; top:18px; }
-  #orders { display:flex; flex-direction:column; gap:0; }
-  .top .brand-name { font-size:28px; }
-  h2 { font-size:22px; }
-}
-
-.top { display:flex; align-items:center; gap:12px; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--line); }
-.brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; color:inherit; }
-.brand-dot { width:14px; height:14px; border-radius:50%; background:var(--yellow); box-shadow:3px 3px 0 var(--ink); }
-.brand-name { font-family:var(--display); font-size:22px; font-weight:800; letter-spacing:-.04em; line-height:1; text-transform:uppercase; }
-.top small { display:block; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--orange); margin-top:4px; }
-.top .out { margin-left:auto; }
-
-.card { background:var(--paper); border:1px solid var(--ink); border-radius:0; padding:20px 18px; margin-bottom:16px; box-shadow:6px 6px 0 var(--yellow); }
-h2 { font-family:var(--display); font-size:20px; font-weight:800; margin:0 0 14px; letter-spacing:-.03em; text-transform:uppercase; }
-.topline { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:4px; }
-.topline h2 { margin-bottom:14px; }
-
-.stats { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:16px; }
-@media (max-width:640px){ .stats { grid-template-columns:repeat(3,1fr); } }
-.stat { background:var(--paper); border:1px solid var(--line); border-radius:0; padding:12px 8px; text-align:center; }
-.stat.highlight { background:var(--yellow); border-color:var(--ink); }
-.stat.highlight b { color:var(--ink); }
-.stat b { display:block; font-family:var(--display); font-size:22px; font-weight:800; letter-spacing:-.03em; }
-.stat span { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
-
-.toast { position:fixed; left:50%; bottom:22px; transform:translate(-50%,16px); z-index:300; max-width:90vw; padding:12px 18px; background:var(--ink); color:var(--paper); font-weight:700; font-size:13.5px; border-radius:0; box-shadow:6px 6px 0 var(--yellow); opacity:0; transition:opacity .3s ease, transform .3s ease; }
-.toast.show { opacity:1; transform:translate(-50%,0); }
-
-.orders-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 12px; }
-.filter-chip {
-  min-height:34px; padding:0 11px; border:1px solid var(--line); background:var(--paper); color:var(--muted);
-  font:inherit; font-weight:800; font-size:11px; text-transform:uppercase; letter-spacing:.04em; cursor:pointer;
-}
-.filter-chip b { font-family:var(--display); margin-left:6px; color:var(--ink); }
-.filter-chip.on { background:var(--ink); border-color:var(--ink); color:var(--paper); }
-.filter-chip.on b { color:var(--yellow); }
-.orders-hint { width:100%; margin:0; font-size:12px; color:var(--muted); }
-
-#orders { display:grid; grid-template-columns:1fr 1fr; gap:14px; border-top:0; align-items:start; }
-@media (max-width:900px) { #orders { grid-template-columns:1fr; } }
-
-.lane {
-  border:1px solid rgba(23,23,20,.12); background:var(--paper); min-height:120px;
-  border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(23,23,20,.04);
-}
-.lane-head {
-  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
-  padding:12px 14px; border-bottom:1px solid rgba(23,23,20,.08); background:var(--canvas);
-}
-.lane-head h3 {
-  margin:0; font-family:var(--display); font-size:14px; font-weight:800;
-  letter-spacing:-.02em; text-transform:uppercase;
-}
-.lane-head span { font-size:11px; font-weight:800; color:var(--muted); }
-.lane.waiting .lane-head { background:var(--yellow); }
-.lane.waiting .lane-head span { color:var(--ink); }
-.lane-body {
-  padding:0;
-  max-height: min(420px, 52vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink) var(--canvas);
-}
-.lane-body::-webkit-scrollbar { width: 8px; }
-.lane-body::-webkit-scrollbar-thumb { background: var(--ink); }
-.lane-body::-webkit-scrollbar-track { background: var(--canvas); }
-.lane-empty { padding:18px 12px; color:var(--muted); font-size:13px; }
-
-.day-group { border-bottom:1px solid var(--line); }
-.day-group:last-child { border-bottom:0; }
-.day-head {
-  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
-  padding:8px 12px 4px; font-size:11px; font-weight:800; letter-spacing:.06em;
-  text-transform:uppercase; color:var(--muted); background:var(--canvas);
-}
-.day-head b { color:var(--ink); font-family:var(--display); letter-spacing:-.02em; text-transform:none; font-size:13px; }
-
-.order {
-  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 12px; align-items:center;
-  padding:12px 14px; border-bottom:1px solid rgba(23,23,20,.06); border-left:3px solid transparent;
-  cursor:pointer; background:transparent; transition:background .15s ease;
-}
-.order:last-child { border-bottom:0; }
-.order:hover { background:rgba(23,23,20,.03); }
-.order.open { background:linear-gradient(90deg, rgba(255,211,42,.22), rgba(255,211,42,.08)); }
-.order.st-new { border-left-color:var(--yellow); }
-.order.st-confirmed { border-left-color:var(--green); }
-.order.st-done { border-left-color:var(--line); opacity:.7; }
-.order.st-cancelled { border-left-color:var(--red); opacity:.55; }
-.order.prio { box-shadow:inset 0 0 0 1px rgba(23,23,20,.12); }
-.order.sus { background:rgba(246,83,47,.05); }
-
-.o-name { font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.01em; }
-.o-sub { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
-.o-right { text-align:right; }
-.o-price { display:block; font-family:var(--display); font-weight:800; font-size:16px; color:var(--orange); letter-spacing:-.03em; line-height:1.1; }
-.o-flag { display:block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:2px; }
-.o-flag.warn { color:var(--orange); }
-.o-name-row { display:flex; align-items:center; gap:8px; min-width:0; }
-.o-name-row .o-name { min-width:0; }
-.badge-paid {
-  flex-shrink:0; padding:3px 8px; border-radius:999px; background:var(--ink); color:var(--yellow);
-  font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-}
-.badge-refunded {
-  flex-shrink:0; padding:3px 8px; border-radius:999px; background:var(--red-soft); color:var(--red);
-  font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-}
-
-.o-detail {
-  display:none; grid-column:1 / -1; gap:0; padding:10px 0 6px;
-  margin-top:4px;
-}
-.order.open .o-detail { display:block; }
-
-.sale-card {
-  margin-top:4px; padding:14px 14px 12px;
-  border:1px solid rgba(23,23,20,.12); border-radius:12px; background:#fff;
-}
-.sale-name {
-  margin:0 0 12px; font-family:var(--display); font-weight:800; font-size:18px;
-  letter-spacing:-.03em; line-height:1.2;
-}
-.sale-chip {
-  display:inline-block; margin-left:8px; padding:3px 8px; border-radius:999px; vertical-align:middle;
-  background:var(--ink); color:var(--yellow); font-size:9px; font-weight:800;
-  letter-spacing:.06em; text-transform:uppercase; position:relative; top:-2px;
-}
-.sale-chip.refunded { background:var(--red-soft); color:var(--red); }
-.sale-contacts { display:grid; gap:10px; }
-.sale-row, a.sale-row {
-  display:block; text-decoration:none; color:inherit;
-}
-.sale-k {
-  display:block; margin:0 0 2px; font-size:10px; font-weight:700;
-  letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
-}
-.sale-v {
-  display:block; margin:0; font-size:14px; font-weight:600; line-height:1.4;
-  word-break:break-word; white-space:pre-line; color:var(--ink);
-}
-.sale-v.muted { color:var(--muted); }
-a.sale-row:hover .sale-v { color:var(--orange); }
-.sale-tools {
-  display:flex; align-items:center; gap:8px; margin-top:14px; padding-top:12px;
-  border-top:1px solid rgba(23,23,20,.1); flex-wrap:wrap;
-}
-.icon-btn {
-  width:36px; height:36px; min-width:36px; min-height:36px;
-  padding:0; display:inline-flex; align-items:center; justify-content:center; overflow:hidden;
-  border:1px solid rgba(23,23,20,.16); border-radius:8px; background:#fff; color:var(--ink);
-  cursor:pointer; text-decoration:none; box-shadow:none; flex:0 0 36px;
-}
-.icon-btn:hover { background:var(--ink); color:#fff; border-color:var(--ink); }
-.icon-btn.danger { color:var(--red); border-color:rgba(179,35,35,.3); }
-.icon-btn.danger:hover { background:var(--red); color:#fff; border-color:var(--red); }
-.icon-btn svg { width:16px; height:16px; display:block; }
-.sale-status { display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
-.sale-status button {
-  min-height:36px; padding:6px 12px; font-size:12px; border-radius:8px; box-shadow:none;
-}
-.o-actions { display:none; }
-.callbtn { background:var(--yellow); color:var(--ink); }
-
-.archive {
-  margin-top:14px; border-top:1px solid var(--line); padding-top:10px;
-}
-.archive summary {
-  cursor:pointer; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
-  list-style:none;
-}
-.archive summary::-webkit-details-marker { display:none; }
-.archive summary::before { content:"+ "; color:var(--ink); }
-.archive[open] summary::before { content:"– "; }
-.archive .lane { margin-top:8px; }
-
-.pill { display:inline-block; padding:2px 7px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.pill.new { background:var(--yellow); color:var(--ink); }
-.pill.confirmed { background:var(--green-soft); color:var(--green); }
-.pill.done { background:var(--canvas); color:var(--muted); }
-.pill.cancelled { background:var(--red-soft); color:var(--red); }
-.pill.paid { background:var(--ink); color:var(--paper); }
-.pill.warn { background:var(--warn); color:var(--ink); }
-
-
-button, .callbtn {
-  display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:10px 14px;
-  border:1px solid var(--ink); border-radius:0; font:inherit; font-weight:800; font-size:13.5px;
-  white-space:nowrap; cursor:pointer; background:var(--ink); color:var(--paper); text-decoration:none;
-  transition:transform .15s ease, background .15s ease, color .15s ease;
-}
-button:active, .callbtn:active { transform:translate(1px,1px); }
-button.ghost { background:var(--paper); color:var(--ink); }
-button.danger { background:var(--red-soft); color:var(--red); border-color:var(--red); }
-.callbtn { background:var(--yellow); color:var(--ink); }
-button:not(.ghost):not(.danger):not(.icon-btn):hover { background:var(--orange); border-color:var(--orange); color:#fff; }
-.callbtn:hover { background:var(--ink); color:var(--paper); }
-
-label { display:block; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:6px; }
-input, select {
-  width:100%; min-height:48px; padding:10px 13px; border:1px solid var(--ink); border-radius:0;
-  font:inherit; font-size:16px; font-weight:600; background:var(--paper); color:var(--ink);
-  transition:border-color .15s ease, box-shadow .15s ease;
-}
-select {
-  appearance:none; -webkit-appearance:none; padding-right:40px; cursor:pointer;
-  background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="9" viewBox="0 0 14 9"><path d="M1 1.5 7 7.5 13 1.5" fill="none" stroke="%23171714" stroke-width="2.2" stroke-linecap="square" stroke-linejoin="miter"/></svg>');
-  background-repeat:no-repeat; background-position:right 14px center;
-}
-input[type="time"] { cursor:pointer; }
-input:hover, select:hover { border-color:var(--orange); }
-input:focus, select:focus { outline:none; border-color:var(--orange); box-shadow:3px 3px 0 var(--yellow); }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
-.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
-@media (max-width:720px) { .grid3 { grid-template-columns:1fr 1fr; } }
-.ps-block { margin:18px 0 8px; padding-top:14px; border-top:1px solid var(--line); }
-.ps-block:first-of-type { margin-top:8px; padding-top:0; border-top:0; }
-.ps-title { font-size:15px; margin:0 0 6px; }
-.ps-sub { margin:0 0 12px; font-size:12.5px; color:var(--muted); }
-.dozen-row {
-  display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:8px; align-items:end;
-  padding:10px 0; border-bottom:1px solid var(--line);
-}
-.dozen-row:last-child { border-bottom:0; }
-.dozen-row .d-name { font-weight:800; font-size:13.5px; padding-bottom:10px; }
-.dozen-row .d-profit {
-  min-width:72px; text-align:right; font-weight:800; font-size:13px; padding-bottom:12px;
-}
-@media (max-width:720px) {
-  .dozen-row { grid-template-columns:1fr 1fr; }
-  .dozen-row .d-name { grid-column:1 / -1; padding-bottom:0; }
-  .dozen-row .d-profit { grid-column:1 / -1; text-align:left; padding-bottom:0; }
-}
-.hint { margin:-6px 0 10px; font-size:12.5px; color:var(--muted); }
-.day-chips { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:14px; }
-.chip {
-  min-height:44px; padding:0; border:1px solid var(--line); border-radius:0; background:var(--paper);
-  color:var(--muted); font:inherit; font-weight:800; font-size:13px; cursor:pointer; transition:all .15s ease;
-}
-.chip:hover { border-color:var(--ink); color:var(--ink); }
-.chip.on { background:var(--ink); border-color:var(--ink); color:var(--paper); box-shadow:3px 3px 0 var(--yellow); }
-.hours-row { display:grid; grid-template-columns:44px 1fr 26px 1fr; gap:8px; align-items:center; margin-bottom:10px; }
-.hours-row b { font-size:13.5px; color:var(--orange); }
-.hours-row span { text-align:center; font-size:12.5px; color:var(--muted); }
-.hours-row select { min-height:44px; }
-.hours-empty { margin:4px 0 10px; font-size:13.5px; color:var(--muted); }
-.b-sum { font-size:12.5px; font-weight:700; color:var(--muted); }
-#buyers { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px; }
-.buyer-card { border:1px solid var(--line); border-radius:0; padding:14px 14px 12px; background:var(--paper); }
-.bc-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
-.b-rank { flex-shrink:0; width:26px; height:26px; display:grid; place-items:center; background:var(--canvas); border:1px solid var(--line); border-radius:0; font-weight:800; font-size:12px; color:var(--muted); }
-.b-rank.top { background:var(--yellow); color:var(--ink); border-color:var(--ink); }
-.bc-name { flex:1; min-width:0; }
-.bc-name b { display:block; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.b-spend { font-family:var(--display); font-weight:800; font-size:18px; color:var(--orange); }
-.bb { display:inline-block; margin-right:4px; padding:2px 7px; border-radius:0; font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.bb.gold { background:var(--yellow); color:var(--ink); }
-.bb.green { background:var(--green-soft); color:var(--green); }
-.bb.blue { background:var(--blue-soft); color:var(--blue); }
-.spark { display:block; width:100%; height:38px; margin-bottom:10px; }
-.bc-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:10px; }
-.bc-grid > div { background:var(--canvas); border:1px solid var(--line); border-radius:0; padding:7px 4px; text-align:center; }
-.bc-grid b { display:block; font-size:13.5px; }
-.bc-grid span { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
-.bc-foot { display:flex; align-items:center; gap:8px; }
-.b-insight { flex:1; font-size:11.5px; font-weight:700; padding:6px 9px; border-radius:0; }
-.b-insight.warn { background:var(--warn); color:var(--ink); }
-.b-insight.due { background:var(--blue-soft); color:var(--blue); }
-.b-insight.good { background:var(--green-soft); color:var(--green); }
-.b-insight.soft { background:var(--canvas); color:var(--muted); }
-.bc-call { flex-shrink:0; padding:6px 14px; background:var(--ink); color:var(--paper); border-radius:0; font-size:12px; font-weight:700; text-decoration:none; border:1px solid var(--ink); }
-.dayrow { display:grid; grid-template-columns:96px 1fr 1fr; gap:10px; align-items:end; margin-bottom:12px; }
-.chk { display:flex; align-items:center; gap:8px; font-size:14.5px; font-weight:800; text-transform:none; letter-spacing:0; color:var(--ink); padding-bottom:12px; }
-.chk input { width:20px; height:20px; min-height:0; accent-color:var(--orange); }
-.msg { font-size:13.5px; font-weight:700; margin-left:10px; }
-.msg.ok { color:var(--green); } .msg.err { color:var(--red); }
-.note { font-size:12.5px; color:var(--muted); margin:12px 0 0; }
-.empty { color:var(--muted); text-align:center; padding:24px 0; }
-.refresh { width:100%; margin-top:4px; }
-.login { max-width:420px; margin:40px auto 0; }
-.login h2 { margin-bottom:8px; }
-.login-lead { margin:0 0 16px; color:var(--muted); font-size:14px; }
-
-
-.visit-card { border:1px solid var(--line); padding:12px; margin:0 0 10px; background:var(--canvas); }
-.visit-card .v-top { display:flex; justify-content:space-between; gap:8px; align-items:baseline; margin-bottom:6px; }
-.visit-card .v-src { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--orange); }
-.visit-card .v-time { font-size:12px; color:var(--muted); font-weight:700; }
-.visit-card .v-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; font-size:12.5px; }
-.visit-card .v-grid b { display:block; font-size:11px; color:var(--muted); font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.visit-note { font-size:12.5px; color:var(--muted); margin:0 0 12px; line-height:1.4; }
-.v-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
-.v-stats .stat { padding:10px; border:1px solid var(--line); background:var(--paper); }
-.v-stats .stat b { display:block; font-family:var(--display); font-size:22px; }
-.v-stats .stat span { font-size:11px; font-weight:800; text-transform:uppercase; color:var(--muted); }
-
-.pw-table { width:100%; border-collapse:collapse; font-size:13px; margin:0 0 16px; }
-.pw-table th, .pw-table td { border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top; }
-.pw-table th { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:800; }
-.pw-table td.num { font-family:var(--display); font-weight:800; white-space:nowrap; }
-.pw-table a { color:var(--blue); font-weight:700; word-break:break-all; }
-.pw-pill { display:inline-block; padding:2px 7px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; border:1px solid var(--line); }
-.pw-pill.in_stock, .pw-pill.sell { background:var(--green-soft); color:var(--green); border-color:transparent; }
-.pw-pill.out_of_stock { background:var(--red-soft); color:var(--red); border-color:transparent; }
-.pw-event { border:1px solid var(--line); padding:10px 12px; margin:0 0 8px; background:var(--canvas); font-size:13px; }
-.pw-event b { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--orange); }
-.pw-actions { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px; }
-
-.admin-tabs { display:flex; gap:8px; margin:0 0 16px; flex-wrap:wrap; }
-.admin-tabs button {
-  min-height:40px; padding:0 16px; border:1px solid var(--ink); background:var(--paper); color:var(--ink);
-  font:inherit; font-weight:800; font-size:12px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
-  box-shadow:none;
-}
-.admin-tabs button.on { background:var(--ink); color:var(--paper); }
-.view[hidden] { display:none !important; }
-.asset-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; }
-.asset-toolbar select, .asset-toolbar input[type=text] {
-  min-height:36px; border:1px solid var(--line); background:var(--paper); padding:0 10px; font:inherit; font-size:13px;
-}
-.asset-publish {
-  display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;
-  padding:12px 14px; margin:0 0 14px; border:1px solid var(--ink); background:var(--yellow);
-}
-.asset-publish p { margin:0; font-size:13px; font-weight:700; }
-.asset-publish .muted { color:var(--muted); font-weight:600; }
-.draft-row { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; min-height:44px; align-items:center; }
-.draft-chip {
-  display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 6px; border:1px solid var(--ink);
-  background:var(--paper); font-size:12px; font-weight:700;
-}
-.draft-chip img { width:36px; height:36px; object-fit:cover; border:1px solid var(--line); }
-.draft-chip button { min-height:28px; padding:0 8px; font-size:11px; box-shadow:none; }
-.asset-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
-.asset-card {
-  border:1px solid var(--ink); background:var(--paper); display:flex; flex-direction:column; overflow:hidden;
-}
-.asset-card.fav { outline:2px solid var(--orange); outline-offset:-2px; }
-.asset-card.in-draft { box-shadow:4px 4px 0 var(--yellow); }
-.asset-card.deleted { opacity:.45; }
-.asset-card .thumb { aspect-ratio:1; background:#111; position:relative; }
-.asset-card .thumb img { width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
-.asset-card .badges { position:absolute; top:8px; left:8px; display:flex; gap:4px; flex-wrap:wrap; }
-.asset-lightbox {
-  position:fixed; inset:0; z-index:500; display:flex; align-items:center; justify-content:center;
-  padding:18px; background:rgba(17,17,14,.88); backdrop-filter:blur(6px);
-}
-.asset-lightbox[hidden] { display:none !important; }
-.asset-lightbox-inner {
-  position:relative; max-width:min(960px, 100%); max-height:100%;
-  display:flex; flex-direction:column; gap:10px; align-items:center;
-}
-.asset-lightbox img {
-  display:block; max-width:100%; max-height:min(82vh, 900px); object-fit:contain;
-  background:#000; border:1px solid rgba(255,255,255,.2);
-}
-.asset-lightbox .lb-cap { color:#f3f1ea; font-size:13px; font-weight:700; text-align:center; }
-.asset-lightbox .lb-close {
-  position:absolute; top:-6px; right:-6px; min-height:40px; min-width:40px; padding:0 12px;
-  background:var(--paper); color:var(--ink); border:1px solid var(--ink); font-weight:800; cursor:pointer;
-  box-shadow:3px 3px 0 var(--yellow);
-}
-.asset-card .badge {
-  padding:2px 6px; font-size:9px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
-  background:var(--ink); color:var(--paper);
-}
-.asset-card .badge.live { background:var(--green); }
-.asset-card .badge.fav { background:var(--orange); }
-.asset-card .meta { padding:10px; display:flex; flex-direction:column; gap:8px; flex:1; }
-.asset-card .meta strong { font-size:12px; line-height:1.25; word-break:break-word; }
-.asset-card .meta select { width:100%; min-height:32px; font-size:12px; border:1px solid var(--line); }
-.asset-card .actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-.asset-card .actions button { min-height:32px; padding:0 6px; font-size:11px; box-shadow:none; }
-.asset-empty { padding:28px 12px; text-align:center; color:var(--muted); }
-
-.asset-bulk {
-  display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-  padding:10px 12px; margin:0 0 12px; border:1px solid var(--line); background:var(--canvas);
-}
-.asset-bulk .count { font-size:12.5px; font-weight:800; margin-right:auto; }
-.asset-bulk label.chk-all {
-  display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:800;
-  text-transform:none; letter-spacing:0; padding:0; color:var(--ink); cursor:pointer;
-}
-.asset-bulk label.chk-all input { width:18px; height:18px; min-height:0; accent-color:var(--orange); }
-.asset-card.selected { box-shadow:4px 4px 0 var(--orange); }
-.asset-card .pick {
-  position:absolute; top:8px; right:8px; z-index:2;
-  width:22px; height:22px; accent-color:var(--orange); cursor:pointer;
-}
-</style>
-
-</head>
-<body>
-<div class="wrap">
-  <div class="top">
-    <a class="brand" href="/" aria-label="YOLKO home">
-      <span class="brand-dot" aria-hidden="true"></span>
-      <span class="brand-name">YOLKO</span>
-    </a>
-    <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
-      <small>Admin</small>
-      <button class="ghost out" id="signout" onclick="logout()" style="display:none">Sign out</button>
-    </div>
-  </div>
-
-  <div class="card login" id="login-card">
-    <h2>Sign in</h2>
-    <p class="login-lead">Paste your admin key to manage orders, stock, and delivery settings.</p>
-    <label>Admin key</label>
-    <input id="key" type="password" placeholder="Paste your admin key" style="margin-bottom:12px" autocomplete="current-password">
-    <button type="button" id="signin-btn" onclick="saveKey()" style="width:100%">Sign in</button>
-    <p class="msg err" id="login-msg" style="margin:10px 0 0; display:block; text-align:center"></p>
-  </div>
-
-  <div id="panel" style="display:none">
-    <div class="admin-tabs" role="tablist">
-      <button type="button" class="on" id="tab-shop" onclick="showAdminView('shop')">Orders &amp; stock</button>
-      <button type="button" id="tab-prices" onclick="showAdminView('prices')">Competitor prices</button>
-      <button type="button" id="tab-visits" onclick="showAdminView('visits')">QR / Flyer</button>
-      <button type="button" id="tab-assets" onclick="showAdminView('assets')">Assets</button>
-    </div>
-
-    <div id="view-shop" class="view">
-    <div class="stats" id="stats"></div>
-
-    <div class="cols">
-    <div class="col-left">
-    <div class="card">
-      <div class="topline">
-        <h2>Orders</h2>
-        <button class="ghost" onclick="loadOrders()" style="min-height:36px;padding:6px 12px;font-size:12px">Refresh</button>
-      </div>
-      <div id="orders"></div>
-      <div id="orders-archive" class="archive"></div>
-      <p class="empty" id="empty" style="display:none">No open orders.</p>
-    </div>
-
-    <div class="card">
-      <div class="topline">
-        <h2>Buyers</h2>
-        <span class="b-sum" id="buyer-sum"></span>
-      </div>
-      <div id="buyers"></div>
-    </div>
-    </div>
-
-    <div class="card">
-      <h2>Prices &amp; stock</h2>
-
-      <div class="ps-block">
-        <h3 class="ps-title">Stock this week</h3>
-        <p class="ps-sub">Dozen packs stay off the website while stock is 0.</p>
-        <div class="grid2">
-          <div><label>Trays left</label><input id="stock" type="number" min="0" step="1"></div>
-          <div><label>Dozen packs left</label><input id="dozen-stock" type="number" min="0" step="1" value="0"></div>
-          <div style="grid-column:1/-1"><label>Featured tray on homepage</label>
-            <select id="tray-weight">
-              <option value="1.75">Cage · 1.75kg (Extra Large)</option>
-              <option value="1.5">Cage · 1.5kg (Large)</option>
-              <option value="fr-700">Free range · 700g</option>
-              <option value="fr-600">Free range · 600g</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="ps-block">
-        <h3 class="ps-title">Tray prices</h3>
-        <p class="ps-sub">Change one price and the others follow. $13 tray locks the box at $72.</p>
-        <div class="grid3">
-          <div><label>1 tray</label><input id="p1" type="number" min="1" step="1"></div>
-          <div><label>2 trays</label><input id="p2" type="number" min="1" step="1"></div>
-          <div><label>Full box</label><input id="p3" type="number" min="1" step="1"></div>
-        </div>
-        <div class="grid2">
-          <div><label>What you pay for a box</label><input id="box-cost" type="number" min="0" step="1" value="55"></div>
-        </div>
-        <p class="hint" id="price-hint"></p>
-      </div>
-
-      <div class="ps-block">
-        <h3 class="ps-title">Dozen packs</h3>
-        <p class="ps-sub">Enter what you pay for a case of 15. We suggest a sell price for that product only.</p>
-        <div id="dozen-list"></div>
-        <p class="hint" id="dozen-hint"></p>
-        <div style="display:none" aria-hidden="true">
-          <input id="p-cage600" type="number"><input id="p-cage700" type="number"><input id="p-cage800" type="number">
-          <input id="p-fr600" type="number"><input id="p-fr700" type="number"><input id="p-fr800" type="number">
-          <input id="p-cage600case" type="number"><input id="p-cage700case" type="number"><input id="p-cage800case" type="number">
-          <input id="p-fr600case" type="number"><input id="p-fr700case" type="number"><input id="p-fr800case" type="number">
-          <input id="c-cage600" type="number"><input id="c-cage700" type="number"><input id="c-cage800" type="number">
-          <input id="c-fr600" type="number"><input id="c-fr700" type="number"><input id="c-fr800" type="number">
-        </div>
-      </div>
-
-      <div class="ps-block">
-        <h3 class="ps-title">Pickup days</h3>
-        <p class="ps-sub">Tap a day to open or close it.</p>
-        <div class="day-chips" id="day-chips"></div>
-        <div id="day-hours"></div>
-      </div>
-
-      <button onclick="saveSettings()" style="width:100%">Save changes</button><span class="msg" id="save-msg"></span>
-      <p class="note">Saved changes show on the website within seconds.</p>
-    </div>
-    </div>
-    </div>
-
-    <div id="view-prices" class="view" hidden>
-      <div class="card">
-        <div class="topline">
-          <h2>Competitor prices</h2>
-          <button class="ghost" onclick="loadPriceWatch()" style="min-height:36px;padding:6px 12px;font-size:12px">Refresh</button>
-        </div>
-        <p class="visit-note">Live caged egg watch (700g dozens + 30-packs). Worker polls every 15 minutes and records changes. Your own sell prices stay under <b>Orders &amp; stock</b>.</p>
-        <div class="pw-actions">
-          <button type="button" class="ghost" onclick="pollPriceWatchNow()">Check prices now</button>
-          <span class="msg" id="pw-msg"></span>
-        </div>
-        <div class="v-stats" id="pw-stats"></div>
-        <p class="muted" id="pw-meta" style="margin:0 0 14px;font-size:12.5px;color:var(--muted);font-weight:700"></p>
-
-        <h3 class="ps-title">Caged 700g (dozen)</h3>
-        <div id="pw-700"></div>
-
-        <h3 class="ps-title">Caged 30-packs <span style="font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0">(not 700g. usually 1.5–1.75kg)</span></h3>
-        <div id="pw-30"></div>
-
-        <h3 class="ps-title">Recent changes</h3>
-        <div id="pw-events"></div>
-        <p class="empty" id="pw-empty" style="display:none">No price snapshots yet. Tap <b>Check prices now</b>.</p>
-      </div>
-    </div>
-
-    <div id="view-visits" class="view" hidden>
-      <div class="card">
-        <div class="topline">
-          <h2>QR / Flyer visits</h2>
-          <button class="ghost" onclick="loadVisits()" style="min-height:36px;padding:6px 12px;font-size:12px">Refresh</button>
-        </div>
-        <p class="visit-note" id="visit-note">Tracks scans that land via <code>/f</code> or <code>?src=flyer</code>. Browsers cannot send gender, real name, or hardware device IDs. Those stay blank until someone orders.</p>
-        <div class="v-stats" id="visit-stats"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-          <button type="button" class="ghost" id="visit-filter-flyer" onclick="loadVisits('flyer')">Flyer / QR only</button>
-          <button type="button" class="ghost" id="visit-filter-all" onclick="loadVisits('')">All sources</button>
-        </div>
-        <div id="visits"></div>
-        <p class="empty" id="visits-empty" style="display:none">No tracked visits yet. Scan the flyer QR (must open getyolko.com/f).</p>
-      </div>
-    </div>
-
-    <div id="view-assets" class="view" hidden>
-      <div class="card">
-        <div class="topline">
-          <h2>Assets</h2>
-          <button class="ghost" onclick="loadAssets()" style="min-height:36px;padding:6px 12px;font-size:12px">Refresh</button>
-        </div>
-        <p class="orders-hint">Favourite images, pick which ones rotate on the website, organise categories, then publish to go live. Delete hides an image from admin and live (files stay in the repo).</p>
-
-        <div class="asset-publish">
-          <div>
-            <p id="publish-status">Loading…</p>
-            <p class="muted" id="publish-meta"></p>
-          </div>
-          <button type="button" id="publish-btn" onclick="publishAssets()">Publish to live</button>
-        </div>
-
-        <h3 class="ps-title">Live rotator (draft)</h3>
-        <p class="ps-sub">Order = slideshow order on the homepage. Tap Use on a card to add/remove.</p>
-        <div class="draft-row" id="draft-row"></div>
-
-        <div class="asset-toolbar">
-          <select id="asset-filter-cat" onchange="renderAssets()"></select>
-          <select id="asset-filter-view" onchange="renderAssets()">
-            <option value="active">Active</option>
-            <option value="favorites">Favorites</option>
-            <option value="draft">In draft</option>
-            <option value="deleted">Deleted</option>
-            <option value="all">All</option>
-          </select>
-          <input id="asset-filter-q" type="text" placeholder="Search…" oninput="renderAssets()" style="flex:1;min-width:140px">
-          <input id="new-cat-name" type="text" placeholder="New category" style="width:140px">
-          <button type="button" class="ghost" onclick="createCategory()">Add category</button>
-        </div>
-        <div class="asset-bulk" id="asset-bulk">
-          <label class="chk-all"><input type="checkbox" id="asset-select-all" onchange="toggleSelectAll(this.checked)"> Select all</label>
-          <span class="count" id="asset-selected-count">0 selected</span>
-          <button type="button" class="ghost" onclick="clearAssetSelection()">Clear</button>
-          <button type="button" class="ghost" onclick="bulkFavorite(true)">Favorite</button>
-          <button type="button" class="ghost" onclick="bulkFavorite(false)">Unfav</button>
-          <button type="button" class="danger" id="bulk-delete-btn" onclick="bulkDeleteSelected()">Delete selected</button>
-          <button type="button" class="ghost" id="bulk-restore-btn" onclick="bulkRestoreSelected()" hidden>Restore selected</button>
-        </div>
-        <div class="asset-grid" id="asset-grid"></div>
-        <p class="asset-empty" id="asset-empty" hidden>No images match.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="asset-lightbox" id="asset-lightbox" hidden onclick="if(event.target===this)closeAssetLightbox()">
-  <div class="asset-lightbox-inner" role="dialog" aria-modal="true" aria-label="Image preview">
-    <button type="button" class="lb-close" onclick="closeAssetLightbox()" aria-label="Close">✕</button>
-    <img id="asset-lightbox-img" src="" alt="">
-    <div class="lb-cap" id="asset-lightbox-cap"></div>
-  </div>
-</div>
-
-<script>
-const $ = (id) => document.getElementById(id);
-let KEY = localStorage.getItem("yolko_admin_key") || "";
-
-const BUNDLE_META = {
-  tray1: { eggs: 30, kind: "tray" },
-  tray2: { eggs: 60, kind: "tray" },
-  box: { eggs: 180, kind: "tray" },
-  cage600: { eggs: 12, kind: "dozen", label: "Cage dozen 600g" },
-  cage700: { eggs: 12, kind: "dozen", label: "Cage dozen 700g" },
-  cage800: { eggs: 12, kind: "dozen", label: "Cage dozen 800g" },
-  fr600: { eggs: 12, kind: "dozen", label: "Free range dozen 600g" },
-  fr700: { eggs: 12, kind: "dozen", label: "Free range dozen 700g" },
-  fr800: { eggs: 12, kind: "dozen", label: "Free range dozen 800g" },
-  cage600case: { eggs: 180, kind: "case", label: "Cage case 600g" },
-  cage700case: { eggs: 180, kind: "case", label: "Cage case 700g" },
-  cage800case: { eggs: 180, kind: "case", label: "Cage case 800g" },
-  fr600case: { eggs: 180, kind: "case", label: "Free range case 600g" },
-  fr700case: { eggs: 180, kind: "case", label: "Free range case 700g" },
-  fr800case: { eggs: 180, kind: "case", label: "Free range case 800g" },
-};
-
-function describeOrder(bundle, qty) {
-  qty = qty || 1;
-  const meta = BUNDLE_META[bundle] || BUNDLE_META.tray1;
-  const eggs = (meta.eggs * qty).toLocaleString();
-  if (meta.kind === "dozen") {
-    return qty === 1 ? meta.label + " (12 eggs)" : qty + "× " + meta.label + " (" + eggs + " eggs)";
-  }
-  if (meta.kind === "case") {
-    return qty === 1 ? meta.label + " (15 dozens)" : qty + "× " + meta.label + " (" + eggs + " eggs)";
-  }
-  if (bundle === "box") return qty === 1 ? "1 box (180 eggs)" : qty + " boxes (" + eggs + " eggs)";
-  const trays = (bundle === "tray2" ? 2 : 1) * qty;
-  return trays === 1 ? "1 tray (30 eggs)" : trays + " trays (" + eggs + " eggs)";
-}
-
-const WEEK_DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-
-function timeOptions(selected) {
-  let out = "";
-  for (let h = 5; h <= 21; h++) {
-    for (const m of [0, 30]) {
-      const val = String(h).padStart(2, "0") + ":" + (m ? "30" : "00");
-      const h12 = h % 12 === 0 ? 12 : h % 12;
-      const label = h12 + (m ? ":30 " : ":00 ") + (h >= 12 ? "PM" : "AM");
-      out += '<option value="' + val + '"' + (val === selected ? " selected" : "") + ">" + label + "</option>";
-    }
-  }
-  return out;
-}
-
-let PICKUP = {};
-
-function renderDays() {
-  $("day-chips").innerHTML = WEEK_DAYS.map(function(day) {
-    const on = PICKUP[day] && PICKUP[day].enabled;
-    return '<button type="button" class="chip' + (on ? " on" : "") + '" data-day="' + day + '">' + day.slice(0,3) + '</button>';
-  }).join("");
-
-  const open = WEEK_DAYS.filter(function(d) { return PICKUP[d] && PICKUP[d].enabled; });
-  $("day-hours").innerHTML = open.length
-    ? open.map(function(day) {
-        const p = PICKUP[day];
-        return '<div class="hours-row">' +
-          '<b>' + day.slice(0,3) + '</b>' +
-          '<select data-day="' + day + '" data-k="open">' + timeOptions(p.open) + '</select>' +
-          '<span>to</span>' +
-          '<select data-day="' + day + '" data-k="close">' + timeOptions(p.close) + '</select>' +
-        '</div>';
-      }).join("")
-    : '<p class="hours-empty">No pickup days open. Tap a day above.</p>';
-}
-
-$("day-chips") && document.addEventListener("click", function(e) {
-  const chip = e.target.closest(".chip");
-  if (!chip) return;
-  const day = chip.dataset.day;
-  PICKUP[day] = PICKUP[day] || { enabled: false, open: "09:00", close: "14:00" };
-  PICKUP[day].enabled = !PICKUP[day].enabled;
-  renderDays();
-});
-
-document.addEventListener("change", function(e) {
-  const sel = e.target.closest("#day-hours select");
-  if (!sel) return;
-  PICKUP[sel.dataset.day][sel.dataset.k] = sel.value;
-});
-
-function collectDayRows() {
-  return PICKUP;
-}
-
-function traysFor(o) {
-  const kind = BUNDLE_META[o.bundle] && BUNDLE_META[o.bundle].kind;
-  if (kind === "dozen" || kind === "case") return 0;
-  return (o.bundle === "box" ? 6 : o.bundle === "tray2" ? 2 : 1) * (o.quantity || 1);
-}
-
-function toast(text) {
-  const el = document.createElement("div");
-  el.className = "toast";
-  el.textContent = text;
-  document.body.appendChild(el);
-  requestAnimationFrame(() => el.classList.add("show"));
-  setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 350); }, 3200);
-}
-
-function authHeaders() { return { "Authorization": "Bearer " + KEY, "Content-Type": "application/json" }; }
-
-async function saveKey() {
-  const input = $("key");
-  KEY = (input && input.value ? input.value : "").trim();
-  if (!KEY) {
-    $("login-msg").textContent = "Paste your admin key first";
-    return;
-  }
-  $("login-msg").textContent = "Checking…";
-  let res;
-  try {
-    res = await fetch("/api/admin/ping", { headers: authHeaders() });
-  } catch (e) {
-    $("login-msg").textContent = "Network error. Try again";
-    return;
-  }
-  if (res.ok) {
-    localStorage.setItem("yolko_admin_key", KEY);
-    $("login-msg").textContent = "";
-    boot();
-  } else if (res.status === 401) {
-    $("login-msg").textContent = "Wrong key, try again";
-  } else {
-    $("login-msg").textContent = "Sign-in failed (" + res.status + ")";
-  }
-}
-
-function logout() { localStorage.removeItem("yolko_admin_key"); location.reload(); }
-
-function fmtTime(iso) {
-  return new Date(iso).toLocaleString("en-AU", { timeZone: "Australia/Sydney", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-}
-
-function fmtPhone(p) { return p.replace(/(\\d{4})(\\d{3})(\\d{3})/, "$1 $2 $3"); }
-
-let ALL_ORDERS = [];
-let OPEN_ORDER_ID = null;
-
-async function loadOrders() {
-  const scrolls = saveLaneScrolls();
-  const res = await fetch("/api/orders", { headers: authHeaders() });
-  if (!res.ok) return;
-  const { orders } = await res.json();
-
-  orders.sort((a, b) => {
-    const day = (o) => (o.pickupDate || "") + " " + (o.pickupDay || "");
-    const rank = (o) => (o.status === "cancelled" ? 4 : o.status === "done" ? 3 : o.status === "confirmed" ? 1 : 0);
-    return rank(a) - rank(b) || day(a).localeCompare(day(b)) || b.createdAt.localeCompare(a.createdAt);
-  });
-  ALL_ORDERS = orders;
-
-  const active = orders.filter(o => o.status !== "cancelled");
-  const revenue = active.filter(o => o.status !== "new").reduce((s, o) => s + (o.price || 0), 0);
-  const paidOnline = active.filter(o => o.paymentStatus === "paid").reduce((s, o) => s + (o.price || 0), 0);
-  const pending = orders.filter(o => o.status === "new").length;
-  $("stats").innerHTML =
-    '<div class="stat"><b>' + orders.length + '</b><span>orders</span></div>' +
-    '<div class="stat"><b>' + pending + '</b><span>waiting</span></div>' +
-    '<div class="stat highlight"><b id="stat-stock">' + (window.TRAYS_LEFT ?? "–") + '</b><span>trays left</span></div>' +
-    '<div class="stat"><b>$' + revenue + '</b><span>confirmed</span></div>' +
-    '<div class="stat"><b>$' + paidOnline + '</b><span>paid online</span></div>';
-
-  renderOrderBoard();
-  restoreLaneScrolls(scrolls);
-  renderBuyers(orders);
-}
-
-function pickupKey(o) {
-  const kind = o.fulfillment === "delivery" ? "delivery" : "pickup";
-  return kind + "|" + (o.pickupDay || "TBD") + "|" + (o.pickupDate || "");
-}
-
-function pickupLabel(o) {
-  const day = o.pickupDate ? (o.pickupDay + " " + o.pickupDate) : (o.pickupDay || "TBD");
-  if (o.fulfillment === "delivery") return "🚚 Delivery " + day;
-  return day || "Pickup TBD";
-}
-
-function isPaid(o) {
-  return o.paymentStatus === "paid" && o.status !== "cancelled";
-}
-
-function isRefunded(o) {
-  return o.paymentStatus === "refunded";
-}
-
-function sortPaidFirst(a, b) {
-  const ap = isPaid(a) ? 0 : 1;
-  const bp = isPaid(b) ? 0 : 1;
-  return ap - bp || String(a.createdAt || "").localeCompare(String(b.createdAt || ""));
-}
-
-// Queue line numbers per pickup day: paid first, then other confirmed, in booking order.
-function assignLineNumbers(allOrders) {
-  const byDay = {};
-  allOrders.forEach(function(o) {
-    if (o.status === "cancelled" || o.status === "done") return;
-    if (!isPaid(o) && o.status !== "confirmed") return;
-    const k = pickupKey(o);
-    (byDay[k] = byDay[k] || []).push(o);
-  });
-  const lines = {};
-  Object.keys(byDay).forEach(function(k) {
-    byDay[k].sort(sortPaidFirst);
-    byDay[k].forEach(function(o, i) { lines[o.id] = i + 1; });
-  });
-  return lines;
-}
-
-function groupByPickup(list) {
-  const map = {};
-  list.forEach(function(o) {
-    const k = pickupKey(o);
-    (map[k] = map[k] || { key: k, label: pickupLabel(o), orders: [], trays: 0, paid: 0 }).orders.push(o);
-    map[k].trays += traysFor(o);
-    if (isPaid(o)) map[k].paid += 1;
-  });
-  return Object.keys(map).sort().map(function(k) {
-    map[k].orders.sort(sortPaidFirst);
-    return map[k];
-  });
-}
-
-function shortBundle(o) {
-  const meta = BUNDLE_META[o.bundle];
-  if (meta && meta.kind === "dozen") {
-    const n = o.quantity || 1;
-    return n + "× " + (meta.label || o.bundle).replace(" dozen", "");
-  }
-  if (meta && meta.kind === "case") {
-    const n = o.quantity || 1;
-    return n + "× " + (meta.label || o.bundle) + " (15pk)";
-  }
-  if (o.bundle === "box") return ((o.quantity || 1) * 6) + "tr box";
-  const trays = traysFor(o);
-  return trays + (trays === 1 ? " tray" : " trays");
-}
-
-function formatDeliveryAddress(o) {
-  const parts = [o.deliveryStreet, o.deliverySuburb, o.deliveryCity, o.deliveryPostcode]
-    .map(function(p) { return String(p || "").trim(); })
-    .filter(Boolean);
-  if (parts.length) return parts.join("\\n");
-  return String(o.deliveryAddress || "").trim();
-}
-
-function orderEmail(o) {
-  return (o.stripe && o.stripe.email) ? String(o.stripe.email) : "";
-}
-
-function iconSvg(kind) {
-  // Hard width/height on the <svg>. CSS alone was letting icons explode to full lane size.
-  const base = 'xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="width:18px;height:18px;display:block"';
-  if (kind === "receipt") {
-    return '<svg ' + base + '><path d="M7 3.5h10v17l-1.8-1.1-1.7 1.1-1.7-1.1-1.7 1.1-1.7-1.1-1.7 1.1-1.7-1.1V3.5z"/><path d="M10 8h6M10 12h6M10 16h3.5"/></svg>';
-  }
-  // refund. clean return arrow (reads clearly at 18px)
-  return '<svg ' + base + '><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>';
-}
-
-function contactRow(label, value, href) {
-  const val = value
-    ? '<div class="sale-v">' + escapeHtml(value) + '</div>'
-    : '<div class="sale-v muted">-</div>';
-  const inner = '<div class="sale-k">' + escapeHtml(label) + '</div>' + val;
-  if (href && value) {
-    return '<a class="sale-row" href="' + escapeHtml(href) + '">' + inner + '</a>';
-  }
-  return '<div class="sale-row">' + inner + '</div>';
-}
-
-function saleCardHtml(o) {
-  const email = orderEmail(o);
-  const phone = o.phone ? fmtPhone(o.phone) : "";
-  const isDelivery = o.fulfillment === "delivery";
-  const addr = isDelivery
-    ? formatDeliveryAddress(o)
-    : "Paddy\\'s Markets Flemington";
-  const canRefund = o.paymentStatus === "paid" && !isRefunded(o);
-  const canReceipt = isPaid(o) || Boolean(o.sessionId);
-  const receiptUrl = o.stripe && o.stripe.receiptUrl ? o.stripe.receiptUrl : "";
-  const chip = isRefunded(o)
-    ? '<span class="sale-chip refunded">Refunded</span>'
-    : (isPaid(o)
-      ? '<span class="sale-chip">Paid</span>'
-      : (o.sessionId ? '<span class="sale-chip" style="background:#eee;color:var(--muted)">Checkout open</span>' : ''));
-
-  let receiptBtn = "";
-  // Receipt only when Stripe has actually charged (paid + receipt URL or paid status).
-  if (isPaid(o)) {
-    if (receiptUrl) {
-      receiptBtn = '<a class="icon-btn" href="' + escapeHtml(receiptUrl) + '" target="_blank" rel="noopener" title="Receipt" aria-label="Receipt">' + iconSvg("receipt") + '</a>';
-    } else {
-      receiptBtn = '<button type="button" class="icon-btn" title="Check Stripe" aria-label="Check Stripe" onclick="openReceipt(\\'' + o.id + '\\')">' + iconSvg("receipt") + '</button>';
-    }
-  } else if (o.sessionId) {
-    receiptBtn = '<button type="button" class="icon-btn" title="Refresh payment status" aria-label="Refresh payment" onclick="hydrateStripeReceipt(\\'' + o.id + '\\')">' + iconSvg("receipt") + '</button>';
-  }
-  const refundBtn = canRefund
-    ? '<button type="button" class="icon-btn danger" title="Refund" aria-label="Refund" onclick="refundOrder(\\'' + o.id + '\\')">' + iconSvg("refund") + '</button>'
-    : "";
-
-  return '<div class="sale-card" data-sale-id="' + escapeHtml(o.id) + '">' +
-    '<h4 class="sale-name">' + escapeHtml(o.name || "-") + chip + '</h4>' +
-    '<div class="sale-contacts">' +
-      contactRow("Email", email || (canReceipt ? "…" : ""), email ? ("mailto:" + email) : "") +
-      contactRow("Phone", phone, o.phone ? ("tel:" + o.phone) : "") +
-      contactRow(isDelivery ? "Address" : "Pickup", addr, "") +
-    '</div>' +
-    '<div class="sale-tools">' +
-      receiptBtn +
-      refundBtn +
-      '<div class="sale-status">' + statusButtons(o) + '</div>' +
-    '</div>' +
-  '</div>';
-}
-
-function orderRow(o, lineNo) {
-  const signals = orderSignals(o, ALL_ORDERS);
-  const prio = isPaid(o);
-  const open = OPEN_ORDER_ID === o.id;
-  const badges =
-    (isRefunded(o) ? '<span class="badge-refunded">Refunded</span>' : '') +
-    (prio ? '<span class="badge-paid">Paid</span>' : '');
-  const place = o.fulfillment === "delivery"
-    ? ([o.deliverySuburb, o.deliveryPostcode].filter(Boolean).join(" ") || "delivery")
-    : "pickup";
-
-  return '<div class="order st-' + o.status + (prio ? ' prio' : '') + (signals.suspicious ? ' sus' : '') +
-    (open ? ' open' : '') + '" data-id="' + escapeHtml(o.id) + '">' +
-    '<div class="o-main">' +
-      '<div class="o-name-row">' + badges + '<div class="o-name">' + escapeHtml(o.name) + '</div></div>' +
-      '<div class="o-sub">' + shortBundle(o) + ' · ' + escapeHtml(place) + '</div>' +
-    '</div>' +
-    '<div class="o-right"><span class="o-price">$' + o.price + '</span></div>' +
-    '<div class="o-detail" onclick="event.stopPropagation()">' +
-      saleCardHtml(o) +
-    '</div>' +
-  '</div>';
-}
-
-function laneHtml(title, cls, list, lineMap) {
-  const groups = groupByPickup(list);
-  const trays = list.reduce(function(s, o) { return s + traysFor(o); }, 0);
-  const paidN = list.filter(isPaid).length;
-  const body = groups.length
-    ? groups.map(function(g) {
-        const paidLabel = g.paid ? (g.paid + ' paid · ') : '';
-        return '<div class="day-group">' +
-          '<div class="day-head"><b>' + escapeHtml(g.label) + '</b><span>' + paidLabel + g.trays + (g.trays === 1 ? ' tray' : ' trays') + ' · ' + g.orders.length + '</span></div>' +
-          g.orders.map(function(o) { return orderRow(o, lineMap[o.id]); }).join('') +
-        '</div>';
-      }).join('')
-    : '<p class="lane-empty">Nothing here.</p>';
-  const headMeta = list.length + ' · ' + trays + ' trays' + (paidN ? ' · ' + paidN + ' paid' : '');
-  return '<section class="lane ' + cls + '">' +
-    '<div class="lane-head"><h3>' + title + '</h3><span>' + headMeta + '</span></div>' +
-    '<div class="lane-body">' + body + '</div></section>';
-}
-
-function renderOrderBoard() {
-  const lineMap = assignLineNumbers(ALL_ORDERS);
-  const waiting = ALL_ORDERS.filter(o => o.status === "new").sort(sortPaidFirst);
-  const confirmed = ALL_ORDERS.filter(o => o.status === "confirmed").sort(sortPaidFirst);
-  const archived = ALL_ORDERS.filter(o => o.status === "done" || o.status === "cancelled");
-  const archiveWasOpen = !!(document.querySelector("#orders-archive details.archive") && document.querySelector("#orders-archive details.archive").open);
-  const openIsArchived = !!(OPEN_ORDER_ID && archived.some(function(o) { return o.id === OPEN_ORDER_ID; }));
-
-  $("orders").innerHTML = laneHtml("Waiting", "waiting", waiting, lineMap) + laneHtml("Confirmed", "confirmed", confirmed, lineMap);
-  $("empty").style.display = (waiting.length || confirmed.length) ? "none" : "block";
-
-  if (archived.length) {
-    $("orders-archive").innerHTML =
-      '<details class="archive"' + (archiveWasOpen || openIsArchived ? " open" : "") + '><summary>Done &amp; cancelled · ' + archived.length + '</summary>' +
-      laneHtml("Archive", "archive-lane", archived, {}) + '</details>';
-  } else {
-    $("orders-archive").innerHTML = "";
-  }
-}
-
-function saveLaneScrolls() {
-  const out = {};
-  document.querySelectorAll(".lane-body").forEach(function(el, i) { out[i] = el.scrollTop; });
-  return out;
-}
-
-function restoreLaneScrolls(map) {
-  if (!map) return;
-  document.querySelectorAll(".lane-body").forEach(function(el, i) {
-    if (typeof map[i] === "number") el.scrollTop = map[i];
-  });
-}
-
-function renderOrderBoardPreservingScroll() {
-  const scrolls = saveLaneScrolls();
-  renderOrderBoard();
-  restoreLaneScrolls(scrolls);
-}
-
-document.addEventListener("click", function(e) {
-  const row = e.target.closest("#orders .order, #orders-archive .order");
-  if (!row) return;
-  if (e.target.closest(".o-detail")) return;
-  // Capture-phase + stopPropagation so <details class="archive"> does not toggle.
-  e.preventDefault();
-  e.stopPropagation();
-  const id = row.dataset.id;
-  const closing = OPEN_ORDER_ID === id;
-  document.querySelectorAll(".order.open").forEach(function(el) { el.classList.remove("open"); });
-  OPEN_ORDER_ID = closing ? null : id;
-  const archive = row.closest("details.archive");
-  if (archive) archive.open = true;
-  if (!closing) {
-    row.classList.add("open");
-    hydrateStripeReceipt(id);
-  }
-}, true);
-
-async function fetchStripeDetails(orderId) {
-  const order = ALL_ORDERS.find(function(o) { return o.id === orderId; });
-  if (!order || (!isPaid(order) && !order.sessionId)) return null;
-  if (order.stripe && order.stripe.receiptUrl && order.stripe.email && isPaid(order)) return order.stripe;
-  try {
-    const res = await fetch("/api/stripe-receipt?id=" + encodeURIComponent(orderId), { headers: authHeaders() });
-    const data = await res.json();
-    if (!res.ok || !data.stripe) return null;
-    order.stripe = data.stripe;
-    // Trust Stripe payment_status from the API. Never mark paid just because stripe{} exists.
-    if (data.paid === true || data.paymentStatus === "paid") {
-      order.paymentStatus = "paid";
-      if (order.status === "new") order.status = "confirmed";
-    } else if (data.paymentStatus) {
-      order.paymentStatus = data.paymentStatus;
-    }
-    return data.stripe;
-  } catch (err) {
-    return null;
-  }
-}
-
-function refreshSaleCard(orderId) {
-  const order = ALL_ORDERS.find(function(o) { return o.id === orderId; });
-  const card = document.querySelector('.sale-card[data-sale-id="' + CSS.escape(orderId) + '"]');
-  if (!order || !card) return;
-  card.outerHTML = saleCardHtml(order);
-}
-
-async function hydrateStripeReceipt(orderId) {
-  const beforePaid = (() => {
-    const o = ALL_ORDERS.find((x) => x.id === orderId);
-    return o ? isPaid(o) : false;
-  })();
-  const stripe = await fetchStripeDetails(orderId);
-  if (!stripe) return;
-  refreshSaleCard(orderId);
-  const afterPaid = (() => {
-    const o = ALL_ORDERS.find((x) => x.id === orderId);
-    return o ? isPaid(o) : false;
-  })();
-  // Re-draw board when payment badge should change.
-  if (beforePaid !== afterPaid) renderOrderBoardPreservingScroll();
-}
-
-async function openReceipt(orderId) {
-  const order = ALL_ORDERS.find(function(o) { return o.id === orderId; });
-  if (!order) return;
-  let url = order.stripe && order.stripe.receiptUrl;
-  if (!url) {
-    toast("Opening receipt…");
-    const stripe = await fetchStripeDetails(orderId);
-    url = stripe && stripe.receiptUrl;
-    refreshSaleCard(orderId);
-  }
-  if (!url) {
-    toast("Receipt not ready yet");
-    return;
-  }
-  window.open(url, "_blank", "noopener");
-}
-
-const TEST_PHONES = { "0412345678": 1, "0498765432": 1 };
-const HOSTING_RE = /amazon|aws|google\s*(cloud|llc)|microsoft|azure|digitalocean|ovh|hetzner|linode|vultr|hosting|datacenter|data centre|\bvps\b|colocation|dedicated server/i;
-
-function orderSignals(o, orders) {
-  const tags = [];
-  let suspicious = false;
-  if (o.country && o.country !== "AU") {
-    tags.push({ cls: "warn", text: o.country + " IP" });
-    suspicious = true;
-  }
-  if (TEST_PHONES[o.phone]) {
-    tags.push({ cls: "warn", text: "test phone?" });
-    suspicious = true;
-  }
-  if (o.asnOrg && HOSTING_RE.test(o.asnOrg)) {
-    tags.push({ cls: "warn", text: "datacenter IP" });
-    suspicious = true;
-  }
-  if (o.ip) {
-    const same = orders.filter(function(x) {
-      return x.ip === o.ip && x.id !== o.id && x.status !== "cancelled";
-    }).length;
-    if (same > 0) {
-      tags.push({ cls: "warn", text: same + " more same IP" });
-      suspicious = true;
-    }
-  }
-  const metaParts = [];
-  if (o.country) metaParts.push(o.country);
-  if (o.ip) metaParts.push(o.ip);
-  if (o.asnOrg) metaParts.push(o.asnOrg);
-  return { tags: tags, suspicious: suspicious, metaLine: metaParts.join(" · ") };
-}
-
-function daysAgo(iso) {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  return days <= 0 ? "today" : days === 1 ? "yesterday" : days + " days ago";
-}
-
-function sparkline(history, maxV) {
-  // history: [{t, v}] sorted by time; renders an SVG line of purchases
-  const W = 100, H = 34, PAD = 5;
-  if (!history.length) return "";
-  const t0 = history[0].t, t1 = history[history.length - 1].t;
-  const span = Math.max(1, t1 - t0);
-  const pts = history.map(function(p) {
-    const x = history.length === 1 ? W / 2 : PAD + ((p.t - t0) / span) * (W - PAD * 2);
-    const y = H - PAD - (p.v / maxV) * (H - PAD * 2);
-    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
-  });
-  const line = pts.map(function(p) { return p[0] + "," + p[1]; }).join(" ");
-  const area = "M" + pts[0][0] + "," + (H - 2) + " L" + pts.map(function(p) { return p[0] + "," + p[1]; }).join(" L") + " L" + pts[pts.length - 1][0] + "," + (H - 2) + " Z";
-  const dots = pts.map(function(p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.4" fill="#f6532f"/>'; }).join("");
-  return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
-    '<path d="' + area + '" fill="rgba(255,211,42,.35)"/>' +
-    (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="#f6532f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' : '') +
-    dots + '</svg>';
-}
-
-function renderBuyers(orders) {
-  const active = orders.filter(function(o) { return o.status !== "cancelled"; });
-  const map = {};
-  active.forEach(function(o) {
-    const b = map[o.phone] = map[o.phone] || { name: o.name, phone: o.phone, orders: 0, trays: 0, spend: 0, paid: 0, history: [], bundles: {}, days: {} };
-    b.orders++;
-    b.trays += traysFor(o);
-    b.spend += o.price || 0;
-    if (o.paymentStatus === "paid") b.paid++;
-    b.history.push({ t: new Date(o.createdAt).getTime(), v: o.price || 0 });
-    b.bundles[o.bundle] = (b.bundles[o.bundle] || 0) + 1;
-    b.days[o.pickupDay] = (b.days[o.pickupDay] || 0) + 1;
-  });
-
-  const buyers = Object.values(map).sort(function(a, b) { return b.spend - a.spend; });
-  const repeat = buyers.filter(function(b) { return b.orders > 1; }).length;
-  $("buyer-sum").textContent = buyers.length
-    ? buyers.length + (buyers.length === 1 ? " buyer" : " buyers") + " · " + repeat + " repeat"
-    : "";
-
-  if (!buyers.length) {
-    $("buyers").innerHTML = '<p class="empty">No buyers yet. They appear with their first order.</p>';
-    return;
-  }
-
-  const BUNDLE_WORD = { tray1: "single trays", tray2: "2-tray packs", box: "full boxes", cage600: "cage 600g", cage700: "cage 700g", cage800: "cage 800g", fr600: "FR 600g", fr700: "FR 700g", fr800: "FR 800g", cage600case: "cage cases", cage700case: "cage cases", cage800case: "cage cases", fr600case: "FR cases", fr700case: "FR cases", fr800case: "FR cases" };
-
-  $("buyers").innerHTML = buyers.map(function(b, i) {
-    b.history.sort(function(x, y) { return x.t - y.t; });
-    const maxOrderV = Math.max.apply(null, b.history.map(function(p) { return p.v; })) || 1;
-    const newest = b.history[b.history.length - 1].t;
-    const daysSince = Math.max(0, Math.floor((Date.now() - newest) / 86400000));
-
-    const favBundle = Object.keys(b.bundles).sort(function(x, y) { return b.bundles[y] - b.bundles[x]; })[0];
-    const favDay = Object.keys(b.days).sort(function(x, y) { return b.days[y] - b.days[x]; })[0];
-
-    let badges = "";
-    if (i === 0 && buyers.length > 1) badges += '<span class="bb gold">top</span>';
-    if (b.orders >= 3) badges += '<span class="bb green">regular</span>';
-    if (b.paid === b.orders && b.orders > 0) badges += '<span class="bb green">prepays</span>';
-    if (b.orders === 1 && daysSince <= 10) badges += '<span class="bb blue">new</span>';
-
-    let insight = "", insightClass = "soft";
-    if (b.orders > 1) {
-      const spanDays = (newest - b.history[0].t) / 86400000;
-      const gap = Math.max(1, Math.round(spanDays / (b.orders - 1)));
-      const ratio = daysSince / gap;
-      if (ratio >= 1.4) { insight = "Overdue " + (daysSince - gap) + "d. Worth a WhatsApp"; insightClass = "warn"; }
-      else if (ratio >= 0.75) { insight = "Due about now, every ~" + gap + " days"; insightClass = "due"; }
-      else { const next = Math.max(1, gap - daysSince); insight = "Next likely in ~" + next + (next === 1 ? " day" : " days"); insightClass = "good"; }
-    } else if (daysSince <= 10) { insight = "New. Follow up to keep them"; insightClass = "due"; }
-    else { insight = "Quiet " + daysSince + "d. Send a comeback"; insightClass = "soft"; }
-
-    return '<div class="buyer-card">' +
-      '<div class="bc-top">' +
-        '<span class="b-rank' + (i === 0 ? " top" : "") + '">' + (i + 1) + '</span>' +
-        '<div class="bc-name"><b>' + escapeHtml(b.name) + '</b><div>' + badges + '</div></div>' +
-        '<span class="b-spend">$' + b.spend + '</span>' +
-      '</div>' +
-      sparkline(b.history, maxOrderV) +
-      '<div class="bc-grid">' +
-        '<div><b>' + b.orders + '</b><span>' + (b.orders === 1 ? "order" : "orders") + '</span></div>' +
-        '<div><b>' + b.trays + '</b><span>' + (b.trays === 1 ? "tray" : "trays") + '</span></div>' +
-        '<div><b>' + favDay.slice(0, 3) + '</b><span>usual day</span></div>' +
-        '<div><b>' + (BUNDLE_WORD[favBundle] || favBundle).split(" ")[0].replace("single", "trays").replace("2-tray", "2-packs") + '</b><span>usually</span></div>' +
-      '</div>' +
-      '<div class="bc-foot">' +
-        '<span class="b-insight ' + insightClass + '">' + insight + '</span>' +
-        '<a class="bc-call" href="tel:' + b.phone + '" title="' + fmtPhone(b.phone) + '">Call</a>' +
-      '</div>' +
-    '</div>';
-  }).join("");
-}
-
-function statusButtons(o) {
-  const btn = (status, label, cls) => '<button class="' + cls + '" onclick="setStatus(\\'' + o.id + '\\',\\'' + status + '\\')">' + label + '</button>';
-  if (o.status === "new") return btn("confirmed", "Confirm", "") + btn("cancelled", "Cancel", "ghost");
-  if (o.status === "confirmed") return btn("done", "Done", "") + btn("cancelled", "Cancel", "ghost");
-  if (o.status === "done") return btn("confirmed", "Undo", "ghost");
-  return btn("new", "Reopen", "ghost");
-}
-
-async function refundOrder(id) {
-  const order = ALL_ORDERS.find(function(o) { return o.id === id; });
-  if (!order) return;
-  const who = order.name || "customer";
-  const amt = order.stripe && order.stripe.amountTotal != null ? order.stripe.amountTotal : order.price;
-  const email = (order.stripe && order.stripe.email) ? (" (" + order.stripe.email + ")") : "";
-  if (!confirm("Refund $" + amt + " to " + who + "?")) return;
-  toast("Refunding via Stripe…");
-  try {
-    const res = await fetch("/api/refund", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ id }),
-    });
-    const d = await res.json().catch(function() { return {}; });
-    if (!res.ok) {
-      toast(d.error || "Refund failed");
-      return;
-    }
-    if (typeof d.traysAvailable === "number") {
-      window.TRAYS_LEFT = d.traysAvailable;
-      $("stock").value = d.traysAvailable;
-      const stat = $("stat-stock");
-      if (stat) stat.textContent = d.traysAvailable;
-    }
-    const back = d.amount != null ? ("$" + d.amount) : ("$" + amt);
-    toast(d.already ? ("Already refunded · " + back) : ("Refunded " + back + " to " + who));
-    await loadOrders();
-  } catch (err) {
-    toast("Refund failed");
-  }
-}
-
-async function setStatus(id, status) {
-  const res = await fetch("/api/order-status", { method: "POST", headers: authHeaders(), body: JSON.stringify({ id, status }) });
-  if (res.ok) {
-    const d = await res.json();
-    if (typeof d.traysAvailable === "number") {
-      window.TRAYS_LEFT = d.traysAvailable;
-      $("stock").value = d.traysAvailable;
-      const stat = $("stat-stock");
-      if (stat) stat.textContent = d.traysAvailable;
-      if (d.stockDelta < 0) toast(d.trays + (d.trays === 1 ? " tray" : " trays") + " allocated · " + d.traysAvailable + " left");
-      if (d.stockDelta > 0) toast(d.stockDelta + (d.stockDelta === 1 ? " tray" : " trays") + " returned · " + d.traysAvailable + " left");
-    }
-  }
-  await loadOrders();
-}
-
-async function loadSettings() {
-  const res = await fetch("/api/settings");
-  const s = await res.json();
-  $("p1").value = s.prices.tray1;
-  $("p2").value = s.prices.tray2;
-  $("p3").value = s.prices.box;
-  DOZEN_KEYS.forEach(function(k) {
-    const el = $("p-" + k);
-    if (el && s.prices[k] != null) el.value = s.prices[k];
-    const cel = $("p-" + k + "case");
-    if (cel) cel.value = s.prices[k + "case"] != null ? s.prices[k + "case"] : Math.round(Number(s.prices[k] || 0) * DOZENS_IN_CASE);
-    const costEl = $("c-" + k);
-    const cost = s.dozenCosts && s.dozenCosts[k] != null ? s.dozenCosts[k] : (DOZEN_COST_DEFAULTS[k] || 75);
-    if (costEl) costEl.value = cost;
-  });
-  $("stock").value = s.traysAvailable;
-  window.TRAYS_LEFT = s.traysAvailable;
-  const stat = $("stat-stock");
-  if (stat) stat.textContent = s.traysAvailable;
-  $("tray-weight").value = s.trayWeight || "1.75";
-  if (s.boxCost != null && $("box-cost")) $("box-cost").value = s.boxCost;
-  if ($("dozen-stock")) $("dozen-stock").value = s.dozensAvailable != null ? s.dozensAvailable : 0;
-  PICKUP = s.pickup || {};
-  renderDays();
-  updatePriceHint();
-  renderDozenCostTable();
-}
-
-// Trays: 12 : 23 : 66 from $55 box cost. Dozens: each SKU has its own case cost.
-const PRICE_RATIO = { tray1: 12, tray2: 23, box: 66 };
-const DOZEN_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "fr800"];
-const DOZEN_LABELS = {
-  cage600: "Cage 600g", cage700: "Cage 700g", cage800: "Cage 800g",
-  fr600: "Free range 600g", fr700: "Free range 700g", fr800: "Free range 800g",
-};
-const DOZEN_COST_DEFAULTS = {
-  cage600: 75, cage700: 75, cage800: 75,
-  fr600: 90, fr700: 90, fr800: 90,
-};
-const BASE_BOX_COST = 55;
-const DOZENS_IN_CASE = 15;
-let SYNCING_PRICES = false;
-
-function roundMoney(n) {
-  return Math.max(1, Math.round(Number(n)));
-}
-
-function money(n) {
-  if (!Number.isFinite(n)) return "–";
-  const r = Math.round(n * 100) / 100;
-  return "$" + (r % 1 ? r.toFixed(2) : String(r));
-}
-
-/** Suggested sell for one dozen from that product's case cost only. */
-function suggestDozenSell(caseCost) {
-  const per = Number(caseCost) / DOZENS_IN_CASE;
-  if (!Number.isFinite(per) || per < 0) return 1;
-  return Math.max(1, Math.round(per + 1));
-}
-
-function pricesFromTrayAnchor(which, value) {
-  const v = Number(value);
-  if (!Number.isFinite(v) || v <= 0 || !PRICE_RATIO[which]) return null;
-  const scale = v / PRICE_RATIO[which];
-  return applyTrayExceptions({
-    tray1: roundMoney(PRICE_RATIO.tray1 * scale),
-    tray2: roundMoney(PRICE_RATIO.tray2 * scale),
-    box: roundMoney(PRICE_RATIO.box * scale),
-  });
-}
-
-function pricesFromBoxCost(cost) {
-  const c = Number(cost);
-  if (!Number.isFinite(c) || c < 0) return null;
-  const scale = c / BASE_BOX_COST;
-  return applyTrayExceptions({
-    tray1: roundMoney(PRICE_RATIO.tray1 * scale),
-    tray2: roundMoney(PRICE_RATIO.tray2 * scale),
-    box: roundMoney(PRICE_RATIO.box * scale),
-  });
-}
-
-/** When single tray is $13, full box is $72. */
-function applyTrayExceptions(prices) {
-  if (!prices) return prices;
-  if (Number(prices.tray1) === 13) {
-    return Object.assign({}, prices, { box: 72 });
-  }
-  return prices;
-}
-
-function applyTrayPrices(next) {
-  if (!next) return;
-  SYNCING_PRICES = true;
-  $("p1").value = next.tray1;
-  $("p2").value = next.tray2;
-  $("p3").value = next.box;
-  SYNCING_PRICES = false;
-  updatePriceHint();
-}
-
-function updatePriceHint() {
-  const el = $("price-hint");
-  if (!el) return;
-  const p1 = +$("p1").value, p2 = +$("p2").value, p3 = +$("p3").value;
-  const cost = +(($("box-cost") && $("box-cost").value) || BASE_BOX_COST);
-  const c1 = cost / 6;
-  if (!(p1 > 0)) {
-    el.textContent = "";
-    return;
-  }
-  el.innerHTML =
-    "Profit after box cost: 1 tray <b>" + money(p1 - c1) + "</b> · 2 trays <b>" +
-    money(p2 - c1 * 2) + "</b> · box <b>" + money(p3 - cost) + "</b>";
-}
-
-function syncHiddenDozenFields(key) {
-  const sell = +(($("p-" + key) && $("p-" + key).value) || 0);
-  const caseEl = $("p-" + key + "case");
-  if (caseEl && sell > 0) caseEl.value = String(Math.round(sell * DOZENS_IN_CASE));
-}
-
-function updateDozenRow(key) {
-  const cost = +(($("c-" + key) && $("c-" + key).value) || 0);
-  const sell = +(($("p-" + key) && $("p-" + key).value) || 0);
-  const per = cost / DOZENS_IN_CASE;
-  const profitEl = $("profit-" + key);
-  if (profitEl) {
-    const profit = sell - per;
-    profitEl.textContent = (profit >= 0 ? "+" : "") + money(profit);
-    profitEl.style.color = profit >= 0 ? "var(--green)" : "#b42318";
-    profitEl.title = "Cost " + money(per) + " each";
-  }
-  syncHiddenDozenFields(key);
-  updateDozenHint();
-}
-
-function onDozenCostInput(key) {
-  if (SYNCING_PRICES) return;
-  const cost = +(($("c-" + key) && $("c-" + key).value) || 0);
-  const suggested = suggestDozenSell(cost);
-  SYNCING_PRICES = true;
-  if ($("p-" + key)) $("p-" + key).value = String(suggested);
-  const sellInput = document.querySelector('input[data-dozen-sell="' + key + '"]');
-  if (sellInput) sellInput.value = String(suggested);
-  SYNCING_PRICES = false;
-  updateDozenRow(key);
-}
-
-function onDozenSellInput(key, value) {
-  if (SYNCING_PRICES) return;
-  const sell = Math.max(1, Math.round(Number(value) || 0));
-  if ($("p-" + key)) $("p-" + key).value = String(sell);
-  updateDozenRow(key);
-}
-
-function renderDozenCostTable() {
-  const list = $("dozen-list");
-  if (!list) return;
-  list.innerHTML = DOZEN_KEYS.map(function(key) {
-    const cost = +(($("c-" + key) && $("c-" + key).value) || DOZEN_COST_DEFAULTS[key] || 75);
-    const sell = +(($("p-" + key) && $("p-" + key).value) || suggestDozenSell(cost));
-    if ($("c-" + key)) $("c-" + key).value = cost;
-    if ($("p-" + key)) $("p-" + key).value = sell;
-    syncHiddenDozenFields(key);
-    const per = cost / DOZENS_IN_CASE;
-    const profit = sell - per;
-    return (
-      '<div class="dozen-row" data-dozen-row="' + key + '">' +
-        '<div class="d-name">' + DOZEN_LABELS[key] + '</div>' +
-        '<div><label>Case cost</label><input data-dozen-cost="' + key + '" type="number" min="0" step="1" value="' + cost + '"></div>' +
-        '<div><label>Sell each</label><input data-dozen-sell="' + key + '" type="number" min="1" step="1" value="' + sell + '"></div>' +
-        '<div class="d-profit" id="profit-' + key + '" title="Cost ' + money(per) + ' each" style="color:' +
-          (profit >= 0 ? "var(--green)" : "#b42318") + '">' +
-          (profit >= 0 ? "+" : "") + money(profit) +
-        '</div>' +
-      '</div>'
-    );
-  }).join("");
-
-  list.querySelectorAll("[data-dozen-cost]").forEach(function(input) {
-    const key = input.getAttribute("data-dozen-cost");
-    input.addEventListener("input", function() {
-      if ($("c-" + key)) $("c-" + key).value = input.value;
-      onDozenCostInput(key);
-    });
-  });
-  list.querySelectorAll("[data-dozen-sell]").forEach(function(input) {
-    const key = input.getAttribute("data-dozen-sell");
-    input.addEventListener("input", function() {
-      onDozenSellInput(key, input.value);
-    });
-  });
-  updateDozenHint();
-}
-
-function updateDozenHint() {
-  const el = $("dozen-hint");
-  if (!el) return;
-  const stock = +(($("dozen-stock") && $("dozen-stock").value) || 0);
-  el.innerHTML = stock > 0
-    ? '<b style="color:var(--green)">On the website · ' + stock + ' packs left</b>'
-    : '<b style="color:var(--muted)">Hidden on website · set dozen stock above 0 to show</b>';
-}
-
-function onTrayPriceInput(which) {
-  if (SYNCING_PRICES) return;
-  const val = which === "tray1" ? $("p1").value : which === "tray2" ? $("p2").value : $("p3").value;
-  applyTrayPrices(pricesFromTrayAnchor(which, val));
-}
-
-$("p1") && $("p1").addEventListener("input", function() { onTrayPriceInput("tray1"); });
-$("p2") && $("p2").addEventListener("input", function() { onTrayPriceInput("tray2"); });
-$("p3") && $("p3").addEventListener("input", function() { onTrayPriceInput("box"); });
-$("box-cost") && $("box-cost").addEventListener("input", function() {
-  if (SYNCING_PRICES) return;
-  applyTrayPrices(pricesFromBoxCost($("box-cost").value));
-});
-$("dozen-stock") && $("dozen-stock").addEventListener("input", updateDozenHint);
-
-async function saveSettings() {
-  const dozenCosts = {};
-  DOZEN_KEYS.forEach(function(k) {
-    dozenCosts[k] = +(($("c-" + k) && $("c-" + k).value) || 0);
-    syncHiddenDozenFields(k);
-  });
-  const body = {
-    prices: {
-      tray1: +$("p1").value, tray2: +$("p2").value, box: +$("p3").value,
-      cage600: +$("p-cage600").value, cage700: +$("p-cage700").value, cage800: +$("p-cage800").value,
-      fr600: +$("p-fr600").value, fr700: +$("p-fr700").value, fr800: +$("p-fr800").value,
-      cage600case: +$("p-cage600case").value, cage700case: +$("p-cage700case").value, cage800case: +$("p-cage800case").value,
-      fr600case: +$("p-fr600case").value, fr700case: +$("p-fr700case").value, fr800case: +$("p-fr800case").value,
-    },
-    traysAvailable: +$("stock").value,
-    trayWeight: $("tray-weight").value,
-    boxCost: +(($("box-cost") && $("box-cost").value) || BASE_BOX_COST),
-    dozenCosts: dozenCosts,
-    dozensAvailable: +(($("dozen-stock") && $("dozen-stock").value) || 0),
-    pickup: collectDayRows(),
-  };
-  const res = await fetch("/api/settings", { method: "PUT", headers: authHeaders(), body: JSON.stringify(body) });
-  const el = $("save-msg");
-  el.textContent = res.ok ? "Saved, live now" : "Failed";
-  el.className = "msg " + (res.ok ? "ok" : "err");
-  setTimeout(() => { el.textContent = ""; }, 2500);
-}
-
-function escapeHtml(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
-function qid(id) {
-  // Safe single-quoted JS string for inline onclick handlers (avoids template-literal \\' bugs).
-  return "'" + String(id).replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\\\'") + "'";
-}
-
-
-let ASSET_LIB = null;
-let ASSET_SELECTED = {};
-let ASSET_VISIBLE_IDS = [];
-
-function showAdminView(name) {
-  const view = name === "assets" ? "assets"
-    : name === "visits" ? "visits"
-    : name === "prices" ? "prices"
-    : "shop";
-  $("view-shop").hidden = view !== "shop";
-  $("view-assets").hidden = view !== "assets";
-  $("view-visits").hidden = view !== "visits";
-  $("view-prices").hidden = view !== "prices";
-  $("tab-shop").classList.toggle("on", view === "shop");
-  $("tab-assets").classList.toggle("on", view === "assets");
-  $("tab-visits").classList.toggle("on", view === "visits");
-  $("tab-prices").classList.toggle("on", view === "prices");
-  if (view === "assets") loadAssets();
-  if (view === "visits") loadVisits(window.VISIT_FILTER || "flyer");
-  if (view === "prices") loadPriceWatch();
-  try {
-    const hash = view === "shop" ? "/admin"
-      : view === "assets" ? "/admin#assets"
-      : view === "visits" ? "/admin#visits"
-      : "/admin#prices";
-    history.replaceState(null, "", hash);
-  } catch (e) {}
-}
-
-function pwMoney(n) {
-  if (n == null || n === "" || !Number.isFinite(Number(n))) return "-";
-  return "$" + Number(n).toFixed(2);
-}
-function pwPerEgg(n) {
-  if (n == null || n === "" || !Number.isFinite(Number(n))) return "-";
-  return (Number(n) * 100).toFixed(1) + "¢";
-}
-function pwStockPill(stock) {
-  const s = String(stock || "unknown");
-  return '<span class="pw-pill ' + escapeHtml(s) + '">' + escapeHtml(s.replace(/_/g, " ")) + '</span>';
-}
-function renderPriceTable(rows) {
-  if (!rows.length) return '<p class="empty" style="display:block;padding:12px 0">None found in latest snapshot.</p>';
-  const sorted = rows.slice().sort(function(a, b) {
-    const ap = a.per_egg_aud == null ? 999 : a.per_egg_aud;
-    const bp = b.per_egg_aud == null ? 999 : b.per_egg_aud;
-    return ap - bp;
-  });
-  return '<table class="pw-table"><thead><tr>' +
-    '<th>Retailer</th><th>Price</th><th>Per egg</th><th>Pack</th><th>Stock</th><th>Link</th>' +
-    '</tr></thead><tbody>' +
-    sorted.map(function(o) {
-      const pack = (o.pack_eggs || "?") + " · " + (o.pack_weight_g ? (o.pack_weight_g + "g") : "?");
-      return '<tr>' +
-        '<td><b>' + escapeHtml(o.retailer || "") + '</b><div style="color:var(--muted);font-size:12px;margin-top:2px">' + escapeHtml(o.title || "") + '</div></td>' +
-        '<td class="num">' + pwMoney(o.price_aud) + '</td>' +
-        '<td class="num">' + pwPerEgg(o.per_egg_aud) + '</td>' +
-        '<td>' + escapeHtml(pack) + '</td>' +
-        '<td>' + pwStockPill(o.stock) + '</td>' +
-        '<td>' + (o.url ? ('<a href="' + escapeHtml(o.url) + '" target="_blank" rel="noopener">Open</a>') : "-") + '</td>' +
-      '</tr>';
-    }).join("") +
-    '</tbody></table>';
-}
-
-async function loadPriceWatch() {
-  const empty = $("pw-empty");
-  try {
-    const [snapRes, evRes] = await Promise.all([
-      fetch("/api/price-watch"),
-      fetch("/api/price-watch/events?limit=30", { headers: authHeaders() }),
-    ]);
-    if (!snapRes.ok) {
-      $("pw-700").innerHTML = "";
-      $("pw-30").innerHTML = "";
-      $("pw-stats").innerHTML = "";
-      $("pw-meta").textContent = "Could not load price watch (" + snapRes.status + ")";
-      empty.style.display = "block";
-      return;
-    }
-    const data = await snapRes.json();
-    const offers = data.offers || [];
-    const c700 = offers.filter(function(o) { return o.category === "caged_700g"; });
-    const c30 = offers.filter(function(o) { return o.category === "caged_30pack"; });
-    const s = data.summary || {};
-    const cheap700 = s.cheapest_700g_in_stock;
-    const cheap30 = s.cheapest_30pack_in_stock;
-    $("pw-stats").innerHTML =
-      '<div class="stat"><b>' + (cheap700 ? pwPerEgg(cheap700.per_egg_aud) : "-") + '</b><span>cheapest 700g / egg</span></div>' +
-      '<div class="stat"><b>' + (cheap30 ? pwPerEgg(cheap30.per_egg_aud) : "-") + '</b><span>cheapest 30pk / egg</span></div>' +
-      '<div class="stat"><b>' + offers.length + '</b><span>tracked SKUs</span></div>';
-    $("pw-meta").textContent = data.updatedAt
-      ? ("Updated " + fmtTime(data.updatedAt) + (data.source ? (" · source " + data.source) : ""))
-      : "No snapshot yet";
-    $("pw-700").innerHTML = renderPriceTable(c700);
-    $("pw-30").innerHTML = renderPriceTable(c30);
-
-    let events = [];
-    if (evRes.ok) {
-      const evData = await evRes.json();
-      events = evData.events || [];
-    }
-    if (!events.length && Array.isArray(data.last_changes)) events = data.last_changes;
-    $("pw-events").innerHTML = events.length ? events.map(function(ch) {
-      const delta = ch.delta_aud != null ? (" · Δ " + (ch.delta_aud > 0 ? "+" : "") + pwMoney(ch.delta_aud)) : "";
-      const fromP = ch.from ? pwMoney(ch.from.price_aud) + " / " + escapeHtml(ch.from.stock || "?") : "-";
-      const toP = ch.to ? pwMoney(ch.to.price_aud) + " / " + escapeHtml(ch.to.stock || "?") : "-";
-      return '<div class="pw-event">' +
-        '<b>' + escapeHtml(ch.type || "change") + '</b> · ' + escapeHtml(ch.retailer || "") +
-        '<div style="margin-top:4px">' + escapeHtml(ch.title || "") + delta + '</div>' +
-        '<div style="margin-top:4px;color:var(--muted)">' + fromP + ' → ' + toP +
-        (ch.at ? (' · ' + fmtTime(ch.at)) : '') + '</div>' +
-      '</div>';
-    }).join("") : '<p class="empty" style="display:block;padding:8px 0">No changes recorded yet.</p>';
-
-    empty.style.display = offers.length ? "none" : "block";
-  } catch (e) {
-    $("pw-meta").textContent = "Load failed";
-    empty.style.display = "block";
-  }
-}
-
-async function pollPriceWatchNow() {
-  const el = $("pw-msg");
-  el.textContent = "Checking…";
-  el.className = "msg";
-  try {
-    const res = await fetch("/api/price-watch/poll", { method: "POST", headers: authHeaders() });
-    const data = await res.json().catch(function() { return {}; });
-    if (!res.ok) {
-      el.textContent = data.error || "Poll failed";
-      el.className = "msg err";
-      return;
-    }
-    el.textContent = "Done · " + (data.changeCount || 0) + " change(s)";
-    el.className = "msg ok";
-    await loadPriceWatch();
-    setTimeout(function() { el.textContent = ""; }, 3000);
-  } catch (e) {
-    el.textContent = "Poll failed";
-    el.className = "msg err";
-  }
-}
-
-async function loadVisits(filter) {
-  if (typeof filter === "string") window.VISIT_FILTER = filter;
-  const src = window.VISIT_FILTER || "flyer";
-  const qs = src ? ("?src=" + encodeURIComponent(src)) : "";
-  const res = await fetch("/api/visits" + qs, { headers: authHeaders() });
-  if (!res.ok) {
-    $("visits").innerHTML = '<p class="empty">Could not load visits</p>';
-    return;
-  }
-  const data = await res.json();
-  const s = data.summary || {};
-  $("visit-stats").innerHTML =
-    '<div class="stat"><b>' + (s.total || 0) + '</b><span>scans</span></div>' +
-    '<div class="stat"><b>' + (s.uniqueVisitors || 0) + '</b><span>unique</span></div>' +
-    '<div class="stat"><b>' + Object.keys(s.byCity || {}).length + '</b><span>cities</span></div>';
-  if (data.note) $("visit-note").textContent = data.note;
-
-  const visits = data.visits || [];
-  $("visits-empty").style.display = visits.length ? "none" : "block";
-  $("visits").innerHTML = visits.map(function(v) {
-    const loc = [v.city, v.region, v.country].filter(Boolean).join(", ") || "-";
-    const screen = (v.screen && v.screen.w) ? (v.screen.w + "×" + v.screen.h + (v.screen.dpr ? " @" + v.screen.dpr + "x" : "")) : "-";
-    const utm = v.utm ? [v.utm.source, v.utm.medium, v.utm.campaign].filter(Boolean).join(" / ") : "-";
-    return '<div class="visit-card">' +
-      '<div class="v-top"><span class="v-src">' + escapeHtml(v.src || "direct") + '</span><span class="v-time">' + fmtTime(v.createdAt) + '</span></div>' +
-      '<div class="v-grid">' +
-        '<div><b>Location</b>' + escapeHtml(loc) + '</div>' +
-        '<div><b>IP</b>' + escapeHtml(v.ip || "-") + '</div>' +
-        '<div><b>Device</b>' + escapeHtml((v.deviceType || "?") + " · " + (v.os || "?") + " · " + (v.browser || "?")) + '</div>' +
-        '<div><b>Visitor id</b><span style="word-break:break-all">' + escapeHtml(v.visitorId || "-") + '</span></div>' +
-        '<div><b>Language</b>' + escapeHtml(v.language || "-") + '</div>' +
-        '<div><b>Timezone</b>' + escapeHtml(v.tz || v.timezone || "-") + '</div>' +
-        '<div><b>Screen</b>' + escapeHtml(screen) + '</div>' +
-        '<div><b>Network</b>' + escapeHtml(v.connection || v.asnOrg || "-") + '</div>' +
-        '<div><b>UTM</b>' + escapeHtml(utm) + '</div>' +
-        '<div><b>Path</b>' + escapeHtml(v.path || "/") + '</div>' +
-        '<div><b>Gender</b>not available from browser</div>' +
-        '<div><b>Name</b>only after they order</div>' +
-        '<div><b>Hardware device id</b>not available from browser</div>' +
-        '<div><b>Platform</b>' + escapeHtml(v.platform || "-") + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join("");
-}
-
-
-async function loadAssets() {
-  const res = await fetch("/api/admin/assets", { headers: authHeaders() });
-  if (!res.ok) {
-    $("publish-status").textContent = "Could not load assets";
-    return;
-  }
-  ASSET_LIB = await res.json();
-  const sel = $("asset-filter-cat");
-  const cur = sel.value || "all";
-  sel.innerHTML = '<option value="all">All categories</option>' + ASSET_LIB.categories.map(function(c) {
-    return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>';
-  }).join("");
-  sel.value = ASSET_LIB.categories.includes(cur) || cur === "all" ? cur : "all";
-  // Drop selections for ids that no longer exist
-  const valid = {};
-  ASSET_LIB.items.forEach(function(it) { valid[it.id] = true; });
-  Object.keys(ASSET_SELECTED).forEach(function(id) {
-    if (!valid[id]) delete ASSET_SELECTED[id];
-  });
-  renderAssets();
-}
-
-function draftItems() {
-  if (!ASSET_LIB) return [];
-  const byId = {};
-  ASSET_LIB.items.forEach(function(i) { byId[i.id] = i; });
-  return ASSET_LIB.draft.map(function(id) { return byId[id]; }).filter(Boolean);
-}
-
-function selectedIds() {
-  return Object.keys(ASSET_SELECTED).filter(function(id) { return ASSET_SELECTED[id]; });
-}
-
-function updateBulkBar() {
-  const ids = selectedIds();
-  const countEl = $("asset-selected-count");
-  if (countEl) countEl.textContent = ids.length + " selected";
-  const allBox = $("asset-select-all");
-  if (allBox) {
-    const visible = ASSET_VISIBLE_IDS;
-    const allOn = visible.length > 0 && visible.every(function(id) { return ASSET_SELECTED[id]; });
-    const someOn = visible.some(function(id) { return ASSET_SELECTED[id]; });
-    allBox.checked = allOn;
-    allBox.indeterminate = someOn && !allOn;
-  }
-  const view = $("asset-filter-view") && $("asset-filter-view").value;
-  const delBtn = $("bulk-delete-btn");
-  const restoreBtn = $("bulk-restore-btn");
-  if (delBtn) delBtn.hidden = view === "deleted";
-  if (restoreBtn) restoreBtn.hidden = view !== "deleted";
-}
-
-function toggleAssetSelected(id, on) {
-  if (on) ASSET_SELECTED[id] = true;
-  else delete ASSET_SELECTED[id];
-  const card = document.querySelector('.asset-card[data-id="' + CSS.escape(id) + '"]');
-  if (card) card.classList.toggle("selected", !!on);
-  updateBulkBar();
-}
-
-function toggleSelectAll(on) {
-  ASSET_VISIBLE_IDS.forEach(function(id) {
-    if (on) ASSET_SELECTED[id] = true;
-    else delete ASSET_SELECTED[id];
-  });
-  renderAssets();
-}
-
-function clearAssetSelection() {
-  ASSET_SELECTED = {};
-  renderAssets();
-}
-
-function filteredAssetList() {
-  if (!ASSET_LIB) return [];
-  const draftSet = {};
-  ASSET_LIB.draft.forEach(function(id) { draftSet[id] = true; });
-  const cat = $("asset-filter-cat").value;
-  const view = $("asset-filter-view").value;
-  const q = ($("asset-filter-q").value || "").trim().toLowerCase();
-  return ASSET_LIB.items.filter(function(it) {
-    if (cat !== "all" && it.category !== cat) return false;
-    if (view === "active" && it.deleted) return false;
-    if (view === "favorites" && (!it.favorite || it.deleted)) return false;
-    if (view === "draft" && !draftSet[it.id]) return false;
-    if (view === "deleted" && !it.deleted) return false;
-    if (q && it.id.toLowerCase().indexOf(q) < 0 && it.label.toLowerCase().indexOf(q) < 0) return false;
-    return true;
-  });
-}
-
-function renderAssets() {
-  if (!ASSET_LIB) return;
-  const draftSet = {};
-  ASSET_LIB.draft.forEach(function(id) { draftSet[id] = true; });
-  const publishedSet = {};
-  ASSET_LIB.published.forEach(function(id) { publishedSet[id] = true; });
-
-  const dirty = ASSET_LIB.dirty || (JSON.stringify(ASSET_LIB.draft) !== JSON.stringify(ASSET_LIB.published));
-  $("publish-status").textContent = dirty
-    ? "Draft differs from live. Publish to update the website"
-    : "Live site matches this draft";
-  $("publish-meta").textContent = ASSET_LIB.publishedAt
-    ? ("Last published " + new Date(ASSET_LIB.publishedAt).toLocaleString())
-    : "Not published yet. Using defaults until you publish";
-  $("publish-btn").disabled = !ASSET_LIB.draft.length;
-
-  const row = $("draft-row");
-  const drafts = draftItems();
-  row.innerHTML = drafts.length ? drafts.map(function(it, idx) {
-    return '<span class="draft-chip" data-id="' + escapeHtml(it.id) + '">'
-      + '<img src="' + escapeHtml(it.preview) + '" alt="">'
-      + '<span>' + (idx + 1) + '. ' + escapeHtml(it.label) + '</span>'
-      + '<button type="button" class="ghost" onclick="moveDraft(' + qid(it.id) + ',-1)">↑</button>'
-      + '<button type="button" class="ghost" onclick="moveDraft(' + qid(it.id) + ',1)">↓</button>'
-      + '<button type="button" class="danger" onclick="toggleDraft(' + qid(it.id) + ')">Remove</button>'
-      + '</span>';
-  }).join("") : '<span class="muted">No images selected for the rotator yet.</span>';
-
-  const list = filteredAssetList();
-  ASSET_VISIBLE_IDS = list.map(function(it) { return it.id; });
-
-  $("asset-empty").hidden = list.length > 0;
-  $("asset-grid").innerHTML = list.map(function(it) {
-    const cats = ASSET_LIB.categories.map(function(c) {
-      return '<option value="' + escapeHtml(c) + '"' + (c === it.category ? ' selected' : '') + '>' + escapeHtml(c) + '</option>';
-    }).join("");
-    const cls = ["asset-card"];
-    if (it.favorite) cls.push("fav");
-    if (draftSet[it.id]) cls.push("in-draft");
-    if (it.deleted) cls.push("deleted");
-    if (ASSET_SELECTED[it.id]) cls.push("selected");
-    const badges = [];
-    if (draftSet[it.id]) badges.push('<span class="badge">Draft</span>');
-    if (publishedSet[it.id]) badges.push('<span class="badge live">Live</span>');
-    if (it.favorite) badges.push('<span class="badge fav">Fav</span>');
-    const useLabel = draftSet[it.id] ? "Remove" : "Use";
-    const delBtn = it.deleted
-      ? '<button type="button" class="ghost" onclick="setDeleted(' + qid(it.id) + ',false)">Restore</button>'
-      : '<button type="button" class="danger" onclick="setDeleted(' + qid(it.id) + ',true)">Delete</button>';
-    const checked = ASSET_SELECTED[it.id] ? " checked" : "";
-    return '<article class="' + cls.join(" ") + '" data-id="' + escapeHtml(it.id) + '">'
-      + '<div class="thumb">'
-      + '<input class="pick" type="checkbox" aria-label="Select ' + escapeHtml(it.label) + '"' + checked + ' onchange="toggleAssetSelected(' + qid(it.id) + ', this.checked)">'
-      + '<img src="' + escapeHtml(it.preview) + '" alt="' + escapeHtml(it.label) + '" loading="lazy" onclick="openAssetLightbox(' + qid(it.id) + ')">'
-      + '<div class="badges">' + badges.join("") + '</div></div>'
-      + '<div class="meta"><strong>' + escapeHtml(it.label) + '</strong>'
-      + '<select onchange="setCategory(' + qid(it.id) + ', this.value)">' + cats + '</select>'
-      + '<div class="actions">'
-      + '<button type="button" class="ghost" onclick="toggleFavorite(' + qid(it.id) + ')">' + (it.favorite ? "Unfav" : "Favorite") + '</button>'
-      + '<button type="button" onclick="toggleDraft(' + qid(it.id) + ')">' + useLabel + '</button>'
-      + delBtn
-      + '</div></div></article>';
-  }).join("");
-  updateBulkBar();
-}
-
-async function patchAssetItem(body) {
-  const res = await fetch("/api/admin/assets/item", {
-    method: "PATCH", headers: authHeaders(), body: JSON.stringify(body),
-  });
-  if (!res.ok) { toast("Update failed"); return null; }
-  return res.json();
-}
-
-async function bulkPatch(body) {
-  const res = await fetch("/api/admin/assets/bulk", {
-    method: "POST", headers: authHeaders(), body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(function() { return null; });
-    toast((data && data.error) || "Bulk update failed");
-    return null;
-  }
-  return res.json();
-}
-
-async function bulkDeleteSelected() {
-  const ids = selectedIds();
-  if (!ids.length) { toast("Select images first"); return; }
-  if (!confirm("Hide " + ids.length + " image" + (ids.length === 1 ? "" : "s") + " from admin and live selections?")) return;
-  const data = await bulkPatch({ ids: ids, deleted: true });
-  if (!data) return;
-  ASSET_SELECTED = {};
-  toast("Deleted " + data.changed + " image" + (data.changed === 1 ? "" : "s"));
-  await loadAssets();
-}
-
-async function bulkRestoreSelected() {
-  const ids = selectedIds();
-  if (!ids.length) { toast("Select images first"); return; }
-  const data = await bulkPatch({ ids: ids, deleted: false });
-  if (!data) return;
-  ASSET_SELECTED = {};
-  toast("Restored " + data.changed);
-  await loadAssets();
-}
-
-async function bulkFavorite(on) {
-  const ids = selectedIds();
-  if (!ids.length) { toast("Select images first"); return; }
-  const data = await bulkPatch({ ids: ids, favorite: !!on });
-  if (!data) return;
-  toast((on ? "Favorited " : "Unfavorited ") + data.changed);
-  await loadAssets();
-}
-
-function assetPreviewUrl(it) {
-  if (!it) return "";
-  const h = it.hero || {};
-  return h.jpg928 || h.jpg1080 || h.jpg1400 || h.jpg700 || h.jpg640 || (it.square && it.square.jpg) || it.preview || "";
-}
-
-function openAssetLightbox(id) {
-  if (!ASSET_LIB) return;
-  const it = ASSET_LIB.items.find(function(x) { return x.id === id; });
-  if (!it) return;
-  const box = $("asset-lightbox");
-  const img = $("asset-lightbox-img");
-  const cap = $("asset-lightbox-cap");
-  img.src = assetPreviewUrl(it);
-  img.alt = it.label || "";
-  cap.textContent = it.label || id;
-  box.hidden = false;
-  document.body.style.overflow = "hidden";
-}
-
-function closeAssetLightbox() {
-  const box = $("asset-lightbox");
-  if (!box || box.hidden) return;
-  box.hidden = true;
-  $("asset-lightbox-img").src = "";
-  document.body.style.overflow = "";
-}
-
-document.addEventListener("keydown", function(e) {
-  if (e.key === "Escape") closeAssetLightbox();
-});
-
-async function toggleFavorite(id) {
-  const it = ASSET_LIB.items.find(function(x) { return x.id === id; });
-  if (!it) return;
-  const data = await patchAssetItem({ id: id, favorite: !it.favorite });
-  if (!data) return;
-  it.favorite = data.item.favorite;
-  ASSET_LIB.dirty = data.dirty;
-  renderAssets();
-}
-
-async function setCategory(id, category) {
-  const data = await patchAssetItem({ id: id, category: category });
-  if (!data) return;
-  const it = ASSET_LIB.items.find(function(x) { return x.id === id; });
-  if (it) it.category = data.item.category;
-  renderAssets();
-}
-
-async function setDeleted(id, deleted) {
-  if (deleted && !confirm("Hide this image from admin and live selections?")) return;
-  const data = await patchAssetItem({ id: id, deleted: deleted });
-  if (!data) return;
-  delete ASSET_SELECTED[id];
-  await loadAssets();
-}
-
-
-async function saveDraft(draft) {
-  const res = await fetch("/api/admin/assets/draft", {
-    method: "PUT", headers: authHeaders(), body: JSON.stringify({ draft: draft }),
-  });
-  if (!res.ok) { toast("Could not save selection"); return; }
-  const data = await res.json();
-  ASSET_LIB.draft = data.draft;
-  ASSET_LIB.dirty = data.dirty;
-  renderAssets();
-}
-
-async function toggleDraft(id) {
-  if (!ASSET_LIB) return;
-  const draft = ASSET_LIB.draft.slice();
-  const idx = draft.indexOf(id);
-  if (idx >= 0) draft.splice(idx, 1);
-  else draft.push(id);
-  await saveDraft(draft);
-}
-
-async function moveDraft(id, dir) {
-  const draft = ASSET_LIB.draft.slice();
-  const idx = draft.indexOf(id);
-  if (idx < 0) return;
-  const next = idx + dir;
-  if (next < 0 || next >= draft.length) return;
-  const tmp = draft[idx]; draft[idx] = draft[next]; draft[next] = tmp;
-  await saveDraft(draft);
-}
-
-async function createCategory() {
-  const name = ($("new-cat-name").value || "").trim();
-  if (!name) return;
-  const res = await fetch("/api/admin/assets/category", {
-    method: "POST", headers: authHeaders(), body: JSON.stringify({ name: name }),
-  });
-  if (!res.ok) { toast("Could not add category"); return; }
-  $("new-cat-name").value = "";
-  await loadAssets();
-  $("asset-filter-cat").value = name;
-  renderAssets();
-}
-
-async function publishAssets() {
-  if (!confirm("Publish this rotator to the live website?")) return;
-  const res = await fetch("/api/admin/assets/publish", { method: "POST", headers: authHeaders() });
-  const data = await res.json().catch(function() { return null; });
-  if (!res.ok) { toast((data && data.error) || "Publish failed"); return; }
-  ASSET_LIB.published = data.published;
-  ASSET_LIB.publishedAt = data.publishedAt;
-  ASSET_LIB.dirty = false;
-  ASSET_LIB.live = data.live;
-  renderAssets();
-  toast("Published to live site");
-}
-
-
-async function boot() {
-  const res = await fetch("/api/admin/ping", { headers: authHeaders() });
-  if (!res.ok) {
-    // Stale / wrong cached key. force a clean sign-in.
-    localStorage.removeItem("yolko_admin_key");
-    KEY = "";
-    const msg = $("login-msg");
-    if (msg) msg.textContent = "Session expired. Sign in again";
-    return;
-  }
-  $("login-card").style.display = "none";
-  $("panel").style.display = "block";
-  $("signout").style.display = "inline-flex";
-  loadSettings();
-  loadOrders();
-  setInterval(loadOrders, 30000);
-  if (location.hash === "#assets") showAdminView("assets");
-  if (location.hash === "#visits") showAdminView("visits");
-  if (location.hash === "#prices") showAdminView("prices");
-}
-
-$("key") && $("key").addEventListener("keydown", function(e) {
-  if (e.key === "Enter") { e.preventDefault(); saveKey(); }
-});
-
-if (KEY) boot();
-</script>
-</body>
-</html>`;
-
 export default {
   // Every cron tick: Meta stock sync + competitor price poll (diff → events/webhook).
   async scheduled(_event, env, ctx) {
@@ -4560,7 +2666,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "113",
+          "X-Yolko-Admin": "114",
         },
       });
     }
