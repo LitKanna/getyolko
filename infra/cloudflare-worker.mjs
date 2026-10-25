@@ -426,9 +426,12 @@ function stripeDetailsFromSession(session) {
 }
 
 const STRIPE_BRAND = "YOLKO";
-const STRIPE_SUPPORT_EMAIL = "getyolkonow@gmail.com";
+// Every email customers see or reply to is the Zoho mailbox. The old Gmail is only for Google.
+const SHOP_EMAIL = "orders@getyolko.com";
+const STRIPE_SUPPORT_EMAIL = SHOP_EMAIL;
 const STRIPE_SUPPORT_PHONE = "+61433975055";
-const STRIPE_BRAND_FLAG = "stripe:branded:yolko";
+// Bump the version when the business profile above changes, so Stripe gets it again.
+const STRIPE_BRAND_FLAG = "stripe:branded:yolko:2";
 
 /** Ensure Checkout / receipts show YOLKO. not the personal Stripe account email. */
 async function ensureStripeBranding(env) {
@@ -745,27 +748,39 @@ function buildOrderEmail(order) {
   const wa = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
   const subject = `Your YOLKO order is confirmed (#${ref})`;
 
+  // Same look as the site: ivory page, black text, the yellow logo dot, one font.
+  const C = { canvas: "#faf7f0", paper: "#fffefb", ink: "#171714", ink2: "#3d3b36", muted: "#6d6b64", line: "#e5e0d5", subtle: "#f3efe6", yellow: "#ffd32a" };
+  // Single quotes only: this sits inside style="..." attributes.
+  const FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
   const row = (label, value) =>
-    `<tr><td style="padding:6px 0;color:#6b6257">${htmlEscape(label)}</td><td style="padding:6px 0;text-align:right;color:#1f1a14">${htmlEscape(value)}</td></tr>`;
+    `<tr><td style="padding:7px 0;color:${C.muted}">${htmlEscape(label)}</td><td style="padding:7px 0;text-align:right;color:${C.ink}">${htmlEscape(value)}</td></tr>`;
+  const preheader = `Order #${ref} is confirmed. Delivery on ${when}.`;
 
-  const html = `<!doctype html><html><body style="margin:0;background:#faf6ef;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6ef;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;padding:28px">
-<tr><td style="font-size:22px;font-weight:700;color:#1f1a14;letter-spacing:0.5px">YOLKO</td></tr>
-<tr><td style="padding-top:18px;font-size:18px;color:#1f1a14">Thanks ${htmlEscape(first)}, your eggs are booked.</td></tr>
-<tr><td style="padding-top:8px;font-size:15px;line-height:1.5;color:#4a4238">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
-<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;border-top:1px solid #eee5d8">
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
+<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
+<body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.canvas}">${htmlEscape(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}"><tr><td align="center" style="padding:28px 12px 32px;font-family:${FONT}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;font-family:${FONT}">
+<tr><td style="padding:0 4px 16px"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:${C.yellow};vertical-align:middle"></span><span style="font-size:18px;line-height:22px;font-weight:800;color:${C.ink};letter-spacing:-0.3px;vertical-align:middle;padding-left:8px">YOLKO</span></td></tr>
+<tr><td style="background:${C.paper};border:1px solid ${C.line};border-radius:16px;padding:28px 24px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">Thanks ${htmlEscape(first)}, your eggs are booked</td></tr>
+<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
+<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Delivery</span><strong style="font-weight:600">${htmlEscape(when)}</strong><br>${htmlEscape(where)}</td></tr></table></td></tr>
+<tr><td style="padding-top:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:20px">
 ${row("Order", "#" + ref)}
 ${row("Item", `${qty} x ${item}`)}
 ${order.subtotal != null ? row("Subtotal", money(order.subtotal)) : ""}
 ${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : ""}
-<tr><td style="padding:10px 0;border-top:1px solid #eee5d8;font-weight:700;color:#1f1a14">Total paid</td><td style="padding:10px 0;border-top:1px solid #eee5d8;text-align:right;font-weight:700;color:#1f1a14">${htmlEscape(money(total))} AUD</td></tr>
+<tr><td style="padding:12px 0 0;border-top:1px solid ${C.line};font-weight:700;color:${C.ink}">Total paid</td><td style="padding:12px 0 0;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink}">${htmlEscape(money(total))} AUD</td></tr>
 </table></td></tr>
-<tr><td style="padding-top:16px;font-size:15px;line-height:1.5;color:#4a4238"><strong style="color:#1f1a14">Delivery</strong><br>${htmlEscape(when)}<br>${htmlEscape(where)}</td></tr>
-${receipt ? `<tr><td style="padding-top:20px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:#f2a516;color:#1f1a14;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px">View receipt</a></td></tr>` : ""}
-<tr><td style="padding-top:22px;font-size:14px;line-height:1.5;color:#6b6257">Questions or need to change something? Reply to this email or message us on <a href="${wa}" style="color:#b9770e">WhatsApp</a>.</td></tr>
+${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:${C.ink};color:${C.paper};text-decoration:none;font-weight:600;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">View receipt</a></td></tr>` : ""}
+<tr><td style="padding-top:22px;font-size:14px;line-height:21px;color:${C.muted}">Questions or need to change something? Reply to this email or message us on <a href="${wa}" style="color:${C.ink};text-decoration:underline">WhatsApp</a>.</td></tr>
 </table>
-<p style="font-size:12px;color:#9a8f80;margin-top:14px">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:#9a8f80">getyolko.com</a></p>
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a></td></tr>
+</table>
 </td></tr></table></body></html>`;
 
   const text = [
@@ -803,7 +818,7 @@ async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
   const payload = {
     from: { address: from, name: STRIPE_BRAND },
     to: [{ email_address: { address: to, name: order.name || "" } }],
-    reply_to: [{ address: STRIPE_SUPPORT_EMAIL, name: STRIPE_BRAND }],
+    reply_to: [{ address: SHOP_EMAIL, name: STRIPE_BRAND }],
     subject: test ? `[Test] ${subject}` : subject,
     htmlbody: html,
     textbody: text,
@@ -885,6 +900,7 @@ async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
   try {
     if (result.ok) {
       await env.DATA.put(emailSentKey(orderId), JSON.stringify({ sentAt: now, to: result.to, requestId: result.requestId }));
+      await rememberEmailForEvents(env, order, result.requestId);
     }
     const fresh = (await env.DATA.get(orderId, "json")) || order;
     const prev = fresh.confirmationEmail || {};
@@ -941,45 +957,95 @@ function orderEmailEntry(order, marker) {
   };
 }
 
-// Optional Zoho Mail read access, for the admin inbox. Secrets: ZOHO_CLIENT_ID,
-// ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN from a Zoho Self Client with the scopes
-// ZohoMail.accounts.READ, ZohoMail.folders.READ and ZohoMail.messages.READ.
+// Zoho Mail for the admin mailbox (read, reply and write as orders@getyolko.com).
+// Secrets: ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET from a Zoho API console "Server-based
+// Application" whose redirect URI is https://getyolko.com/api/zoho/callback. The owner signs
+// in once with "Connect Zoho Mail" on the admin Emails page; the refresh token is stored in
+// KV, encrypted with a key derived from ZOHO_CLIENT_SECRET, so a KV read alone can't use it.
+// A ZOHO_REFRESH_TOKEN secret (Self Client) still works and wins over the stored login.
 // Optional: ZOHO_ACCOUNTS_URL / ZOHO_MAIL_URL (other data centres), ZOHO_MAIL_ACCOUNT_ID.
-function zohoMailConfigured(env) {
-  return Boolean(
-    String(env.ZOHO_CLIENT_ID || "").trim() &&
-      String(env.ZOHO_CLIENT_SECRET || "").trim() &&
-      String(env.ZOHO_REFRESH_TOKEN || "").trim()
-  );
+const ZOHO_AUTH_KEY = "zoho:mail:auth";
+const ZOHO_SCOPES = "ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.ALL";
+const ZOHO_ACCOUNTS_HOST = /^accounts\.(zoho\.(com|eu|in|com\.au|jp|sa|uk|com\.cn)|zohocloud\.ca)$/;
+
+function zohoClientConfigured(env) {
+  return Boolean(String(env.ZOHO_CLIENT_ID || "").trim() && String(env.ZOHO_CLIENT_SECRET || "").trim());
 }
 
-/** Which email features are switched on, from which secrets exist (never their values). */
-function emailStatus(env) {
-  let host = "";
+function zohoMailHostFor(accountsUrl) {
   try {
-    host = new URL(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL)).host;
+    const host = new URL(accountsUrl).host;
+    if (ZOHO_ACCOUNTS_HOST.test(host)) return `https://${host.replace(/^accounts\./, "mail.")}`;
   } catch {}
-  return {
-    sending: { connected: emailConfigured(env), from: String(env.ORDER_EMAIL_FROM || "").trim() || null, host, replyTo: STRIPE_SUPPORT_EMAIL },
-    inbox: { connected: zohoMailConfigured(env) },
-    // The CPaaS send key can't read delivery logs; that needs separate Zoho OAuth access.
-    deliveryLogs: { connected: false },
-  };
+  return "https://mail.zoho.com";
 }
 
-// Per isolate only. Tokens are secrets, so they never go to KV.
+function b64(bytes) {
+  let s = "";
+  for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+function unb64(s) {
+  return Uint8Array.from(atob(String(s || "")), (c) => c.charCodeAt(0));
+}
+
+async function zohoVaultKey(env) {
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`yolko-zoho-vault:${String(env.ZOHO_CLIENT_SECRET).trim()}`));
+  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function sealSecret(env, plain) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await zohoVaultKey(env), new TextEncoder().encode(plain));
+  return { iv: b64(iv), ct: b64(ct) };
+}
+
+async function openSecret(env, sealed) {
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(sealed.iv) }, await zohoVaultKey(env), unb64(sealed.ct));
+  return new TextDecoder().decode(pt);
+}
+
+/** The Zoho Mail login in use, or null when the mailbox isn't connected. */
+async function zohoAuth(env) {
+  if (!zohoClientConfigured(env)) return null;
+  const fixed = String(env.ZOHO_REFRESH_TOKEN || "").trim();
+  if (fixed) {
+    const accountsUrl = String(env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com").replace(/\/+$/, "");
+    return {
+      refreshToken: fixed,
+      accountsUrl,
+      mailUrl: String(env.ZOHO_MAIL_URL || zohoMailHostFor(accountsUrl)).replace(/\/+$/, ""),
+      accountId: String(env.ZOHO_MAIL_ACCOUNT_ID || "").trim() || null,
+      address: null,
+      source: "secret",
+    };
+  }
+  const saved = await env.DATA.get(ZOHO_AUTH_KEY, "json").catch(() => null);
+  if (!saved?.token) return null;
+  let refreshToken;
+  try {
+    refreshToken = await openSecret(env, saved.token);
+  } catch {
+    // The client secret changed, so the stored login can't be read any more.
+    return null;
+  }
+  return { ...saved, token: undefined, refreshToken, source: "login" };
+}
+
+// Per isolate only, keyed to the login they came from.
 let zohoToken = null;
 let zohoAccount = null;
 
-async function zohoAccessToken(env) {
-  if (zohoToken && zohoToken.exp > Date.now() + 60000) return zohoToken.token;
-  const base = String(env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com").replace(/\/+$/, "");
-  const resp = await fetch(`${base}/oauth/v2/token`, {
+async function zohoAccessToken(env, auth) {
+  const tag = auth.refreshToken.slice(-12);
+  if (zohoToken && zohoToken.tag === tag && zohoToken.exp > Date.now() + 60000) return zohoToken.token;
+  const resp = await fetch(`${auth.accountsUrl}/oauth/v2/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: String(env.ZOHO_REFRESH_TOKEN).trim(),
+      refresh_token: auth.refreshToken,
       client_id: String(env.ZOHO_CLIENT_ID).trim(),
       client_secret: String(env.ZOHO_CLIENT_SECRET).trim(),
     }),
@@ -988,38 +1054,161 @@ async function zohoAccessToken(env) {
   const data = await resp.json().catch(() => null);
   // Zoho answers some failures with HTTP 200 and an error field.
   if (!resp.ok || !data?.access_token) {
-    throw new Error(`Zoho sign-in failed${data?.error ? `: ${data.error}` : ` (HTTP ${resp.status})`}`);
+    const err = new Error(
+      data?.error === "invalid_code" ? "The Zoho login has expired. Connect Zoho Mail again" : `Zoho sign-in failed${data?.error ? `: ${data.error}` : ` (HTTP ${resp.status})`}`
+    );
+    err.reconnect = data?.error === "invalid_code";
+    throw err;
   }
-  zohoToken = { token: data.access_token, exp: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+  zohoToken = { tag, token: data.access_token, exp: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
   return zohoToken.token;
 }
 
-async function zohoMailFetch(env, path) {
-  const token = await zohoAccessToken(env);
-  const base = String(env.ZOHO_MAIL_URL || "https://mail.zoho.com").replace(/\/+$/, "");
-  const resp = await fetch(`${base}/api${path}`, {
-    headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: "application/json" },
-    signal: AbortSignal.timeout(10000),
+async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = false } = {}) {
+  const token = await zohoAccessToken(env, auth);
+  const headers = { Authorization: `Zoho-oauthtoken ${token}`, Accept: raw ? "*/*" : "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const resp = await fetch(`${auth.mailUrl}/api${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
   });
-  const data = await resp.json().catch(() => null);
   if (resp.status === 401) zohoToken = null;
-  if (!resp.ok) throw new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`));
+  if (raw && resp.ok) return resp;
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
   return data;
 }
 
-async function zohoMailAccount(env) {
-  const fixed = String(env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
-  if (fixed) return { accountId: fixed, address: null };
-  if (zohoAccount) return zohoAccount;
-  const data = await zohoMailFetch(env, "/accounts");
-  const acct = (Array.isArray(data?.data) ? data.data : [])[0];
-  if (!acct?.accountId) throw new Error("No Zoho Mail account for this login");
-  zohoAccount = { accountId: String(acct.accountId), address: acct.primaryEmailAddress || acct.mailboxAddress || null };
+/** The mailbox account plus its Inbox and Sent folder ids. */
+async function zohoMailAccount(env, auth) {
+  const tag = auth.refreshToken.slice(-12);
+  if (zohoAccount && zohoAccount.tag === tag) return zohoAccount;
+  let accountId = auth.accountId;
+  let address = auth.address;
+  if (!accountId || !address) {
+    const data = await zohoMailFetch(env, auth, "/accounts");
+    const list = Array.isArray(data?.data) ? data.data : [];
+    const acct = list.find((a) => String(a.accountId) === String(accountId)) || list.find((a) => String(a.primaryEmailAddress || "").toLowerCase() === SHOP_EMAIL) || list[0];
+    if (!acct?.accountId) throw new Error("This Zoho login has no mailbox");
+    accountId = String(acct.accountId);
+    address = acct.primaryEmailAddress || acct.mailboxAddress || address || null;
+  }
+  const fdata = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(accountId)}/folders`);
+  const folders = Array.isArray(fdata?.data) ? fdata.data : [];
+  const pick = (type) => folders.find((f) => String(f.folderType || "").toLowerCase() === type) || folders.find((f) => String(f.folderName || "").toLowerCase() === type);
+  zohoAccount = {
+    tag,
+    accountId,
+    address,
+    folders: { inbox: pick("inbox")?.folderId ? String(pick("inbox").folderId) : null, sent: pick("sent")?.folderId ? String(pick("sent").folderId) : null },
+  };
   return zohoAccount;
 }
 
 function decodeMailEntities(s) {
   return String(s || "").replace(/&(lt|gt|quot|amp|#39);/g, (_, e) => ({ lt: "<", gt: ">", quot: '"', amp: "&", "#39": "'" }[e]));
+}
+
+/** One mailbox row for the admin list. */
+function mailRow(m) {
+  return {
+    messageId: String(m.messageId || ""),
+    folderId: String(m.folderId || ""),
+    threadId: m.threadId ? String(m.threadId) : null,
+    subject: decodeMailEntities(m.subject),
+    from: decodeMailEntities(m.fromAddress),
+    fromName: decodeMailEntities(m.sender),
+    to: decodeMailEntities(m.toAddress),
+    summary: decodeMailEntities(m.summary),
+    receivedAt: Number(m.receivedTime || m.sentDateInGMT) ? new Date(Number(m.receivedTime || m.sentDateInGMT)).toISOString() : null,
+    unread: String(m.status) === "0",
+    hasAttachment: String(m.hasAttachment) === "1",
+  };
+}
+
+const EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/;
+
+/** "Name <a@b.c>, d@e.f" into a clean comma list of addresses, or null if any is bad. */
+function cleanAddressList(v, max = 10) {
+  const parts = String(v || "")
+    .split(/[,;]/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => (/<([^>]+)>/.exec(p)?.[1] || p).trim());
+  if (parts.length > max || parts.some((p) => p.length > 254 || !EMAIL_RE.test(p))) return null;
+  return parts.join(",");
+}
+
+/** Plain text written in the admin, as a simple HTML email in the shop's style. */
+function mailHtml(text, quote) {
+  const body = htmlEscape(text).replace(/\r?\n/g, "<br>");
+  const q = quote?.text
+    ? `<br><div style="color:#6d6b64">${htmlEscape(quote.header || "")}</div><blockquote style="margin:6px 0 0;padding:0 0 0 12px;border-left:3px solid #e5e0d5;color:#3d3b36">${htmlEscape(String(quote.text).slice(0, 20000)).replace(/\r?\n/g, "<br>")}</blockquote>`
+    : "";
+  return `<div style="font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#171714">${body}<br><br><span style="color:#6d6b64">YOLKO · getyolko.com</span>${q}</div>`;
+}
+
+/** Delivery events for order emails, from Zoho's webhooks, keyed by the send's request id. */
+const emailReqKey = (requestId) => `email:req:${requestId}`;
+const emailEventsKey = (orderId) => `email:events:${orderId}`;
+
+async function rememberEmailForEvents(env, order, requestId) {
+  if (!requestId || !order?.id) return;
+  await env.DATA.put(emailReqKey(requestId), order.id, { expirationTtl: 180 * 24 * 3600 }).catch(() => null);
+}
+
+function normalizeEmailEvent(name) {
+  const n = String(name || "").toLowerCase().replace(/[\s_-]+/g, "");
+  if (n.includes("hardbounce")) return "hardBounce";
+  if (n.includes("softbounce")) return "softBounce";
+  if (n.includes("click")) return "click";
+  if (n.includes("open")) return "open";
+  if (n.includes("fbl") || n.includes("feedback") || n.includes("complaint") || n.includes("spam")) return "spam";
+  if (n.includes("deliver")) return "delivered";
+  return null;
+}
+
+/** Fold one event into an order's delivery record. */
+function applyEmailEvent(rec, kind, at, detail) {
+  const out = { ...(rec || {}) };
+  if (kind === "delivered") out.deliveredAt = out.deliveredAt || at;
+  if (kind === "open") {
+    out.openedAt = out.openedAt || at;
+    out.lastOpenedAt = at;
+    out.opens = (out.opens || 0) + 1;
+    out.deliveredAt = out.deliveredAt || at;
+  }
+  if (kind === "click") {
+    out.clickedAt = out.clickedAt || at;
+    out.deliveredAt = out.deliveredAt || at;
+  }
+  if (kind === "hardBounce") out.bounce = { type: "hard", at, reason: detail || "The address doesn't accept mail" };
+  if (kind === "softBounce" && out.bounce?.type !== "hard") out.bounce = { type: "soft", at, reason: detail || "The mailbox didn't take it yet" };
+  if (kind === "spam") out.spamAt = at;
+  out.updatedAt = new Date().toISOString();
+  return out;
+}
+
+/** Which email features are switched on, from which secrets exist (never their values). */
+async function emailStatus(env) {
+  let host = "";
+  try {
+    host = new URL(String(env.ZEPTOMAIL_API_URL || ZEPTOMAIL_DEFAULT_URL)).host;
+  } catch {}
+  const clientReady = zohoClientConfigured(env);
+  let inbox = { clientReady, connected: false };
+  if (clientReady) {
+    const auth = await zohoAuth(env).catch(() => null);
+    if (auth) inbox = { clientReady, connected: true, account: auth.address || null, connectedAt: auth.connectedAt || null, source: auth.source };
+  }
+  const lastEventAt = await env.DATA.get("email:events:last").catch(() => null);
+  return {
+    sending: { connected: emailConfigured(env), from: String(env.ORDER_EMAIL_FROM || "").trim() || null, host, replyTo: SHOP_EMAIL },
+    inbox,
+    deliveryLogs: { connected: Boolean(String(env.ZOHO_WEBHOOK_TOKEN || "").trim()), lastEventAt: lastEventAt || null },
+  };
 }
 
 /**
@@ -1680,6 +1869,13 @@ async function handleApi(request, env, url, ctx) {
     return json({ ok: true });
   }
 
+  // Admin: one-read check for new orders, so a background tab can poll cheaply.
+  if (url.pathname === "/api/admin/orders-head" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const ids = await getOrderIndex(env);
+    return json({ count: ids.length, latest: ids[0] || null });
+  }
+
   // Admin: list orders, newest first (uses orders:index. avoids KV list())
   if (url.pathname === "/api/orders" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
@@ -1952,9 +2148,19 @@ async function handleApi(request, env, url, ctx) {
     const markers = await Promise.all(
       orders.map((o) => (o.confirmationEmail?.sentAt ? null : env.DATA.get(emailSentKey(o.id), "json").catch(() => null)))
     );
+    const events = await Promise.all(orders.map((o) => env.DATA.get(emailEventsKey(o.id), "json").catch(() => null)));
+    // Emails sent before delivery tracking began get their request ids indexed once.
+    if (!(await env.DATA.get("email:req:backfill:1"))) {
+      await Promise.all(
+        orders.map((o, i) => rememberEmailForEvents(env, o, o.confirmationEmail?.requestId || markers[i]?.requestId))
+      );
+      await env.DATA.put("email:req:backfill:1", "1");
+    }
     const when = (e) => e.sentAt || e.lastTriedAt || e.paidAt || e.createdAt || "";
-    const emails = orders.map((o, i) => orderEmailEntry(o, markers[i])).sort((a, b) => String(when(b)).localeCompare(String(when(a))));
-    return json({ ok: true, emails, status: emailStatus(env) });
+    const emails = orders
+      .map((o, i) => ({ ...orderEmailEntry(o, markers[i]), delivery: events[i] || null }))
+      .sort((a, b) => String(when(b)).localeCompare(String(when(a))));
+    return json({ ok: true, emails, status: await emailStatus(env) });
   }
 
   // Admin: the confirmation email for one order, rebuilt exactly as it is sent
@@ -1974,7 +2180,7 @@ async function handleApi(request, env, url, ctx) {
       toName: order.name || "",
       from: String(env.ORDER_EMAIL_FROM || "").trim() || null,
       fromName: STRIPE_BRAND,
-      replyTo: STRIPE_SUPPORT_EMAIL,
+      replyTo: SHOP_EMAIL,
       sent: Boolean(order.confirmationEmail?.sentAt),
     });
   }
@@ -2005,46 +2211,319 @@ async function handleApi(request, env, url, ctx) {
     return json(result, result.ok ? 200 : 502);
   }
 
-  // Admin: recent mail in the Zoho mailbox (only once Zoho Mail read access is set up)
-  if (url.pathname === "/api/admin/inbox" && request.method === "GET") {
+  // Admin: start the one-time Zoho Mail sign-in. Returns the Zoho consent URL to open.
+  if (url.pathname === "/api/admin/zoho/connect" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    if (!zohoMailConfigured(env)) return json({ ok: true, connected: false, messages: [] });
+    if (!zohoClientConfigured(env)) return json({ error: "The Zoho client isn't set up on the Worker yet" }, 503);
+    const state = b64(crypto.getRandomValues(new Uint8Array(24))).replace(/[^A-Za-z0-9]/g, "");
+    await env.DATA.put(`zoho:oauth:state:${state}`, "1", { expirationTtl: 600 });
+    const auth = new URL(`${String(env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com").replace(/\/+$/, "")}/oauth/v2/auth`);
+    auth.search = new URLSearchParams({
+      scope: ZOHO_SCOPES,
+      client_id: String(env.ZOHO_CLIENT_ID).trim(),
+      response_type: "code",
+      access_type: "offline",
+      prompt: "consent",
+      redirect_uri: `${url.origin}/api/zoho/callback`,
+      state,
+    }).toString();
+    return json({ ok: true, url: auth.toString() });
+  }
+
+  // Zoho sends the owner back here after they allow access.
+  if (url.pathname === "/api/zoho/callback" && request.method === "GET") {
+    const back = (status, msg) =>
+      Response.redirect(`${url.origin}/admin#emails?zoho=${status}${msg ? `&msg=${encodeURIComponent(String(msg).slice(0, 160))}` : ""}`, 302);
+    const state = String(url.searchParams.get("state") || "");
+    if (!/^[A-Za-z0-9]{16,64}$/.test(state) || !(await env.DATA.get(`zoho:oauth:state:${state}`))) {
+      return back("error", "That sign-in link expired. Try Connect again");
+    }
+    await env.DATA.delete(`zoho:oauth:state:${state}`);
+    if (url.searchParams.get("error")) return back("error", url.searchParams.get("error") === "access_denied" ? "Access wasn't allowed" : url.searchParams.get("error"));
+    const code = String(url.searchParams.get("code") || "");
+    if (!code || !zohoClientConfigured(env)) return back("error", "Zoho didn't send a sign-in code");
+    let accountsUrl = String(env.ZOHO_ACCOUNTS_URL || "https://accounts.zoho.com").replace(/\/+$/, "");
+    const server = url.searchParams.get("accounts-server");
+    if (server) {
+      try {
+        const host = new URL(server).host;
+        if (ZOHO_ACCOUNTS_HOST.test(host)) accountsUrl = `https://${host}`;
+      } catch {}
+    }
     try {
-      const acct = await zohoMailAccount(env);
-      const limit = Math.min(100, Math.max(1, Math.floor(Number(url.searchParams.get("limit")) || 30)));
-      const data = await zohoMailFetch(env, `/accounts/${encodeURIComponent(acct.accountId)}/messages/view?limit=${limit}&sortorder=false`);
-      const messages = (Array.isArray(data?.data) ? data.data : []).map((m) => ({
-        messageId: String(m.messageId || ""),
-        folderId: String(m.folderId || ""),
-        subject: decodeMailEntities(m.subject),
-        from: decodeMailEntities(m.fromAddress),
-        fromName: decodeMailEntities(m.sender),
-        to: decodeMailEntities(m.toAddress),
-        summary: decodeMailEntities(m.summary),
-        receivedAt: Number(m.receivedTime) ? new Date(Number(m.receivedTime)).toISOString() : null,
-        unread: String(m.status) === "0",
-        hasAttachment: String(m.hasAttachment) === "1",
-      }));
-      return json({ ok: true, connected: true, account: acct.address, messages });
+      const resp = await fetch(`${accountsUrl}/oauth/v2/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          client_id: String(env.ZOHO_CLIENT_ID).trim(),
+          client_secret: String(env.ZOHO_CLIENT_SECRET).trim(),
+          redirect_uri: `${url.origin}/api/zoho/callback`,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!data?.refresh_token) return back("error", `Zoho said: ${data?.error || `HTTP ${resp.status}`}`);
+      const mailUrl = String(env.ZOHO_MAIL_URL || zohoMailHostFor(accountsUrl)).replace(/\/+$/, "");
+      const auth = { refreshToken: data.refresh_token, accountsUrl, mailUrl, accountId: null, address: null };
+      zohoToken = { tag: auth.refreshToken.slice(-12), token: data.access_token, exp: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
+      zohoAccount = null;
+      const acct = await zohoMailAccount(env, auth);
+      if (String(acct.address || "").toLowerCase() !== SHOP_EMAIL) {
+        zohoToken = null;
+        zohoAccount = null;
+        return back("error", `That was ${acct.address || "another account"}. Sign in to Zoho as ${SHOP_EMAIL}`);
+      }
+      await env.DATA.put(
+        ZOHO_AUTH_KEY,
+        JSON.stringify({
+          token: await sealSecret(env, data.refresh_token),
+          accountsUrl,
+          mailUrl: auth.mailUrl,
+          accountId: acct.accountId,
+          address: acct.address,
+          connectedAt: new Date().toISOString(),
+        })
+      );
+      return back("connected");
     } catch (err) {
-      return json({ ok: false, connected: true, error: String(err?.message || err).slice(0, 300) }, 502);
+      return back("error", String(err?.message || err));
     }
   }
 
-  // Admin: one message from the Zoho mailbox
-  if (url.pathname === "/api/admin/inbox/message" && request.method === "GET") {
+  // Admin: sign the shop out of Zoho Mail (revokes the stored login).
+  if (url.pathname === "/api/admin/zoho/disconnect" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    if (!zohoMailConfigured(env)) return json({ error: "Zoho Mail isn't connected" }, 503);
+    const auth = await zohoAuth(env).catch(() => null);
+    if (auth?.source === "login") {
+      await fetch(`${auth.accountsUrl}/oauth/v2/token/revoke?token=${encodeURIComponent(auth.refreshToken)}`, { method: "POST", signal: AbortSignal.timeout(10000) }).catch(() => null);
+    }
+    await env.DATA.delete(ZOHO_AUTH_KEY);
+    zohoToken = null;
+    zohoAccount = null;
+    return json({ ok: true, stillConnected: auth?.source === "secret" });
+  }
+
+  // Admin: the mailbox (Inbox or Sent) of orders@getyolko.com
+  if (url.pathname === "/api/admin/mail" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ ok: true, connected: false, messages: [] });
+    const folder = url.searchParams.get("folder") === "sent" ? "sent" : "inbox";
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(url.searchParams.get("limit")) || 40)));
+    const start = Math.max(1, Math.floor(Number(url.searchParams.get("start")) || 1));
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const folderId = acct.folders[folder];
+      if (!folderId) throw new Error(`No ${folder} folder in this mailbox`);
+      const data = await zohoMailFetch(
+        env,
+        auth,
+        `/accounts/${encodeURIComponent(acct.accountId)}/messages/view?folderId=${folderId}&start=${start}&limit=${limit}&sortorder=false&includeto=true`
+      );
+      const messages = (Array.isArray(data?.data) ? data.data : []).map(mailRow);
+      return json({ ok: true, connected: true, account: acct.address, folder, folderId, start, messages, hasMore: messages.length === limit });
+    } catch (err) {
+      return json({ ok: false, connected: true, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: how many unread messages wait in the inbox (for the nav badge)
+  if (url.pathname === "/api/admin/mail/unread" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ ok: true, connected: false, unread: 0 });
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const data = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages/view?folderId=${acct.folders.inbox}&status=unread&limit=99&sortorder=false`);
+      const list = Array.isArray(data?.data) ? data.data : [];
+      return json({ ok: true, connected: true, unread: list.length, latest: list[0] ? mailRow(list[0]) : null });
+    } catch (err) {
+      return json({ ok: false, connected: true, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: one message, with its recipients and attachments. Opening it marks it read.
+  if (url.pathname === "/api/admin/mail/message" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ error: "Zoho Mail isn't connected" }, 503);
     const folderId = String(url.searchParams.get("folderId") || "");
     const messageId = String(url.searchParams.get("messageId") || "");
     if (!/^\d{1,30}$/.test(folderId) || !/^\d{1,30}$/.test(messageId)) return json({ error: "bad message" }, 400);
     try {
-      const acct = await zohoMailAccount(env);
-      const data = await zohoMailFetch(env, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/content`);
-      return json({ ok: true, html: String(data?.data?.content || "") });
+      const acct = await zohoMailAccount(env, auth);
+      const base = `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}`;
+      const [content, details, files] = await Promise.all([
+        zohoMailFetch(env, auth, `${base}/content`),
+        zohoMailFetch(env, auth, `${base}/details`).catch(() => null),
+        zohoMailFetch(env, auth, `${base}/attachmentinfo`).catch(() => null),
+      ]);
+      const d = details?.data || {};
+      if (url.searchParams.get("markRead") === "1") {
+        await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/updatemessage`, {
+          method: "PUT",
+          body: { mode: "markAsRead", messageId: [messageId] },
+        }).catch(() => null);
+      }
+      const attachments = (Array.isArray(files?.data?.attachments) ? files.data.attachments : []).map((a) => ({
+        id: String(a.attachmentId || ""),
+        name: String(a.attachmentName || "attachment"),
+        size: Number(a.attachmentSize) || 0,
+      }));
+      return json({
+        ok: true,
+        html: String(content?.data?.content || ""),
+        subject: decodeMailEntities(d.subject),
+        from: decodeMailEntities(d.fromAddress),
+        fromName: decodeMailEntities(d.sender),
+        to: decodeMailEntities(d.toAddress),
+        cc: decodeMailEntities(d.ccAddress),
+        replyTo: decodeMailEntities(d.replyTo),
+        receivedAt: Number(d.receivedTime || d.sentDateInGMT) ? new Date(Number(d.receivedTime || d.sentDateInGMT)).toISOString() : null,
+        attachments,
+      });
+    } catch (err) {
+      return json({ ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: download one attachment
+  if (url.pathname === "/api/admin/mail/attachment" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ error: "Zoho Mail isn't connected" }, 503);
+    const folderId = String(url.searchParams.get("folderId") || "");
+    const messageId = String(url.searchParams.get("messageId") || "");
+    const attachmentId = String(url.searchParams.get("attachmentId") || "");
+    if (!/^\d{1,30}$/.test(folderId) || !/^\d{1,30}$/.test(messageId) || !/^[\w.-]{1,80}$/.test(attachmentId)) return json({ error: "bad attachment" }, 400);
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const resp = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/attachments/${attachmentId}`, { raw: true });
+      return new Response(resp.body, {
+        headers: {
+          "Content-Type": resp.headers.get("Content-Type") || "application/octet-stream",
+          "Content-Disposition": "attachment",
+          "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "private, no-store",
+          ...CORS,
+        },
+      });
     } catch (err) {
       return json({ ok: false, error: String(err?.message || err).slice(0, 300) }, 502);
     }
+  }
+
+  // Admin: mark a message read or unread
+  if (url.pathname === "/api/admin/mail/flag" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ error: "Zoho Mail isn't connected" }, 503);
+    const body = await request.json().catch(() => null);
+    const messageId = String(body?.messageId || "");
+    if (!/^\d{1,30}$/.test(messageId)) return json({ error: "bad message" }, 400);
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/updatemessage`, {
+        method: "PUT",
+        body: { mode: body?.read === false ? "markAsUnread" : "markAsRead", messageId: [messageId] },
+      });
+      return json({ ok: true });
+    } catch (err) {
+      return json({ ok: false, error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: send a new email, or reply to one, from orders@getyolko.com
+  if (url.pathname === "/api/admin/mail/send" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ error: "Zoho Mail isn't connected" }, 503);
+    const body = await request.json().catch(() => null);
+    const to = cleanAddressList(body?.to);
+    const cc = body?.cc ? cleanAddressList(body.cc) : "";
+    const subject = String(body?.subject || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200);
+    const text = String(body?.text || "").trim();
+    if (!to) return json({ error: "Check the To address" }, 400);
+    if (cc === null) return json({ error: "Check the Cc address" }, 400);
+    if (!subject) return json({ error: "Add a subject" }, 400);
+    if (!text || text.length > 20000) return json({ error: text ? "That message is too long" : "Write a message first" }, 400);
+    const replyId = body?.replyTo?.messageId ? String(body.replyTo.messageId) : "";
+    if (replyId && !/^\d{1,30}$/.test(replyId)) return json({ error: "bad message" }, 400);
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const mail = {
+        fromAddress: acct.address || SHOP_EMAIL,
+        toAddress: to,
+        ...(cc ? { ccAddress: cc } : {}),
+        subject,
+        content: mailHtml(text, body?.quote),
+        mailFormat: "html",
+      };
+      const path = replyId
+        ? `/accounts/${encodeURIComponent(acct.accountId)}/messages/${replyId}`
+        : `/accounts/${encodeURIComponent(acct.accountId)}/messages`;
+      const data = await zohoMailFetch(env, auth, path, { method: "POST", body: replyId ? { ...mail, action: "reply" } : mail });
+      return json({ ok: true, to, messageId: data?.data?.messageId ? String(data.data.messageId) : null });
+    } catch (err) {
+      return json({ ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Zoho CPaaS webhooks: delivered, opened, clicked, bounced and spam reports for order emails.
+  // Zoho sends ZOHO_WEBHOOK_TOKEN back as the Authorization header we set on the webhook.
+  if (url.pathname === "/api/zoho/email-events") {
+    if (request.method === "GET" || request.method === "HEAD") return json({ ok: true });
+    if (request.method !== "POST") return json({ error: "method" }, 405);
+    const want = String(env.ZOHO_WEBHOOK_TOKEN || "").trim();
+    if (!want) return json({ error: "not configured" }, 503);
+    const got = String(request.headers.get("Authorization") || url.searchParams.get("token") || "").replace(/^Bearer\s+/i, "").trim();
+    const a = new TextEncoder().encode(got);
+    const b = new TextEncoder().encode(want);
+    let diff = a.length ^ b.length;
+    for (let i = 0; i < b.length; i++) diff |= (a[i] || 0) ^ b[i];
+    if (diff !== 0) return json({ error: "unauthorised" }, 401);
+    const raw = await request.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      // Some Zoho webhooks post form fields that hold JSON.
+      for (const [, v] of new URLSearchParams(raw)) {
+        try {
+          payload = JSON.parse(v);
+          break;
+        } catch {}
+      }
+    }
+    if (!payload || typeof payload !== "object") return json({ ok: true, ignored: "unreadable" });
+    const names = [].concat(payload.event_name || []);
+    const messages = [].concat(payload.event_message || []);
+    let applied = 0;
+    for (const [i, m] of messages.entries()) {
+      const datas = [].concat(m?.event_data || []);
+      const info = m?.email_info || {};
+      for (const d of datas.length ? datas : [{}]) {
+        const kind = normalizeEmailEvent(d?.object || names[i] || names[0]);
+        if (!kind) continue;
+        const ids = [m?.request_id, info.email_reference, info.client_reference].filter(Boolean).map(String);
+        let orderId = null;
+        for (const id of ids) {
+          orderId = await env.DATA.get(emailReqKey(id));
+          if (orderId) break;
+        }
+        if (!orderId) continue;
+        const det = [].concat(d?.details || [])[0] || {};
+        const at = det.time ? new Date(det.time).toISOString() : new Date().toISOString();
+        const reason = String(det.reason || det.diagnostic_message || "").slice(0, 200) || null;
+        const rec = await env.DATA.get(emailEventsKey(orderId), "json").catch(() => null);
+        await env.DATA.put(emailEventsKey(orderId), JSON.stringify(applyEmailEvent(rec, kind, Number.isNaN(Date.parse(at)) ? new Date().toISOString() : at, reason)));
+        applied++;
+      }
+    }
+    await env.DATA.put("email:events:last", new Date().toISOString());
+    return json({ ok: true, applied });
   }
 
   // Public: confirm payment after returning from Stripe
@@ -2666,7 +3145,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "114",
+          "X-Yolko-Admin": "115",
         },
       });
     }
@@ -2732,6 +3211,8 @@ export default {
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
     };
+    // The order email loads the site font from here, and mail apps fetch it cross-origin.
+    if (url.pathname.startsWith("/assets/fonts/")) headers["Access-Control-Allow-Origin"] = "*";
     // Let browsers revalidate expired files with a cheap 304 instead of a full download.
     const etag = upstreamResp.headers.get("ETag");
     if (etag && ext !== "html") {

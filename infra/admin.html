@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#faf7f0">
+<meta name="theme-color" content="#faf7f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151412" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='%23ffd32a'/%3E%3C/svg%3E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="YOLKO Admin">
 <title>YOLKO Admin</title>
@@ -23,12 +26,20 @@
   src: url(/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko40yyygA.woff2) format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
+/* Apple HIG basics used throughout: 44pt touch targets on touch screens, text contrast of
+   at least 4.5:1 in both appearances, the system light/dark setting, press states. */
 :root {
+  color-scheme:light;
   --canvas:#faf7f0; --side:#f4f0e6; --paper:#fffefb; --subtle:#f3efe6; --hover:#efebe1;
-  --ink:#171714; --ink2:#3d3b36; --muted:#6d6b64; --faint:#9a978e; --on-ink:#fffefb;
-  --line:#e5e0d5; --line2:#d6d0c3;
-  --yellow:#ffd32a; --yellow-hover:#f5c814; --yellow-soft:#fff6cf; --yellow-ink:#5c4a00;
-  --green:#15734c; --green-soft:#e5f1e9; --red:#b42318; --red-soft:#fbeae7; --amber:#8a5a00; --amber-soft:#fbf0d9;
+  --ink:#171714; --ink2:#3d3b36; --muted:#6d6b64; --faint:#9a978e; --on-ink:#fffefb; --ink-hover:#2c2b27;
+  --line:#e5e0d5; --line2:#d6d0c3; --line3:#c4bdae;
+  --yellow:#ffd32a; --yellow-hover:#f5c814; --yellow-soft:#fff6cf; --yellow-ink:#5c4a00; --yellow-line:#f0e2a2; --on-yellow:#171714;
+  --green:#15734c; --green-soft:#e5f1e9; --red:#b42318; --red-soft:#fbeae7; --red-line:#e9c6c0; --amber:#8a5a00; --amber-soft:#fbf0d9;
+  --red-solid:#b42318; --red-solid-hover:#9a1d13;
+  --dayh:#f5f1e8; --row-hover:#f8f4ec; --sk:#ebe6da; --glass:rgba(255,254,251,.92); --bar-bg:rgba(255,254,251,.94);
+  --inverse:#171714; --on-inverse:#fffefb; --inverse-hover:rgba(255,255,255,.1);
+  --toggle-on:#171714; --knob:#fffefb; --knob-on:#ffd32a;
+  --scrim:rgba(23,23,20,.32); --modal-scrim:rgba(23,23,20,.4);
   --r-sm:8px; --r-md:12px; --r-lg:16px;
   --shadow-sm:0 1px 2px rgba(23,23,20,.04);
   --shadow-md:0 10px 30px rgba(23,23,20,.08), 0 1px 3px rgba(23,23,20,.06);
@@ -36,7 +47,26 @@
   --ease:cubic-bezier(.2,.8,.2,1);
   --side-w:248px;
   --font:"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --safe-b:env(safe-area-inset-bottom, 0px);
+  --safe-t:env(safe-area-inset-top, 0px); --safe-b:env(safe-area-inset-bottom, 0px);
+  --safe-l:env(safe-area-inset-left, 0px); --safe-r:env(safe-area-inset-right, 0px);
+}
+/* Dark appearance follows the device setting (no switch in the app, as Apple recommends). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --canvas:#151412; --side:#1a1917; --paper:#1f1e1b; --subtle:#2a2925; --hover:#2f2d29;
+    --ink:#f3f0e8; --ink2:#d6d2c8; --muted:#a39f95; --faint:#6f6b63; --on-ink:#171714; --ink-hover:#dcd8cf;
+    --line:#2f2d29; --line2:#3d3b36; --line3:#55524b;
+    --yellow-hover:#ffdc52; --yellow-soft:#3a3420; --yellow-ink:#ffe27a; --yellow-line:#5a4f22;
+    --green:#5fd39b; --green-soft:#173022; --red:#ff8f85; --red-soft:#3a1d1a; --red-line:#6b2b25; --amber:#f2b955; --amber-soft:#3a2c14;
+    --dayh:#22211e; --row-hover:#252421; --sk:#34322d; --glass:rgba(31,30,27,.9); --bar-bg:rgba(26,25,23,.92);
+    --inverse:#3a3934; --on-inverse:#fffefb; --inverse-hover:rgba(255,255,255,.1);
+    --toggle-on:#ffd32a; --knob:#d6d2c8; --knob-on:#171714;
+    --scrim:rgba(0,0,0,.5); --modal-scrim:rgba(0,0,0,.6);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+    --shadow-md:0 10px 30px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.4);
+    --shadow-lg:0 24px 64px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.4);
+  }
 }
 *, *::before, *::after { box-sizing:border-box; }
 html { -webkit-text-size-adjust:100%; }
@@ -73,10 +103,11 @@ a { color:inherit; text-decoration:none; }
   color:var(--ink2); font-weight:500; transition:background .15s, color .15s;
 }
 .nav a:hover { background:var(--hover); color:var(--ink); }
+.nav a:active { background:var(--hover); }
 .nav a.on { background:var(--paper); color:var(--ink); font-weight:600; box-shadow:0 0 0 1px var(--line), var(--shadow-sm); }
 .badge {
   margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:10px;
-  background:var(--yellow); color:var(--ink); font-size:12px; font-weight:700; line-height:20px; text-align:center;
+  background:var(--yellow); color:var(--on-yellow); font-size:12px; font-weight:700; line-height:20px; text-align:center;
 }
 .unsaved-dot { margin-left:auto; width:8px; height:8px; border-radius:50%; background:var(--amber); }
 .week {
@@ -99,8 +130,9 @@ a { color:inherit; text-decoration:none; }
 .main { margin-left:var(--side-w); padding:28px 32px 40px; min-width:0; }
 
 /* ---------- view header ---------- */
-.view { animation:viewIn .24s var(--ease); }
-@keyframes viewIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+/* Switching sections is frequent, so it only gets a short fade (Apple: keep motion purposeful). */
+.view { animation:viewIn .14s ease-out; }
+@keyframes viewIn { from { opacity:0; } to { opacity:1; } }
 .vhead { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; }
 .vhead h1 { margin:0; font-size:22px; line-height:28px; font-weight:700; letter-spacing:-.01em; }
 .vhead .sub { margin:2px 0 0; color:var(--muted); font-size:13px; line-height:18px; }
@@ -112,7 +144,7 @@ a { color:inherit; text-decoration:none; }
 }
 .search:focus-within { border-color:var(--ink); box-shadow:0 0 0 3px rgba(255,211,42,.45); color:var(--ink); }
 .search input { flex:1; min-width:0; border:0; background:none; height:100%; font-size:14px; color:var(--ink); }
-.search input::placeholder { color:var(--faint); }
+.search input::placeholder { color:var(--muted); }
 .search kbd {
   font:inherit; font-size:11px; line-height:18px; min-width:20px; padding:0 5px; text-align:center;
   border:1px solid var(--line2); border-radius:5px; color:var(--muted);
@@ -122,7 +154,10 @@ a { color:inherit; text-decoration:none; }
   display:inline-grid; place-items:center; transition:background .15s, border-color .15s;
 }
 .ib:hover { background:var(--hover); }
+.ib:active { background:var(--hover); transform:scale(.96); }
 .ib.spin .i { animation:spin .8s linear infinite; }
+.ib.bell { position:relative; }
+.ib.bell.on::after { content:""; position:absolute; top:8px; right:9px; width:8px; height:8px; border-radius:50%; background:var(--yellow); box-shadow:0 0 0 2px var(--paper); }
 @keyframes spin { to { transform:rotate(360deg); } }
 
 /* ---------- buttons, chips, inputs ---------- */
@@ -133,19 +168,22 @@ a { color:inherit; text-decoration:none; }
 }
 .btn:active { transform:scale(.98); }
 .btn .i { width:16px; height:16px; }
-.btn.primary { background:var(--yellow); color:var(--ink); }
+.btn.primary { background:var(--yellow); color:var(--on-yellow); --spin:var(--on-yellow); }
 .btn.primary:hover { background:var(--yellow-hover); }
-.btn.dark { background:var(--ink); color:var(--on-ink); }
-.btn.dark:hover { background:#2c2b27; }
+.btn.dark { background:var(--ink); color:var(--on-ink); --spin:var(--on-ink); }
+.btn.dark:hover { background:var(--ink-hover); }
 .btn.ghost { background:var(--paper); border-color:var(--line2); color:var(--ink); }
 .btn.ghost:hover { background:var(--hover); }
-.btn.danger { background:var(--paper); border-color:#e9c6c0; color:var(--red); }
+.btn.danger { background:var(--paper); border-color:var(--red-line); color:var(--red); --spin:var(--red); }
 .btn.danger:hover { background:var(--red-soft); }
-.btn.danger-solid { background:var(--red); color:#fff; }
-.btn.danger-solid:hover { background:#9a1d13; }
+.btn.danger-solid { background:var(--red-solid); color:#fff; --spin:#fff; }
+.btn.danger-solid:hover { background:var(--red-solid-hover); }
 .btn.sm { height:32px; padding:0 12px; font-size:13px; border-radius:8px; gap:6px; }
 .btn.lg { height:48px; padding:0 22px; font-size:15px; border-radius:12px; }
-.btn[disabled], .btn.busy { opacity:.55; pointer-events:none; }
+.btn[disabled] { opacity:.55; pointer-events:none; }
+/* Work in progress shows a spinner inside the button itself. */
+.btn.busy { position:relative; pointer-events:none; color:transparent !important; }
+.btn.busy::after { content:""; position:absolute; left:50%; top:50%; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%; border:2px solid var(--spin, var(--ink)); border-right-color:transparent; animation:spin .7s linear infinite; }
 .chip {
   display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:999px; flex:none;
   font-size:12px; font-weight:600; line-height:1; white-space:nowrap; background:var(--subtle); color:var(--ink2);
@@ -166,9 +204,9 @@ a { color:inherit; text-decoration:none; }
   background:var(--paper); font-size:15px; font-weight:600; color:var(--ink);
   transition:border-color .15s, box-shadow .15s;
 }
-.inp:hover, .dd:hover { border-color:#c4bdae; }
+.inp:hover, .dd:hover { border-color:var(--line3); }
 .inp:focus, .dd:focus { border-color:var(--ink); box-shadow:0 0 0 3px rgba(255,211,42,.45); }
-.inp::placeholder { color:var(--faint); font-weight:500; }
+.inp::placeholder { color:var(--muted); font-weight:400; }
 .dd {
   appearance:none; -webkit-appearance:none; padding-right:36px; cursor:pointer; font-weight:500; font-size:14px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236d6b64' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -199,7 +237,7 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
   color:var(--ink2); font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; transition:background .15s, color .15s;
 }
 .seg button:hover, .seg label:hover { color:var(--ink); }
-.seg .c { color:var(--faint); font-weight:500; }
+.seg .c { color:var(--muted); font-weight:500; }
 .seg .on, .seg input:checked + span {
   background:var(--paper); color:var(--ink); font-weight:600;
   box-shadow:0 1px 2px rgba(23,23,20,.08), 0 0 0 1px rgba(23,23,20,.04);
@@ -213,7 +251,7 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
 .empty-state .i { width:28px; height:28px; color:var(--faint); margin-bottom:4px; }
 .empty-state b { color:var(--ink); font-weight:600; font-size:15px; }
 .empty-state p { margin:0; max-width:340px; font-size:13px; line-height:18px; }
-.sk { display:block; border-radius:6px; background:linear-gradient(90deg, var(--subtle) 25%, #ebe6da 37%, var(--subtle) 63%); background-size:400% 100%; animation:sk 1.3s ease infinite; }
+.sk { display:block; border-radius:6px; background:linear-gradient(90deg, var(--subtle) 25%, var(--sk) 37%, var(--subtle) 63%); background-size:400% 100%; animation:sk 1.3s ease infinite; }
 @keyframes sk { 0% { background-position:100% 50%; } 100% { background-position:0 50%; } }
 
 /* ---------- KPIs ---------- */
@@ -239,12 +277,13 @@ button.kpi:active { transform:scale(.99); }
 .lp-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--line2) transparent; }
 .dayh {
   position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px; padding:9px 16px;
-  background:#f5f1e8; border-bottom:1px solid var(--line); font-size:13px; line-height:18px;
+  background:var(--dayh); border-bottom:1px solid var(--line); font-size:13px; line-height:18px;
 }
 .dayh b { font-weight:600; white-space:nowrap; flex:none; }
 .dayh .m { flex:0 1 auto; min-width:0; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dayh > .i { flex:none; }
-.dayh a { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-weight:600; white-space:nowrap; padding:2px 0; }
+.dayh .dl { margin-left:auto; display:flex; align-items:center; gap:18px; flex:none; }
+.dayh a { display:inline-flex; align-items:center; gap:6px; font-weight:600; white-space:nowrap; padding:2px 0; }
 .dayh a:hover { text-decoration:underline; text-underline-offset:3px; }
 .dayh .i { width:16px; height:16px; }
 .row {
@@ -252,7 +291,8 @@ button.kpi:active { transform:scale(.99); }
   width:100%; padding:12px 16px 12px 30px; border-bottom:1px solid var(--line); text-align:left;
   transition:background .12s;
 }
-.row:hover { background:#f8f4ec; }
+.row:hover { background:var(--row-hover); }
+.row:active { background:var(--hover); }
 .row.sel { background:var(--hover); }
 .row.sel::before { content:""; position:absolute; left:15px; top:12px; bottom:12px; width:3px; border-radius:2px; background:var(--ink); }
 .row.erow { grid-template-columns:minmax(0,1fr) auto; }
@@ -267,8 +307,20 @@ button.kpi:active { transform:scale(.99); }
 .row .mt.bad { color:var(--red); }
 .row .rt { text-align:right; }
 .row .pr { display:block; font-weight:700; }
-.row .tm { display:block; margin-top:2px; color:var(--faint); font-size:12px; line-height:16px; white-space:nowrap; }
+.row .tm { display:block; margin-top:2px; color:var(--muted); font-size:12px; line-height:16px; white-space:nowrap; }
 .row.dim .nm b, .row.dim .pr { color:var(--muted); }
+/* Wide order lists line the details up in columns instead of one long line. */
+.split.orders .lp { container-type:inline-size; container-name:olist; }
+.row .c2, .row .c3, .row .mt.ref { display:none; }
+@container olist (min-width: 720px) {
+  .row:not(.erow) { grid-template-columns:36px minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 92px; gap:16px; }
+  .row:not(.erow) .mt.combo { display:none; }
+  .row .mt.ref { display:block; }
+  .row .c2, .row .c3 { display:block; min-width:0; }
+  .row .c2 b, .row .c3 b { display:block; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .c2 span, .row .c3 span { display:block; margin-top:2px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .c2 span.due { color:var(--amber); font-weight:600; }
+}
 .row .unread { width:8px; height:8px; border-radius:50%; background:var(--yellow); flex:none; }
 
 .dp { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
@@ -299,7 +351,7 @@ button.kpi:active { transform:scale(.99); }
 .dp-empty .i { width:30px; height:30px; color:var(--faint); margin-bottom:6px; }
 .dp-empty b { color:var(--ink); font-weight:600; font-size:15px; }
 .dp-empty p { margin:0; font-size:13px; }
-.scrim { position:fixed; inset:0; z-index:55; background:rgba(23,23,20,.32); opacity:0; pointer-events:none; transition:opacity .22s; }
+.scrim { position:fixed; inset:0; z-index:55; background:var(--scrim); opacity:0; pointer-events:none; transition:opacity .22s; }
 .scrim.on { opacity:1; pointer-events:auto; }
 
 /* ---------- emails ---------- */
@@ -322,8 +374,101 @@ button.kpi:active { transform:scale(.99); }
 .ep-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; line-height:16px; color:var(--muted); }
 .ep-meta span b { font-weight:500; color:var(--ink2); margin-left:6px; }
 .ep-body { flex:1; min-height:0; overflow-y:auto; background:var(--subtle); padding:16px; scrollbar-width:thin; }
-.ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf6ef; min-height:420px; }
-.ep-note { max-width:640px; margin:10px auto 0; font-size:12px; line-height:16px; color:var(--faint); text-align:center; }
+.ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf7f0; min-height:420px; }
+.ep-note { max-width:640px; margin:10px auto 0; font-size:12px; line-height:16px; color:var(--muted); text-align:center; }
+
+/* mailbox rows, message extras, compose */
+.mrow .mt .subj { color:var(--ink2); }
+.mrow.unread-row .nm b, .mrow.unread-row .mt .subj { font-weight:700; color:var(--ink); }
+.mrow .nm .i { width:14px; height:14px; color:var(--muted); flex:none; }
+.more-row { display:flex; justify-content:center; padding:14px; }
+.cust-strip { display:flex; align-items:center; gap:10px; margin-top:12px; padding:8px 8px 8px 12px; border-radius:10px; background:var(--subtle); font-size:13px; line-height:18px; color:var(--ink2); }
+.cust-strip > .i { color:var(--muted); flex:none; }
+.cust-strip .min0 { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cust-strip b { font-weight:600; color:var(--ink); }
+.atts { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.att { display:inline-flex; align-items:center; gap:8px; max-width:100%; height:36px; padding:0 12px; border:1px solid var(--line2); border-radius:10px; background:var(--paper); font-size:13px; font-weight:500; }
+.att:hover { background:var(--hover); }
+.att .min0 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+.att small { color:var(--muted); font-size:12px; }
+.att.busy { opacity:.6; pointer-events:none; }
+.em-line.bad span { color:var(--red); }
+.em-msg { display:flex; align-items:center; gap:10px; margin-top:12px; padding:10px 10px 10px 12px; border-radius:10px; background:var(--subtle); }
+.em-msg > .i { color:var(--muted); flex:none; }
+.em-msg .min0 { flex:1; }
+.em-msg b { display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.em-msg span span { display:block; color:var(--muted); font-size:13px; line-height:18px; }
+.modal.compose { width:min(640px, 100%); }
+.modal.compose .field { margin-top:12px; }
+.cfrom { font-size:13px; color:var(--muted); }
+.cfrom b { font-weight:500; color:var(--ink2); }
+.inp.ta { height:auto; min-height:180px; padding:12px 14px; line-height:22px; font-weight:400; font-size:15px; resize:vertical; }
+.chint { margin:8px 0 0; font-size:12px; line-height:16px; color:var(--muted); }
+.cquote { margin-top:10px; font-size:13px; color:var(--muted); }
+.cquote summary { cursor:pointer; padding:6px 0; }
+.cquote pre { margin:6px 0 0; padding:10px 12px; max-height:180px; overflow:auto; white-space:pre-wrap; font:inherit; color:var(--ink2); background:var(--subtle); border-radius:10px; }
+.mlist .badge { margin-left:0; }
+
+.zline { display:none; align-items:center; gap:12px; width:100%; padding:12px 14px; text-align:left; }
+.zline .min0 { flex:1; }
+.zline b { display:block; font-weight:600; }
+.zline span.s { display:block; color:var(--muted); font-size:13px; line-height:18px; }
+.zline > .i { color:var(--muted); }
+.zstack .zcell { border-left:0; border-top:1px solid var(--line); padding:14px 0; }
+.zstack .zcell:first-child { border-top:0; padding-top:4px; }
+
+/* ---------- delivery run ---------- */
+.run { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:16px; align-items:start; }
+.run-side { position:sticky; top:28px; }
+.run-prog .top { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.run-prog .big { font-size:26px; line-height:32px; font-weight:700; letter-spacing:-.02em; }
+.run-prog .bar { height:8px; border-radius:4px; margin-top:10px; }
+.run-prog .bar i { border-radius:4px; }
+.run-prog.complete .bar i { background:var(--green); }
+.load { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.load h3 { margin:0 0 4px; font-size:13px; line-height:18px; font-weight:500; color:var(--muted); }
+.load .ln { line-height:26px; }
+.load .ln b { font-weight:600; }
+.load .due { color:var(--amber); }
+.run-acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+.run-sec { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:22px 2px 10px; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
+.run-sec:first-child { margin-top:0; }
+.stops { display:flex; flex-direction:column; gap:10px; }
+.stop { position:relative; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-sm); }
+.stop-h { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:12px; align-items:center; width:100%; padding:14px 16px; text-align:left; border-radius:var(--r-lg); }
+button.stop-h:active { background:var(--hover); }
+.stop .n { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; background:var(--subtle); color:var(--ink2); font-weight:700; font-size:13px; flex:none; }
+.stop .who { display:flex; align-items:center; gap:8px; min-width:0; }
+.stop .who b { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.stop .sub { display:block; margin-top:2px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stop .go { color:var(--muted); }
+.stop.open { border-color:var(--ink); box-shadow:0 0 0 1px var(--ink), var(--shadow-md); }
+.stop.open .n { background:var(--yellow); color:var(--on-yellow); }
+.stop-b { padding:0 16px 16px 60px; }
+.stop-b .addr { font-size:17px; line-height:24px; font-weight:600; }
+.stop-b .meta { margin-top:4px; color:var(--muted); font-size:13px; line-height:18px; }
+.stop-b .acts3 { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; margin-top:14px; }
+.stop-b .acts3 .btn { padding:0 8px; }
+.stop-b .done-btn { width:100%; margin-top:10px; height:52px; font-size:16px; border-radius:14px; }
+.stop.done { background:transparent; box-shadow:none; }
+.stop.done .n { background:var(--green-soft); color:var(--green); }
+.stop.done .who b { color:var(--muted); font-weight:500; text-decoration:line-through; text-decoration-color:var(--line3); }
+.stop .mv { display:flex; gap:6px; }
+.run-done { display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:32px 20px; }
+.run-done .tick { width:52px; height:52px; border-radius:50%; display:grid; place-items:center; background:var(--green-soft); color:var(--green); margin-bottom:6px; }
+.run-done b { font-size:17px; font-weight:700; }
+.run-done p { margin:0; color:var(--muted); font-size:13px; }
+
+/* ---------- more (phone) ---------- */
+.mlist { padding:4px 0; overflow:hidden; }
+.mlist a, .mlist button { display:flex; align-items:center; gap:14px; width:100%; min-height:52px; padding:0 16px; border-top:1px solid var(--line); font-weight:500; font-size:15px; text-align:left; }
+.mlist > :first-child { border-top:0; }
+.mlist a:active, .mlist button:active { background:var(--hover); }
+.mlist .lbl { flex:1; min-width:0; }
+.mlist .val { color:var(--muted); font-size:13px; }
+.mlist .chev { color:var(--faint); }
+.mhead { margin:22px 4px 8px; font-size:13px; font-weight:600; color:var(--muted); }
+.mhead:first-child { margin-top:0; }
 
 /* ---------- stock & prices ---------- */
 .stock-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
@@ -345,9 +490,9 @@ button.kpi:active { transform:scale(.99); }
 .toggle { position:relative; width:42px; height:24px; flex:none; display:inline-block; }
 .toggle input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; z-index:1; }
 .toggle span { position:absolute; inset:0; border-radius:12px; background:var(--line2); transition:background .2s; }
-.toggle span::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--paper); box-shadow:0 1px 2px rgba(0,0,0,.2); transition:transform .22s var(--ease), background .2s; }
-.toggle input:checked + span { background:var(--ink); }
-.toggle input:checked + span::after { transform:translateX(18px); background:var(--yellow); }
+.toggle span::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--knob); box-shadow:0 1px 2px rgba(0,0,0,.2); transition:transform .22s var(--ease), background .2s; }
+.toggle input:checked + span { background:var(--toggle-on); }
+.toggle input:checked + span::after { transform:translateX(18px); background:var(--knob-on); }
 .toggle input:focus-visible + span { outline:2px solid var(--ink); outline-offset:2px; }
 .pgrid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
 .profit { margin-top:6px; font-size:12px; line-height:16px; font-weight:600; color:var(--green); }
@@ -376,12 +521,12 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .savebar {
   position:fixed; z-index:45; left:calc(50% + var(--side-w) / 2); bottom:20px; transform:translateX(-50%);
   display:flex; align-items:center; gap:14px; max-width:calc(100vw - var(--side-w) - 32px);
-  padding:10px 10px 10px 18px; border-radius:14px; background:var(--ink); color:var(--on-ink); box-shadow:var(--shadow-lg);
+  padding:10px 10px 10px 18px; border-radius:14px; background:var(--inverse); color:var(--on-inverse); box-shadow:var(--shadow-lg);
   animation:barIn .28s var(--ease);
 }
 .savebar .txt { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500; }
-.savebar .btn.text { color:var(--on-ink); background:none; padding:0 12px; }
-.savebar .btn.text:hover { background:rgba(255,255,255,.08); }
+.savebar .btn.text { color:var(--on-inverse); background:none; padding:0 12px; }
+.savebar .btn.text:hover { background:var(--inverse-hover); }
 @keyframes barIn { from { opacity:0; transform:translate(-50%, 12px); } to { opacity:1; transform:translate(-50%, 0); } }
 
 /* ---------- customers ---------- */
@@ -392,7 +537,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .cc-top .nm b { display:block; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cc-tags { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
 .cc-spend { font-weight:700; font-size:16px; }
-.spark { display:block; width:100%; height:36px; margin:12px 0 10px; }
+.spark { display:block; width:100%; height:36px; margin:12px 0 10px; color:var(--ink); }
 .cc-stats { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
 .cc-stats div { background:var(--subtle); border-radius:8px; padding:7px 4px; text-align:center; min-width:0; }
 .cc-stats b { display:block; font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -428,7 +573,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .vgrid span { display:block; font-size:12px; color:var(--muted); }
 
 /* ---------- images ---------- */
-.pubbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:14px 16px; margin-bottom:16px; border-radius:var(--r-md); background:var(--yellow-soft); border:1px solid #f0e2a2; }
+.pubbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:14px 16px; margin-bottom:16px; border-radius:var(--r-md); background:var(--yellow-soft); border:1px solid var(--yellow-line); }
 .pubbar p { margin:0; font-weight:600; }
 .pubbar .m { font-weight:500; color:var(--muted); font-size:13px; }
 .rot { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 6px; margin-top:12px; scrollbar-width:thin; }
@@ -452,9 +597,9 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .acard .th img { width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
 .acard .pick { position:absolute; top:8px; right:8px; width:20px; height:20px; accent-color:var(--ink); cursor:pointer; margin:0; }
 .acard .tags { position:absolute; top:8px; left:8px; display:flex; gap:4px; flex-wrap:wrap; }
-.acard .tags .chip { height:20px; font-size:11px; background:rgba(255,254,251,.92); }
+.acard .tags .chip { height:20px; font-size:11px; background:var(--glass); }
 .acard .tags .chip.ok { background:var(--green-soft); }
-.acard .tags .chip.fav { background:var(--yellow); color:var(--ink); }
+.acard .tags .chip.fav { background:var(--yellow); color:var(--on-yellow); }
 .acard .meta { display:flex; flex-direction:column; gap:8px; padding:10px; }
 .acard .meta b { font-size:12px; line-height:16px; font-weight:600; overflow-wrap:anywhere; }
 .acard .a3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
@@ -466,7 +611,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .lightbox .ib { position:absolute; top:16px; right:16px; }
 
 /* ---------- modal, sheet, toast ---------- */
-.modal-wrap { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:16px; background:rgba(23,23,20,.4); animation:fade .16s; }
+.modal-wrap { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:16px; background:var(--modal-scrim); animation:fade .16s; }
 .modal { width:min(460px, 100%); max-height:calc(100dvh - 32px); overflow:auto; padding:22px; border-radius:18px; background:var(--paper); box-shadow:var(--shadow-lg); animation:pop .22s var(--ease); }
 .modal h2 { margin:0 0 8px; font-size:18px; line-height:24px; font-weight:700; }
 .modal p { margin:0 0 8px; color:var(--ink2); }
@@ -481,7 +626,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 @keyframes pop { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
 @keyframes up { from { transform:translateY(100%); } to { transform:none; } }
 .toasts { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:130; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; width:max-content; max-width:calc(100vw - 24px); }
-.toast { pointer-events:auto; display:flex; align-items:center; gap:14px; padding:11px 12px 11px 16px; border-radius:12px; background:var(--ink); color:var(--on-ink); box-shadow:var(--shadow-lg); font-weight:500; animation:toastIn .26s var(--ease); }
+.toast { pointer-events:auto; display:flex; align-items:center; gap:14px; padding:11px 12px 11px 16px; border-radius:12px; background:var(--inverse); color:var(--on-inverse); box-shadow:var(--shadow-lg); font-weight:500; animation:toastIn .26s var(--ease); }
 .toast.out { opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s; }
 .toast button { color:var(--yellow); font-weight:700; padding:0 4px; }
 @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
@@ -493,18 +638,19 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 .login-card h1 { margin:0; font-size:22px; line-height:28px; font-weight:700; }
 .login-card p { margin:4px 0 18px; color:var(--muted); }
 .login-card .btn { width:100%; margin-top:14px; }
-.login-msg { min-height:20px; margin:12px 0 0; text-align:center; color:var(--red); font-weight:500; font-size:13px; }
+.login-msg { margin:12px 0 0; text-align:center; color:var(--red); font-weight:500; font-size:13px; }
+.login-msg:empty { display:none; }
 
 /* ---------- phone tab bar ---------- */
 .tabbar {
   display:none; position:fixed; left:0; right:0; bottom:0; z-index:40; grid-template-columns:repeat(5, 1fr);
-  padding:6px 4px calc(6px + var(--safe-b)); background:rgba(255,254,251,.94);
+  padding:6px calc(4px + var(--safe-r)) calc(6px + var(--safe-b)) calc(4px + var(--safe-l)); background:var(--bar-bg);
   -webkit-backdrop-filter:saturate(1.4) blur(14px); backdrop-filter:saturate(1.4) blur(14px); border-top:1px solid var(--line);
 }
 .tabbar a, .tabbar button { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0 3px; font-size:11px; line-height:14px; font-weight:500; color:var(--muted); }
 .tabbar .on { color:var(--ink); font-weight:600; }
 .tabbar .i { width:22px; height:22px; }
-.tabbar .tb { position:absolute; top:0; left:calc(50% + 3px); min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--yellow); color:var(--ink); font-size:10px; font-weight:700; line-height:17px; text-align:center; }
+.tabbar .tb { position:absolute; top:0; left:calc(50% + 3px); min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--yellow); color:var(--on-yellow); font-size:11px; font-weight:700; line-height:17px; text-align:center; }
 
 /* ---------- responsive ---------- */
 @media (max-width:1440px) { .copy-lbl { display:none; } .copy-btn { width:32px; padding:0; } }
@@ -521,20 +667,22 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .kpi .v { font-size:22px; line-height:28px; }
   .stock-grid { grid-template-columns:minmax(0,1fr); }
   .vgrid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .run { grid-template-columns:minmax(0,1fr) 300px; }
 }
 @media (max-width:899px) {
+  body { font-size:15px; line-height:22px; }
   .side { display:none; }
   .tabbar { display:grid; }
-  .main { margin-left:0; padding:14px 16px calc(92px + var(--safe-b)); }
+  .main { margin-left:0; padding:calc(14px + var(--safe-t)) calc(16px + var(--safe-r)) calc(92px + var(--safe-b)) calc(16px + var(--safe-l)); }
   .lg-only { display:none !important; }
   .vhead { align-items:center; margin-bottom:14px; }
   .vhead h1 { display:flex; align-items:center; gap:10px; font-size:24px; line-height:30px; }
   .vhead h1::before { content:""; width:12px; height:12px; border-radius:50%; background:var(--yellow); flex:none; }
   .vhead.tight .sub { display:none; }
   .vhead .vact .btn .lbl { display:none; }
-  .vhead .vact .btn { width:40px; padding:0; }
+  .vhead .vact .btn { width:44px; height:44px; padding:0; }
   .search { display:none; }
-  .searching .search { display:flex; position:absolute; left:16px; right:16px; top:14px; width:auto; z-index:5; height:44px; box-shadow:var(--shadow-md); }
+  .searching .search { display:flex; position:absolute; left:0; right:0; top:0; width:auto; z-index:5; height:44px; box-shadow:var(--shadow-md); }
   .view { position:relative; }
   .view.fill { display:block; height:auto; min-height:0; }
   .kpis { grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
@@ -544,23 +692,28 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .kpis.three .kpi .k { white-space:normal; }
   .lp { background:none; border:0; box-shadow:none; overflow:visible; }
   .lp-bar { padding:0 0 12px; border:0; }
+  /* Every filter fits on the screen: label on top, count underneath. */
+  .lp-bar .seg { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); width:100%; overflow:visible; }
+  .lp-bar .seg button { flex-direction:column; gap:0; height:46px; padding:0 2px; font-size:12px; line-height:16px; }
+  .lp-bar .seg .c { font-size:12px; line-height:16px; }
+  .copy-btn { display:none; }
   .lp-scroll { overflow:visible; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); }
   .lp-scroll:empty { display:none; }
   .lp-scroll > :first-child { border-top-left-radius:var(--r-lg); border-top-right-radius:var(--r-lg); }
   .lp-scroll > :last-child { border-bottom:0; }
   .dayh { top:0; }
-  .row { padding:12px 14px; grid-template-columns:36px minmax(0,1fr) auto; }
+  .row { padding:12px 14px; grid-template-columns:36px minmax(0,1fr) auto; min-height:64px; }
   .row.erow { padding:12px 14px; }
   .row.sel::before { display:none; }
   .row.sel { background:transparent; }
-  .dp.pane { width:100vw; border-left:0; }
+  .dp.pane { width:100vw; border-left:0; padding-top:var(--safe-t); }
   .dp-foot { padding:12px 16px calc(12px + var(--safe-b)); }
   .dp-foot .btn { flex:1; height:48px; font-size:15px; border-radius:12px; }
   .dp-head, .ep-head { padding:16px; }
   .dp-body { padding:0 16px 8px; }
-  .zstrip { grid-template-columns:1fr; }
-  .zcell { border-left:0; border-top:1px solid var(--line); padding:12px 14px; }
-  .zcell:first-child { border-top:0; }
+  .zstrip { display:block; }
+  .zstrip > .zcell { display:none; }
+  .zline { display:flex; }
   .ep-tools { margin-left:0; width:100%; }
   .ep-body { padding:12px; }
   .pgrid { grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
@@ -573,7 +726,9 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .savebar .txt .long { display:none; }
   .toasts { bottom:calc(86px + var(--safe-b)); }
   .modal-wrap { align-items:end; padding:0; }
-  .modal { width:100%; border-radius:20px 20px 0 0; padding:22px 18px calc(18px + var(--safe-b)); animation:up .26s var(--ease); max-height:90dvh; }
+  .modal { width:100%; border-radius:20px 20px 0 0; padding:10px 18px calc(18px + var(--safe-b)); animation:up .26s var(--ease); max-height:90dvh; touch-action:pan-y; }
+  /* Sheets get a grabber and close with a swipe down. */
+  .modal::before { content:""; display:block; width:36px; height:5px; border-radius:3px; background:var(--line2); margin:0 auto 16px; }
   .modal .mact .btn { flex:1; height:48px; }
   .tbl.stack thead { display:none; }
   .tbl.stack tr { display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:10px 0; border-bottom:1px solid var(--line); }
@@ -585,6 +740,34 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .acard .a3 { grid-template-columns:1fr 1fr; }
   .acard .a3 .btn:last-child { grid-column:1 / -1; }
   .toolbar .dd, .toolbar .inp { flex:1 1 140px; }
+  .run { grid-template-columns:minmax(0,1fr); gap:0; }
+  .run-side { position:static; margin-bottom:16px; order:-1; }
+  .run-prog .big { font-size:22px; line-height:28px; }
+  .stop-b { padding:0 14px 14px; }
+  .stop-h { padding:12px 14px; }
+}
+/* Touch screens: every control is at least 44 x 44 pt, with room between them (Apple HIG). */
+@media (pointer:coarse) {
+  .btn { height:44px; }
+  .btn.sm { height:44px; padding:0 14px; font-size:14px; border-radius:10px; }
+  .acts { gap:10px; }
+  .ib { width:44px; height:44px; }
+  .seg button, .seg label { height:38px; }
+  .seg.wide label { height:42px; }
+  .stepper { height:44px; }
+  .stepper button { width:44px; }
+  .toggle input { inset:-10px -6px; }
+  .rot-item .ib { width:44px; height:44px; }
+  .acard .a3 .btn { height:40px; }
+  .acard .pick { width:24px; height:24px; }
+  .check input { width:22px; height:22px; }
+  .days button { height:44px; }
+  .dayh a, .zcell .more { padding:10px 0; margin:-10px 0; }
+  .inp, .dd, .inp.sm, .dd.sm, .search input { font-size:16px; }
+  .inp.sm, .dd.sm { height:44px; }
+  .dz .inp { height:44px; font-size:16px; }
+  .tabbar a, .tabbar button { min-height:48px; }
+  .tabbar a:active { opacity:.6; }
 }
 @media (max-width:380px) {
   .pgrid { grid-template-columns:1fr 1fr; }
@@ -629,6 +812,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
         <div class="vact">
           <label class="search" id="o-search"><span data-icon="search"></span><input id="o-q" type="search" placeholder="Search orders" autocomplete="off" aria-label="Search orders"><kbd>/</kbd></label>
           <button class="ib sm-only" type="button" data-action="toggle-search" aria-label="Search"><span data-icon="search"></span></button>
+          <button class="ib bell" type="button" data-action="alerts" id="o-alerts" aria-label="New order alerts" title="New order alerts"><span data-icon="bell"></span></button>
           <button class="ib" type="button" data-action="refresh" id="o-refresh" aria-label="Refresh" title="Refresh"><span data-icon="refresh"></span></button>
         </div>
       </div>
@@ -645,6 +829,14 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
       </div>
     </section>
 
+    <section class="view" data-view="run" id="v-run" hidden>
+      <div class="vhead">
+        <div class="min0"><h1>Delivery run</h1><p class="sub" id="r-sub">Your stops in order</p></div>
+        <div class="vact" id="r-act"></div>
+      </div>
+      <div id="r-body"></div>
+    </section>
+
     <section class="view" data-view="stock" id="v-stock" hidden>
       <div class="vhead">
         <div class="min0"><h1>Stock &amp; prices</h1><p class="sub">Saved changes show on the website within seconds</p></div>
@@ -655,8 +847,8 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view fill" data-view="emails" id="v-emails" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Emails</h1><p class="sub" id="e-sub">Order emails from orders@getyolko.com, sent through Zoho</p></div>
-        <div class="vact"><button class="btn ghost sm" type="button" data-action="test-email"><span data-icon="send"></span><span class="lbl">Send me a test email</span></button></div>
+        <div class="min0"><h1>Emails</h1><p class="sub" id="e-sub">Customer mail and order emails for orders@getyolko.com</p></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="test-email" title="Send me a test order email"><span data-icon="eye"></span><span class="lbl">Test order email</span></button><button class="btn dark sm" type="button" data-action="compose"><span data-icon="pencil"></span><span class="lbl">Write email</span></button></div>
       </div>
       <div class="panel zstrip" id="e-status"></div>
       <div class="split emails">
@@ -697,6 +889,11 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
         <div class="vact"><button class="ib" type="button" data-action="assets-refresh" aria-label="Refresh"><span data-icon="refresh"></span></button></div>
       </div>
       <div id="im-body"></div>
+    </section>
+
+    <section class="view" data-view="more" id="v-more" hidden>
+      <div class="vhead"><div class="min0"><h1>More</h1></div></div>
+      <div id="m-body"></div>
     </section>
   </main>
 
@@ -756,6 +953,13 @@ const ICONS = {
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   menu: '<circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15l1.5-2z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+  pencil: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
+  reply: '<path d="M10 8 5 12.5l5 4.5"/><path d="M5 12.5h9a5 5 0 0 1 5 5V19"/>',
+  clip: '<path d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L11.5 6.8"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/>',
+  navigate: '<path d="M12 3 4.5 20 12 16l7.5 4L12 3z"/>',
+  unread: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 6 8.5-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
 };
 function ic(name, size) {
   const s = size || 18;
@@ -847,22 +1051,37 @@ function toast(text, action) {
   el.innerHTML = "<span>" + esc(text) + "</span>" + (action ? '<button type="button">' + esc(action.label) + "</button>" : "");
   box.appendChild(el);
   while (box.children.length > 3) box.firstChild.remove();
-  let timer = setTimeout(close, action ? 6000 : 3200);
+  // Toasts with Undo stay longer and pause while the pointer or focus is on them.
+  const life = action ? 8000 : 3200;
+  let timer = setTimeout(close, life);
   function close() { clearTimeout(timer); el.classList.add("out"); setTimeout(function () { el.remove(); }, 220); }
-  if (action) el.querySelector("button").addEventListener("click", function () { close(); action.run(); });
+  el.addEventListener("mouseenter", function () { clearTimeout(timer); });
+  el.addEventListener("mouseleave", function () { clearTimeout(timer); timer = setTimeout(close, 2500); });
+  if (action) {
+    const b = el.querySelector("button");
+    b.addEventListener("focus", function () { clearTimeout(timer); });
+    b.addEventListener("click", function () { close(); action.run(); });
+  }
+  return { close: close };
 }
 
-let MODAL_RESOLVE = null;
+let MODAL_RESOLVE = null, MODAL_RETURN = null, MODAL_BEFORE_CLOSE = null;
+/* Dialogs follow Apple's guidance: Cancel is always there, a destructive button never gets the
+   default focus, Escape or a tap outside cancels, and on phones the sheet has a grabber and closes
+   with a swipe down. */
 function openModal(opts) {
   closeModal(null);
+  MODAL_RETURN = document.activeElement;
+  MODAL_BEFORE_CLOSE = opts.beforeClose || null;
   const slot = $("modal-slot");
   const actions = (opts.actions || [{ label: "OK", kind: "primary", value: true }]).map(function (a, i) {
     return '<button type="button" class="btn ' + (a.kind || "ghost") + '" data-mval="' + i + '">' + esc(a.label) + "</button>";
   }).join("");
-  slot.innerHTML = '<div class="modal-wrap" id="modal-wrap"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+  slot.innerHTML = '<div class="modal-wrap" id="modal-wrap"><div class="modal' + (opts.cls ? " " + opts.cls : "") + '" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
     '<h2 id="modal-title">' + esc(opts.title || "") + "</h2>" + (opts.html || "") +
-    '<div class="mact">' + actions + "</div></div></div>";
+    (actions ? '<div class="mact">' + actions + "</div>" : "") + "</div></div>";
   const wrap = $("modal-wrap");
+  const modal = $("modal");
   return new Promise(function (resolve) {
     MODAL_RESOLVE = resolve;
     wrap.addEventListener("click", function (e) {
@@ -875,28 +1094,78 @@ function openModal(opts) {
         if (err) { toast(err); return; }
       }
       const val = a.value === true && opts.collect ? opts.collect(wrap) : a.value;
-      closeModal(val);
+      if (a.value === true && opts.submit) {
+        // Work that can fail keeps the sheet open, with a spinner in the button meanwhile.
+        if (b.classList.contains("busy")) return;
+        b.classList.add("busy");
+        Promise.resolve(opts.submit(val, wrap)).then(function (err) {
+          b.classList.remove("busy");
+          if (err) { toast(err); return; }
+          closeModal(val, true);
+        });
+        return;
+      }
+      closeModal(val, true);
     });
-    const first = wrap.querySelector("input") || wrap.querySelector(".btn.primary, .btn.danger-solid, .btn.dark");
+    const first = wrap.querySelector("[autofocus]") || wrap.querySelector("input:not([type=hidden]), textarea") ||
+      wrap.querySelector(".mact .btn.primary, .mact .btn.dark") || wrap.querySelector(".mact .btn.ghost");
     if (first) setTimeout(function () { first.focus(); }, 30);
     wrap.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && e.target.tagName === "INPUT") {
         e.preventDefault();
-        const ok = wrap.querySelector(".mact .btn:last-child");
+        const ok = wrap.querySelector(".mact .btn.primary, .mact .btn.dark");
         if (ok) ok.click();
       }
+      if (e.key === "Tab") {
+        // Keep keyboard focus inside the dialog.
+        const f = qsa('button:not([disabled]), [href], input:not([type=hidden]), select, textarea', modal).filter(function (x) { return x.offsetParent !== null; });
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
     });
+    if (PHONE_MQ.matches) swipeToDismiss(modal);
+    if (opts.onOpen) opts.onOpen(wrap);
   });
 }
-function closeModal(value) {
+function swipeToDismiss(modal) {
+  let y0 = null, dy = 0, t0 = 0;
+  modal.addEventListener("touchstart", function (e) {
+    // Only from the top of the sheet, or when its content is scrolled to the top.
+    const top = e.touches[0].clientY - modal.getBoundingClientRect().top;
+    if (modal.scrollTop > 0 && top > 48) return;
+    if (e.target.closest("textarea, input, select")) return;
+    y0 = e.touches[0].clientY; dy = 0; t0 = Date.now();
+    modal.style.transition = "none";
+  }, { passive: true });
+  modal.addEventListener("touchmove", function (e) {
+    if (y0 == null) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    modal.style.transform = "translateY(" + dy + "px)";
+  }, { passive: true });
+  modal.addEventListener("touchend", function () {
+    if (y0 == null) return;
+    const fast = dy > 40 && Date.now() - t0 < 250;
+    y0 = null;
+    modal.style.transition = "transform .22s var(--ease)";
+    if (dy > 110 || fast) { modal.style.transform = "translateY(100%)"; setTimeout(function () { closeModal(null); }, 200); }
+    else modal.style.transform = "";
+  });
+}
+function closeModal(value, chosen) {
+  if (MODAL_BEFORE_CLOSE && !chosen) { try { MODAL_BEFORE_CLOSE(); } catch (e) {} }
+  MODAL_BEFORE_CLOSE = null;
   const slot = $("modal-slot");
+  const had = slot && slot.innerHTML;
   if (slot) slot.innerHTML = "";
   const r = MODAL_RESOLVE;
   MODAL_RESOLVE = null;
   if (r) r(value);
+  if (had && MODAL_RETURN && document.contains(MODAL_RETURN)) { try { MODAL_RETURN.focus({ preventScroll: true }); } catch (e) {} }
+  MODAL_RETURN = null;
 }
-function confirmBox(title, html, okLabel, danger) {
-  return openModal({ title: title, html: html, actions: [{ label: "Keep", kind: "ghost", value: false }, { label: okLabel, kind: danger ? "danger-solid" : "primary", value: true }] });
+function confirmBox(title, html, okLabel, danger, cancelLabel) {
+  return openModal({ title: title, html: html, actions: [{ label: cancelLabel || "Cancel", kind: "ghost", value: false }, { label: okLabel, kind: danger ? "danger-solid" : "primary", value: true }] });
 }
 
 async function copyText(text, msg) {
@@ -989,12 +1258,12 @@ function orderSignals(o) {
 /* ============================== state ============================== */
 const S = {
   view: null, filter: "upcoming", q: "", selectedId: null, autoPicked: false,
-  emailFilter: "all", emailSel: null, inboxSel: null,
+  emailFilter: null, emailSel: null, mailSel: { inbox: null, sent: null }, runOpen: null,
   ordersLoaded: false, lastText: "", lastLoad: 0, loading: false,
 };
 let ORDERS = [];
 let SAVED = null, DRAFT = null, SAVING = false;
-let EMAILS = null, EMAIL_STATUS = null, EMAILS_AT = 0, INBOX = null;
+let EMAILS = null, EMAIL_STATUS = null, EMAILS_AT = 0;
 const PREVIEWS = {};
 const OVERLAY_MQ = window.matchMedia("(max-width: 1179px)");
 const PHONE_MQ = window.matchMedia("(max-width: 899px)");
@@ -1032,6 +1301,7 @@ function onOrdersChanged() {
   renderWeek();
   if (S.view === "emails") renderEmails();
   if (S.view === "customers") renderCustomers();
+  if (S.view === "run") renderRun();
 }
 
 /* ============================== orders: list ============================== */
@@ -1071,10 +1341,10 @@ function groupOrders(list, asc) {
   return groups;
 }
 function visibleOrders() { return ORDERS.filter(function (o) { return inFilter(o, S.filter) && matchesQuery(o); }); }
-function mapsRoute(orders) {
-  const stops = orders.filter(function (o) { return o.fulfillment === "delivery" && o.status !== "cancelled" && addressLine(o); })
-    .sort(function (a, b) { return (Number(a.deliveryKm) || 0) - (Number(b.deliveryKm) || 0); })
-    .map(addressLine);
+function mapsRoute(orders, keepOrder) {
+  let list = orders.filter(function (o) { return o.fulfillment === "delivery" && o.status !== "cancelled" && addressLine(o); });
+  if (!keepOrder) list = list.slice().sort(function (a, b) { return (Number(a.deliveryKm) || 0) - (Number(b.deliveryKm) || 0); });
+  const stops = list.map(addressLine);
   if (!stops.length) return "";
   const dest = stops[stops.length - 1];
   const via = stops.slice(0, -1).slice(0, 9);
@@ -1107,7 +1377,7 @@ function renderOrderList() {
     const route = asc && !g.pickup ? mapsRoute(g.orders) : "";
     const meta = plural(g.orders.length, "order") + " · " + plural(g.trays, "tray") + (g.paid ? " · " + g.paid + " paid" : "");
     return '<div class="dayh">' + ic(g.pickup ? "pin" : "truck", 16) + "<b>" + esc(g.label) + '</b><span class="m">' + esc(meta) + "</span>" +
-      (route ? '<a href="' + esc(route) + '" target="_blank" rel="noopener">' + ic("route", 16) + '<span class="lg-only">Open route in Maps</span><span class="sm-only">Route</span></a>' : "") +
+      (route ? '<span class="dl"><a href="#run">' + ic("navigate", 16) + '<span>Start run</span></a><a href="' + esc(route) + '" target="_blank" rel="noopener" class="lg-only">' + ic("route", 16) + "<span>Route in Maps</span></a></span>" : "") +
       "</div>" + g.orders.map(function (o) { VISIBLE_IDS.push(o.id); return rowHtml(o); }).join("");
   }).join("");
   el.scrollTop = keep;
@@ -1119,7 +1389,10 @@ function rowHtml(o) {
   return '<button type="button" class="row' + (S.selectedId === o.id ? " sel" : "") + (dim ? " dim" : "") + '" data-action="open-order" data-id="' + esc(o.id) + '">' +
     '<span class="av">' + esc(initials(o.name)) + "</span>" +
     '<span class="min0"><span class="nm"><b>' + esc(o.name || "No name") + "</b>" + primaryChip(o) + (sig.suspicious ? chip("warn", "Check") : "") + "</span>" +
-    '<span class="mt">' + esc(shortItem(o) + " · " + place(o) + unpaid) + "</span></span>" +
+    '<span class="mt combo">' + esc(shortItem(o) + " · " + place(o) + unpaid) + '</span><span class="mt ref">#' + esc(orderRef(o)) + " · " + esc(fmtPhone(o.phone) || "no phone") + "</span></span>" +
+    // Wide lists show these as their own columns (see the olist container query).
+    '<span class="c2"><b>' + esc(o.fulfillment === "delivery" ? (o.deliverySuburb || "Delivery") : "Pickup") + "</b><span>" + esc(dayLabel(o)) + "</span></span>" +
+    '<span class="c3"><b>' + esc(shortItem(o)) + "</b><span" + (unpaid ? ' class="due"' : "") + ">" + esc(unpaid ? "Not paid" : isPaid(o) ? "Paid" : isRefunded(o) ? "Refunded" : o.status === "new" ? "Waiting" : "") + "</span></span>" +
     '<span class="rt"><span class="pr num">' + esc(money(amountOf(o))) + '</span><span class="tm">' + esc(rel(o.createdAt)) + "</span></span></button>";
 }
 function markSelectedRow() {
@@ -1161,7 +1434,7 @@ function renderOrdersMeta() {
     const trays = SAVED ? SAVED.traysAvailable : "-";
     kp.innerHTML =
       kpi("Waiting", String(waiting), waiting ? (waiting === 1 ? "order to confirm" : "orders to confirm") : "All caught up", "kpi-waiting") +
-      kpi(next ? next.label : "Next delivery", next ? plural(next.orders.length, "order") : "None yet", next ? plural(next.trays, "tray") + " to deliver" : "No upcoming orders", "kpi-upcoming") +
+      kpi(next ? next.label : "Next delivery", next ? plural(next.orders.length, "order") : "None yet", next ? plural(next.trays, "tray") + " to deliver" : "No upcoming orders", next && !next.pickup ? "kpi-run" : "kpi-upcoming") +
       kpi("Trays left", String(trays), "after confirmed orders", "kpi-stock") +
       kpi("Paid online", money(paid), money(confirmed) + " confirmed in total", "");
   }
@@ -1201,15 +1474,20 @@ function paymentSection(o) {
 }
 function emailEntryFor(id) { return emailList().find(function (e) { return e.orderId === id; }) || null; }
 function emailSection(o) {
+  const email = orderEmail(o);
+  const id = esc(o.id);
+  // Their latest message in the orders mailbox, if any.
+  const theirs = email && MAIL.inbox ? MAIL.inbox.messages.find(function (m) { return String(m.from || "").toLowerCase() === email.toLowerCase(); }) : null;
+  const msg = theirs ? '<div class="em-msg">' + ic("inbox", 16) + '<span class="min0"><b>' + esc(theirs.subject || "(no subject)") + "</b><span>" + esc((theirs.unread ? "Unread · " : "") + "from them " + relInbox(theirs.receivedAt)) + '</span></span><button type="button" class="btn sm ghost" data-action="open-mail-any" data-id="' + esc(theirs.folderId + ":" + theirs.messageId) + '">Read</button></div>' : "";
   if (o.paymentStatus !== "paid" && o.paymentStatus !== "refunded") {
-    return '<section class="sec"><h3>Email</h3><div class="minor" style="margin:0">The confirmation email goes out by itself once they pay.</div></section>';
+    return '<section class="sec"><h3>Email</h3><div class="minor" style="margin:0">The confirmation email goes out by itself once they pay.</div>' + msg + "</section>";
   }
   const e = emailEntryFor(o.id);
   if (!e) return "";
-  const id = esc(o.id);
   let line, acts;
+  const ds = deliveryState(e);
   if (e.status === "sent") {
-    line = chip("sent", "Sent") + "<span>Confirmation sent " + esc(sydDate(e.sentAt) === sydDate(Date.now()) ? fmtClock(e.sentAt) : fmtDateTime(e.sentAt)) + "</span>";
+    line = emailChip(e) + "<span>" + esc(ds && ds.key !== "sent" ? ds.line : "Confirmation sent " + (sydDate(e.sentAt) === sydDate(Date.now()) ? fmtClock(e.sentAt) : fmtDateTime(e.sentAt))) + "</span>";
     acts = '<button type="button" class="btn sm ghost" data-action="view-email" data-id="' + id + '">' + ic("eye", 16) + 'View</button><button type="button" class="btn sm ghost" data-action="send-email" data-id="' + id + '">' + ic("send", 16) + "Resend</button>";
   } else if (e.status === "failed") {
     line = chip("failed", "Failed") + "<span>" + esc("Not sent: " + e.reason + (e.attempts ? " · " + plural(e.attempts, "try", "tries") : "")) + "</span>";
@@ -1219,7 +1497,7 @@ function emailSection(o) {
     acts = '<button type="button" class="btn sm ghost" data-action="view-email" data-id="' + id + '">' + ic("eye", 16) + "Preview</button>" +
       (e.to ? '<button type="button" class="btn sm ghost" data-action="send-email" data-id="' + id + '">' + ic("send", 16) + "Send now</button>" : "");
   }
-  return '<section class="sec"><h3>Email</h3><div class="em-line">' + line + "</div>" + (e.to ? '<div class="minor">' + esc(e.to) + "</div>" : "") + '<div class="acts">' + acts + "</div></section>";
+  return '<section class="sec"><h3>Email</h3><div class="em-line' + (ds && ds.bad ? " bad" : "") + '">' + line + "</div>" + (e.to ? '<div class="minor">' + esc(e.to) + "</div>" : "") + msg + '<div class="acts">' + acts + "</div></section>";
 }
 function customerHistory(o) {
   if (!o.phone) return "";
@@ -1272,7 +1550,7 @@ function detailHtml(o) {
           (o.phone ? '<a class="btn sm ghost" href="tel:' + esc(o.phone) + '">' + ic("phone", 16) + "Call</a>" : "") +
           (o.phone ? '<a class="btn sm ghost" href="' + esc(waLink(o.phone)) + "?text=" + encodeURIComponent("Hi " + firstName + ", it's YOLKO about your egg order #" + orderRef(o) + ".") + '" target="_blank" rel="noopener">' + ic("chat", 16) + "WhatsApp</a>" : "") +
           (o.phone ? '<a class="btn sm ghost" href="sms:' + esc(o.phone) + '">' + ic("sms", 16) + "Text</a>" : "") +
-          (email ? '<a class="btn sm ghost" href="mailto:' + esc(email) + "?subject=" + encodeURIComponent("Your YOLKO order #" + orderRef(o)) + '">' + ic("mail", 16) + "Email</a>" : "") +
+          (email ? (mailConnected() ? '<button type="button" class="btn sm ghost" data-action="compose-order" data-id="' + esc(o.id) + '">' + ic("mail", 16) + "Email</button>" : '<a class="btn sm ghost" href="mailto:' + esc(email) + "?subject=" + encodeURIComponent("Your YOLKO order #" + orderRef(o)) + '">' + ic("mail", 16) + "Email</a>") : "") +
         "</div></section>" +
       paymentSection(o) +
       emailSection(o) +
@@ -1302,8 +1580,11 @@ function selectOrder(id) {
   openOverlay($("o-detail"));
   if (fresh) hydrateStripeReceipt(id);
 }
+function clearEmailSel() {
+  if (S.emailFilter === "inbox" || S.emailFilter === "sent") S.mailSel[S.emailFilter] = null; else S.emailSel = null;
+}
 function closeDetail() {
-  if (S.view === "emails") { S.emailSel = null; S.inboxSel = null; closeOverlay($("e-detail")); markEmailRow(); if (!OVERLAY_MQ.matches) renderEmailDetail(); return; }
+  if (S.view === "emails") { clearEmailSel(); closeOverlay($("e-detail")); markEmailRow(); if (!OVERLAY_MQ.matches) renderEmailDetail(); return; }
   if (OVERLAY_MQ.matches) {
     closeOverlay($("o-detail"));
     S.selectedId = null;
@@ -1337,7 +1618,7 @@ window.addEventListener("popstate", function () {
       $("scrim").classList.remove("on");
       document.body.style.overflow = "";
       if (id === "o-detail") { S.selectedId = null; markSelectedRow(); }
-      else { S.emailSel = null; S.inboxSel = null; markEmailRow(); }
+      else { clearEmailSel(); markEmailRow(); }
     }
   });
 });
@@ -1356,7 +1637,7 @@ async function setStatus(id, status, opts) {
   const o = findOrder(id);
   if (!o) return;
   if (status === "cancelled" && o.paymentStatus === "paid" && !opts.skipConfirm) {
-    const ok = await confirmBox("Cancel this paid order?", "<p>" + esc(o.name || "This customer") + " paid " + esc(money(amountOf(o))) + ". Cancelling does not refund them. Use Refund in Payment to send the money back.</p>", "Cancel order", true);
+    const ok = await confirmBox("Cancel this paid order?", "<p>" + esc(o.name || "This customer") + " paid " + esc(money(amountOf(o))) + ". Cancelling does not refund them. Use Refund in Payment to send the money back.</p>", "Cancel order", true, "Keep order");
     if (!ok) return;
   }
   const prev = o.status;
@@ -1462,9 +1743,276 @@ async function sendOrderEmail(id) {
   if (S.view === "emails") loadEmails();
 }
 
+/* ============================== delivery run ============================== */
+/* Saturday mode: the next delivery day as a list of stops in driving order, one tap to
+   navigate, call or text, and a big Mark delivered button. Built for a phone in the car. */
+function runGroup() {
+  const live = ORDERS.filter(function (o) { return o.fulfillment === "delivery" && (o.status === "new" || o.status === "confirmed"); });
+  const groups = groupOrders(live, true);
+  if (groups.length) {
+    const g = groups[0];
+    return { key: g.key, label: g.label, orders: ORDERS.filter(function (o) { return dayKey(o) === g.key && o.status !== "cancelled"; }) };
+  }
+  // Nothing left to deliver: show today's finished run, if there was one.
+  const today = sydDate(Date.now());
+  const done = ORDERS.filter(function (o) { const d = deliveryDate(o); return o.fulfillment === "delivery" && o.status === "done" && d && d.toISOString().slice(0, 10) === today; });
+  return done.length ? { key: dayKey(done[0]), label: dayLabel(done[0]), orders: done } : null;
+}
+function runOrderKey(key) { return "yolko_run:" + key; }
+function savedRunOrder(key) { try { return JSON.parse(localStorage.getItem(runOrderKey(key)) || "null"); } catch (e) { return null; } }
+/** Stops in driving order: the owner's saved order first, then nearest first. */
+function runStops(g) {
+  const saved = savedRunOrder(g.key) || [];
+  const pos = {};
+  saved.forEach(function (id, i) { pos[id] = i; });
+  return g.orders.slice().sort(function (a, b) {
+    const pa = pos[a.id], pb = pos[b.id];
+    if (pa != null && pb != null) return pa - pb;
+    if (pa != null) return -1;
+    if (pb != null) return 1;
+    return (Number(a.deliveryKm) || 99) - (Number(b.deliveryKm) || 99);
+  });
+}
+function moveStop(id, d) {
+  const g = runGroup();
+  if (!g) return;
+  const ids = runStops(g).map(function (o) { return o.id; });
+  const i = ids.indexOf(id), j = i + d;
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  ids.splice(j, 0, ids.splice(i, 1)[0]);
+  try { localStorage.setItem(runOrderKey(g.key), JSON.stringify(ids)); } catch (e) {}
+  renderRun();
+}
+function resetRunOrder() {
+  const g = runGroup();
+  if (!g) return;
+  try { localStorage.removeItem(runOrderKey(g.key)); } catch (e) {}
+  renderRun();
+  toast("Back to nearest first");
+}
+function loadList(stops) {
+  const lines = {};
+  let trays = 0;
+  stops.forEach(function (o) {
+    const m = BUNDLE_META[o.bundle] || BUNDLE_META.tray1;
+    if (m.kind === "tray") { trays += traysFor(o); return; }
+    lines[m.label] = (lines[m.label] || 0) + (o.quantity || 1);
+  });
+  const out = [];
+  if (trays) out.push([plural(trays, "tray"), ""]);
+  Object.keys(lines).forEach(function (k) { out.push([lines[k] + " × " + k, ""]); });
+  return out;
+}
+function smsHref(o) {
+  const first = String(o.name || "").split(/\s+/)[0] || "there";
+  return "sms:" + String(o.phone || "").replace(/[^\d+]/g, "") + "?&body=" + encodeURIComponent("Hi " + first + ", it's YOLKO. I'm on my way with your eggs, about 10 minutes away.");
+}
+function stopHtml(o, n, open, isFirst, isLast) {
+  const done = o.status === "done";
+  const unpaid = !isPaid(o) && !isRefunded(o) && !done;
+  const addr = addressLine(o);
+  const id = esc(o.id);
+  let body = "";
+  if (open) {
+    body = '<div class="stop-b">' +
+      '<div class="addr">' + esc(addr || "No address") + "</div>" +
+      '<div class="meta">' + esc([o.deliveryKm ? o.deliveryKm + " km from home" : "", itemLine(o), fmtPhone(o.phone)].filter(Boolean).join(" · ")) + "</div>" +
+      (unpaid ? '<div class="alert" style="margin-top:12px">' + ic("card", 16) + "<div><b>Not paid online.</b> Collect " + esc(money(amountOf(o))) + " at the door.</div></div>" : "") +
+      (done
+        ? '<div class="acts"><button type="button" class="btn ghost" data-action="status" data-id="' + id + '" data-status="confirmed">' + ic("undo", 16) + "Undo delivered</button></div>"
+        : '<div class="acts3">' +
+            (addr ? '<a class="btn ghost" href="https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(addr) + '" target="_blank" rel="noopener">' + ic("navigate", 16) + "Navigate</a>" : '<span></span>') +
+            (o.phone ? '<a class="btn ghost" href="tel:' + esc(o.phone) + '">' + ic("phone", 16) + "Call</a>" : "<span></span>") +
+            (o.phone ? '<a class="btn ghost" href="' + esc(smsHref(o)) + '">' + ic("sms", 16) + "On my way</a>" : "<span></span>") +
+          "</div>" +
+          '<button type="button" class="btn primary done-btn" data-action="run-done" data-id="' + id + '">' + ic("check", 18) + "Mark delivered</button>" +
+          '<div class="mv"><button type="button" class="btn sm ghost" data-action="run-move" data-id="' + id + '" data-d="-1"' + (isFirst ? " disabled" : "") + ">" + ic("up", 16) + 'Earlier</button><button type="button" class="btn sm ghost" data-action="run-move" data-id="' + id + '" data-d="1"' + (isLast ? " disabled" : "") + ">" + ic("down", 16) + 'Later</button><button type="button" class="btn sm ghost" data-action="open-order-from-run" data-id="' + id + '">' + ic("orders", 16) + "Order</button></div>") +
+    "</div>";
+  }
+  return '<div class="stop' + (open ? " open" : "") + (done ? " done" : "") + '" data-id="' + id + '">' +
+    '<button type="button" class="stop-h" data-action="run-open" data-id="' + id + '" aria-expanded="' + open + '"><span class="n">' + (done ? ic("check", 16) : n) + '</span><span class="min0"><span class="who"><b>' + esc(o.name || "No name") + "</b>" + (unpaid ? chip("checkout", "Collect " + money(amountOf(o))) : "") + '</span><span class="sub">' + esc((o.deliverySuburb || "Delivery") + " · " + shortItem(o)) + '</span></span><span class="go">' + ic(open ? "up" : "down", 18) + "</span></button>" +
+    body + "</div>";
+}
+function renderRun() {
+  const body = $("r-body");
+  if (!body) return;
+  if (!S.ordersLoaded) { body.innerHTML = '<div class="card"><span class="sk" style="width:40%;height:16px"></span><span class="sk" style="height:180px;margin-top:16px"></span></div>'; return; }
+  const g = runGroup();
+  $("r-act").innerHTML = '<button class="ib" type="button" data-action="refresh" aria-label="Refresh" title="Refresh">' + ic("refresh") + "</button>";
+  if (!g) {
+    $("r-sub").textContent = "Nothing booked yet";
+    body.innerHTML = '<div class="card"><div class="empty-state">' + ic("truck", 28) + "<b>No deliveries coming up</b><p>Paid Saturday orders show up here as a route, nearest first.</p></div></div>";
+    return;
+  }
+  const stops = runStops(g);
+  const left = stops.filter(function (o) { return o.status !== "done"; });
+  const doneN = stops.length - left.length;
+  if (!S.runOpen || !stops.some(function (o) { return o.id === S.runOpen; })) S.runOpen = left.length ? left[0].id : null;
+  $("r-sub").textContent = g.label + " · " + plural(stops.length, "stop");
+  const collect = left.filter(function (o) { return !isPaid(o) && !isRefunded(o); });
+  const owed = collect.reduce(function (s, o) { return s + (Number(amountOf(o)) || 0); }, 0);
+  const pct = stops.length ? Math.round((doneN / stops.length) * 100) : 0;
+  const custom = !!savedRunOrder(g.key);
+  const route = mapsRoute(left, true);
+  const side = '<div class="card run-prog' + (left.length ? "" : " complete") + '"><div class="top"><span class="big num">' + doneN + " of " + stops.length + '</span><span class="minor" style="margin:0">delivered</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
+    '<div class="load"><h3>' + (left.length ? "In the car" : "Delivered today") + "</h3>" + loadList(left.length ? left : stops).map(function (l) { return '<div class="ln"><b>' + esc(l[0]) + "</b></div>"; }).join("") +
+      (collect.length ? '<div class="ln due">' + esc("Collect " + money(owed) + " from " + plural(collect.length, "stop")) + "</div>" : "") + "</div>" +
+    (left.length ? '<div class="run-acts">' + (route ? '<a class="btn dark" href="' + esc(route) + '" target="_blank" rel="noopener">' + ic("route", 16) + "Full route</a>" : "") + '<button type="button" class="btn ghost" data-action="copy-run">' + ic("copy", 16) + "Copy list</button></div>" : "") +
+    (custom && left.length ? '<button type="button" class="btn sm ghost" style="margin-top:10px;width:100%" data-action="run-reset">Nearest first again</button>' : "") +
+    "</div>";
+  let list = "";
+  if (left.length) {
+    list += '<div class="run-sec"><span>' + esc(plural(left.length, "stop") + " to go") + "</span></div><div class=\"stops\">" +
+      left.map(function (o, i) { return stopHtml(o, stops.indexOf(o) + 1, S.runOpen === o.id, i === 0, i === left.length - 1); }).join("") + "</div>";
+  } else {
+    list += '<div class="card run-done"><span class="tick">' + ic("check", 26) + "</span><b>All delivered</b><p>" + esc(plural(stops.length, "stop") + " done. Nice work.") + "</p></div>";
+  }
+  const doneList = stops.filter(function (o) { return o.status === "done"; });
+  if (doneList.length && left.length) {
+    list += '<div class="run-sec"><span>Delivered</span></div><div class="stops">' + doneList.map(function (o) { return stopHtml(o, stops.indexOf(o) + 1, S.runOpen === o.id, false, false); }).join("") + "</div>";
+  }
+  body.innerHTML = '<div class="run"><div class="min0">' + list + '</div><div class="run-side">' + side + "</div></div>";
+}
+async function runDone(id) {
+  const g = runGroup();
+  const stops = g ? runStops(g) : [];
+  const next = stops.filter(function (o) { return o.status !== "done" && o.id !== id; })[0];
+  try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  S.runOpen = next ? next.id : null;
+  await setStatus(id, "done");
+  const el = next && document.querySelector('.stop[data-id="' + CSS.escape(next.id) + '"]');
+  if (el && PHONE_MQ.matches) el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+function copyRun() {
+  const g = runGroup();
+  if (!g) return;
+  const lines = [g.label];
+  runStops(g).filter(function (o) { return o.status !== "done"; }).forEach(function (o, i) {
+    lines.push((i + 1) + ". " + o.name + ", " + addressLine(o) + (o.phone ? ", " + fmtPhone(o.phone) : "") + " (" + shortItem(o) + (isPaid(o) ? "" : ", collect " + money(amountOf(o))) + ")");
+  });
+  copyText(lines.join("\n"), "Stops copied");
+}
+/* Keep the phone screen awake while the run is open. */
+let WAKE = null;
+async function syncWakeLock() {
+  const want = S.view === "run" && !document.hidden && PHONE_MQ.matches;
+  try {
+    if (want && !WAKE && navigator.wakeLock) { WAKE = await navigator.wakeLock.request("screen"); WAKE.addEventListener("release", function () { WAKE = null; }); }
+    else if (!want && WAKE) { await WAKE.release(); WAKE = null; }
+  } catch (e) { WAKE = null; }
+}
+
+/* ============================== new order alerts ============================== */
+/* A cheap check every 30 seconds, even in a background tab: the tab title and icon show a
+   count, and if the owner turned them on, a sound and a system notification. */
+const ALERTS = { sound: false, notify: false };
+try { Object.assign(ALERTS, JSON.parse(localStorage.getItem("yolko_alerts") || "{}")); } catch (e) {}
+let HEAD = null, UNSEEN = 0, AUDIO = null;
+function saveAlerts() { try { localStorage.setItem("yolko_alerts", JSON.stringify(ALERTS)); } catch (e) {} renderBell(); }
+function renderBell() {
+  const b = $("o-alerts");
+  if (b) b.classList.toggle("on", !!(ALERTS.sound || (ALERTS.notify && window.Notification && Notification.permission === "granted")));
+}
+function chime() {
+  try {
+    AUDIO = AUDIO || new (window.AudioContext || window.webkitAudioContext)();
+    if (AUDIO.state === "suspended") AUDIO.resume();
+    const t = AUDIO.currentTime;
+    [[880, 0], [1318.5, 0.16]].forEach(function (n) {
+      const o = AUDIO.createOscillator(), g = AUDIO.createGain();
+      o.type = "sine"; o.frequency.value = n[0];
+      g.gain.setValueAtTime(0.0001, t + n[1]);
+      g.gain.exponentialRampToValueAtTime(0.25, t + n[1] + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + 0.45);
+      o.connect(g); g.connect(AUDIO.destination);
+      o.start(t + n[1]); o.stop(t + n[1] + 0.5);
+    });
+  } catch (e) {}
+}
+function setFavicon(n) {
+  const link = $("favicon");
+  if (!link) return;
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const x = c.getContext("2d");
+    x.fillStyle = "#ffd32a";
+    x.beginPath(); x.arc(32, 32, 24, 0, Math.PI * 2); x.fill();
+    if (n > 0) {
+      x.fillStyle = "#b42318";
+      x.beginPath(); x.arc(46, 18, 17, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#fff"; x.font = "700 22px system-ui, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(n > 9 ? "9+" : String(n), 46, 19);
+    }
+    link.href = c.toDataURL("image/png");
+  } catch (e) {}
+}
+function setTitle() {
+  const v = VIEWS.find(function (x) { return x.id === S.view; });
+  document.title = (UNSEEN ? "(" + UNSEEN + ") " : "") + (v ? v.label : S.view === "more" ? "More" : "Orders") + " · YOLKO Admin";
+  setFavicon(UNSEEN);
+}
+function seenOrders() {
+  if (!UNSEEN || document.hidden) return;
+  UNSEEN = 0;
+  setTitle();
+}
+async function pollHead() {
+  const r = await api("/api/admin/orders-head");
+  if (!r.ok) return;
+  const h = r.data;
+  const changed = HEAD && h.latest && h.latest !== HEAD.latest;
+  const n = changed ? Math.max(1, h.count - HEAD.count) : 0;
+  HEAD = h;
+  if (changed) onNewOrders(n);
+}
+async function onNewOrders(n) {
+  if (document.hidden || S.view !== "orders") { UNSEEN += n; setTitle(); }
+  if (ALERTS.sound) chime();
+  await loadOrders(true);
+  const newest = ORDERS.slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); })[0];
+  if (!newest) return;
+  const line = (newest.name || "New customer") + " · " + shortItem(newest) + " · " + money(amountOf(newest));
+  if (ALERTS.notify && window.Notification && Notification.permission === "granted" && (document.hidden || !document.hasFocus())) {
+    try {
+      const note = new Notification(n > 1 ? n + " new orders" : "New order", { body: line, tag: "yolko-order", icon: "/assets/yolko-app-icon-1024.png" });
+      note.onclick = function () { window.focus(); go("orders"); selectOrder(newest.id); note.close(); };
+    } catch (e) {}
+  }
+  if (!document.hidden) toast("New order: " + line, { label: "Open", run: function () { go("orders"); selectOrder(newest.id); } });
+}
+function alertsSheet() {
+  const can = "Notification" in window;
+  const perm = can ? Notification.permission : "unsupported";
+  const row = function (id, title, sub, on, dis) {
+    return '<div class="srow"><div class="t"><b>' + esc(title) + "</b><span>" + esc(sub) + '</span></div><label class="toggle"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + (dis ? " disabled" : "") + ' aria-label="' + esc(title) + '"><span></span></label></div>';
+  };
+  openModal({
+    title: "New order alerts",
+    html: "<p>While this page is open, even in a background tab, new orders show as a count on the tab.</p>" +
+      row("al-notify", "Show a notification", perm === "denied" ? "Blocked for this site in the browser settings" : perm === "unsupported" ? "This browser doesn’t support it here" : "A banner on this device when an order comes in", ALERTS.notify && perm === "granted", perm === "denied" || perm === "unsupported") +
+      row("al-sound", "Play a sound", "A short chime for each new order", ALERTS.sound, false),
+    actions: [{ label: "Done", kind: "primary", value: true }],
+    onOpen: function (w) {
+      w.addEventListener("change", async function (e) {
+        if (e.target.id === "al-sound") { ALERTS.sound = e.target.checked; if (ALERTS.sound) chime(); saveAlerts(); }
+        if (e.target.id === "al-notify") {
+          if (e.target.checked && Notification.permission !== "granted") {
+            const p = await Notification.requestPermission().catch(function () { return "denied"; });
+            if (p !== "granted") { e.target.checked = false; toast("Notifications weren’t allowed"); }
+          }
+          ALERTS.notify = e.target.checked;
+          saveAlerts();
+        }
+      });
+    },
+  });
+}
+
 /* ============================== nav + week card ============================== */
 const VIEWS = [
   { id: "orders", label: "Orders", icon: "orders", hash: "orders" },
+  { id: "run", label: "Delivery run", short: "Run", icon: "truck", hash: "run" },
   { id: "stock", label: "Stock & prices", short: "Stock", icon: "stock", hash: "stock" },
   { id: "emails", label: "Emails", icon: "mail", hash: "emails" },
   { id: "customers", label: "Customers", icon: "users", hash: "customers" },
@@ -1472,7 +2020,9 @@ const VIEWS = [
   { id: "visits", label: "Flyer visits", icon: "qr", hash: "visits" },
   { id: "images", label: "Images", icon: "image", hash: "assets" },
 ];
-const HASH_TO_VIEW = { "": "orders", orders: "orders", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", visits: "visits", assets: "images", images: "images" };
+const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", visits: "visits", assets: "images", images: "images", more: "more" };
+// The phone tab bar is for moving between sections only; everything else lives on the More page.
+const TAB_IDS = ["orders", "run", "stock", "emails"];
 function navBadge(id) {
   if (id === "orders") { const n = ORDERS.filter(function (o) { return o.status === "new"; }).length; return n ? String(n) : ""; }
   if (id === "emails") { const n = emailAttention(); return n ? String(n) : ""; }
@@ -1485,11 +2035,26 @@ function renderNav() {
     return '<a href="#' + v.hash + '" class="' + (S.view === v.id ? "on" : "") + '"' + (S.view === v.id ? ' aria-current="page"' : "") + ">" + ic(v.icon) + "<span>" + esc(v.label) + "</span>" +
       (b ? '<span class="badge">' + b + "</span>" : (v.id === "stock" && dirty ? '<span class="unsaved-dot" title="Unsaved changes"></span>' : "")) + "</a>";
   }).join("");
-  const more = ["competitors", "visits", "images"].indexOf(S.view) >= 0;
-  $("tabbar").innerHTML = VIEWS.slice(0, 4).map(function (v) {
+  const more = TAB_IDS.indexOf(S.view) < 0;
+  $("tabbar").innerHTML = VIEWS.filter(function (v) { return TAB_IDS.indexOf(v.id) >= 0; }).map(function (v) {
     const b = navBadge(v.id);
-    return '<a href="#' + v.hash + '" class="' + (S.view === v.id ? "on" : "") + '">' + ic(v.icon, 22) + "<span>" + esc(v.short || v.label) + "</span>" + (b ? '<span class="tb">' + b + "</span>" : "") + "</a>";
-  }).join("") + '<button type="button" data-action="more" class="' + (more ? "on" : "") + '">' + ic("more", 22) + "<span>More</span></button>";
+    const on = S.view === v.id;
+    return '<a href="#' + v.hash + '" class="' + (on ? "on" : "") + '"' + (on ? ' aria-current="page"' : "") + ">" + ic(v.icon, 22) + "<span>" + esc(v.short || v.label) + "</span>" + (b ? '<span class="tb">' + b + "</span>" : "") + "</a>";
+  }).join("") + '<a href="#more" class="' + (more ? "on" : "") + '"' + (S.view === "more" ? ' aria-current="page"' : "") + ">" + ic("more", 22) + "<span>More</span></a>";
+  if (S.view === "more") renderMore();
+}
+function renderMore() {
+  const items = VIEWS.filter(function (v) { return TAB_IDS.indexOf(v.id) < 0; });
+  $("m-body").innerHTML =
+    '<div class="panel mlist">' + items.map(function (v) {
+      const b = navBadge(v.id);
+      return '<a href="#' + v.hash + '">' + ic(v.icon) + '<span class="lbl">' + esc(v.label) + "</span>" + (b ? '<span class="badge">' + b + "</span>" : "") + '<span class="chev">' + ic("chevron", 16) + "</span></a>";
+    }).join("") + "</div>" +
+    '<div class="mhead">Shop</div><div class="panel mlist">' +
+      '<button type="button" data-action="alerts">' + ic("bell") + '<span class="lbl">New order alerts</span><span class="val">' + esc(ALERTS.sound || ALERTS.notify ? "On" : "Off") + '</span><span class="chev">' + ic("chevron", 16) + "</span></button>" +
+      '<a href="/" target="_blank" rel="noopener">' + ic("external") + '<span class="lbl">Open the shop</span></a>' +
+      '<button type="button" data-action="logout">' + ic("logout") + '<span class="lbl">Sign out</span></button>' +
+    "</div>";
 }
 function renderWeek() {
   const el = $("week");
@@ -1623,28 +2188,7 @@ function stepperHtml(id, value, unit, disabled) {
     '<label><input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" value="' + value + '" aria-label="' + esc(unit) + '"><small>' + esc(unit) + '</small></label>' +
     '<button type="button" data-action="step" data-target="' + id + '" data-d="1" aria-label="One more">' + ic("plus", 16) + "</button></div>";
 }
-function timeOptions(selected) {
-  let out = "";
-  for (let h = 5; h <= 21; h++) {
-    [0, 30].forEach(function (m) {
-      const val = String(h).padStart(2, "0") + ":" + (m ? "30" : "00");
-      const h12 = h % 12 === 0 ? 12 : h % 12;
-      out += '<option value="' + val + '"' + (val === selected ? " selected" : "") + ">" + h12 + (m ? ":30 " : ":00 ") + (h >= 12 ? "pm" : "am") + "</option>";
-    });
-  }
-  return out;
-}
 function websiteStockText(n) { return n > 0 ? "The website says “" + plural(n, "tray") + " left this week.”" : "The website says “Sold out this week. Check back Wednesday.”"; }
-function pickupHtml() {
-  const open = WEEK_DAYS.filter(function (d) { return DRAFT.pickup[d].enabled; });
-  return '<div class="days">' + WEEK_DAYS.map(function (d) {
-    return '<button type="button" class="' + (DRAFT.pickup[d].enabled ? "on" : "") + '" data-action="pickup-day" data-day="' + d + '" aria-pressed="' + DRAFT.pickup[d].enabled + '">' + d.slice(0, 3) + "</button>";
-  }).join("") + "</div>" +
-  (open.length ? open.map(function (d) {
-    const p = DRAFT.pickup[d];
-    return '<div class="hours"><b>' + d.slice(0, 3) + '</b><select class="dd sm" data-f="hours" data-day="' + d + '" data-k="open">' + timeOptions(p.open) + '</select><span>to</span><select class="dd sm" data-f="hours" data-day="' + d + '" data-k="close">' + timeOptions(p.close) + "</select></div>";
-  }).join("") : '<p class="csub">No pickup days open. Tap a day to open it.</p>');
-}
 function renderStock() {
   const body = $("stock-body");
   if (!DRAFT) {
@@ -1653,7 +2197,6 @@ function renderStock() {
   }
   const d = DRAFT;
   const dzOn = d.dozensAvailable > 0;
-  const pickupDays = WEEK_DAYS.filter(function (x) { return d.pickup[x].enabled; }).map(function (x) { return x.slice(0, 3); });
   body.innerHTML =
     '<div class="stock-grid"><div class="stack">' +
       '<div class="card"><div class="chead"><div><h2>This week</h2><p class="csub">What customers can buy right now</p></div></div>' +
@@ -1664,7 +2207,7 @@ function renderStock() {
           WEIGHTS.map(function (w) { return '<label><input type="radio" name="st-weight" value="' + w[0] + '"' + (d.trayWeight === w[0] ? " checked" : "") + "><span>" + esc(w[1]) + "</span></label>"; }).join("") +
         "</div></div>" +
       "</div>" +
-      '<details class="card pick" id="st-pickup"><summary><div><h2>Pickup days</h2><p class="csub">' + esc(pickupDays.length ? "Open " + pickupDays.join(", ") + ". Not shown while the shop is Saturday delivery only" : "Not shown while the shop is Saturday delivery only") + "</p></div>" + ic("chevron") + '</summary><div id="st-pickup-body">' + pickupHtml() + "</div></details>" +
+      // Pickup days stay saved but aren't shown: the shop is Saturday delivery only (app.js).
     "</div><div class=\"stack\">" +
       '<div class="card"><div class="chead"><div><h2>Tray prices</h2><p class="csub">Change one and the others follow. A $13 tray locks the box at $72.</p></div></div>' +
         '<div class="pgrid">' +
@@ -1749,7 +2292,6 @@ function onStockInput(t) {
     }
   }
   else if (f === "dsell") { const k = t.getAttribute("data-k"); if (v > 0) DRAFT.prices[k] = Math.max(1, Math.round(v)); }
-  else if (f === "hours") { DRAFT.pickup[t.getAttribute("data-day")][t.getAttribute("data-k")] = t.value; }
   updateStockDerived();
   updateSaveBar();
 }
@@ -1794,11 +2336,16 @@ function discardSettings() {
 }
 
 /* ============================== emails ============================== */
+/* One place for the shop's email, all on Zoho as orders@getyolko.com: the mailbox (Inbox and
+   Sent, read and reply here), and the order confirmations with what happened to each one. */
 const EMAIL_LAUNCH = Date.parse("2026-10-22T10:57:00Z");
-const EMAIL_FILTERS = [["all", "All"], ["sent", "Sent"], ["failed", "Failed"], ["not_sent", "Not sent"], ["inbox", "Inbox"]];
+const EMAIL_FILTERS = [["inbox", "Inbox"], ["sent", "Sent"], ["orders", "Order emails"], ["problems", "Problems"]];
+const MAIL = { inbox: null, sent: null };
+let MAIL_UNREAD = 0;
 function reasonText(r) {
   return { before_launch: "Paid before order emails started", no_email: "No email address on this order", pending: "Not sent yet" }[r] || r || "Not sent yet";
 }
+function mailConnected() { return !!(EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected); }
 function deriveEmails() {
   return ORDERS.filter(function (o) { return o.paymentStatus === "paid" || o.paymentStatus === "refunded"; }).map(function (o) {
     const ce = o.confirmationEmail || {};
@@ -1810,7 +2357,7 @@ function deriveEmails() {
     else if (!to) reason = "no_email";
     else if (!(Date.parse(paidAt || "") > EMAIL_LAUNCH)) reason = "before_launch";
     else reason = "pending";
-    return { orderId: o.id, ref: orderRef(o), name: o.name || "", to: to, status: status, reason: reason, sentAt: ce.sentAt || null, requestId: ce.requestId || null, attempts: ce.attempts || 0, lastTriedAt: ce.lastTriedAt || null, paidAt: paidAt, createdAt: o.createdAt, subject: "Your YOLKO order is confirmed (#" + orderRef(o) + ")", orderStatus: o.status };
+    return { orderId: o.id, ref: orderRef(o), name: o.name || "", to: to, status: status, reason: reason, sentAt: ce.sentAt || null, requestId: ce.requestId || null, attempts: ce.attempts || 0, lastTriedAt: ce.lastTriedAt || null, paidAt: paidAt, createdAt: o.createdAt, subject: "Your YOLKO order is confirmed (#" + orderRef(o) + ")", orderStatus: o.status, delivery: null };
   });
 }
 function emailTime(e) { return e.sentAt || e.lastTriedAt || e.paidAt || e.createdAt || ""; }
@@ -1819,86 +2366,191 @@ function emailList() {
   (EMAILS || []).forEach(function (e) { server[e.orderId] = e; });
   return deriveEmails().map(function (d) {
     const s = server[d.orderId];
-    // The server also reads the separate "sent" marker, which survives whole-order rewrites.
-    return s && s.status === "sent" && d.status !== "sent" ? Object.assign({}, d, s) : d;
+    if (!s) return d;
+    // The server also reads the separate "sent" marker, which survives whole-order rewrites,
+    // and the delivery events Zoho reports back.
+    const out = s.status === "sent" && d.status !== "sent" ? Object.assign({}, d, s) : Object.assign({}, d);
+    out.delivery = s.delivery || null;
+    return out;
   }).sort(function (a, b) { return String(emailTime(b)).localeCompare(String(emailTime(a))); });
 }
-function emailAttention() {
-  return emailList().filter(function (e) { return e.status === "failed" || (e.status === "not_sent" && e.reason === "pending" && e.orderStatus !== "cancelled"); }).length;
+/** What happened to a sent email, from Zoho's delivery events. */
+function deliveryState(e) {
+  const d = e.delivery || {};
+  if (e.status !== "sent") return null;
+  if (d.bounce && d.bounce.type === "hard") return { key: "bounced", label: "Bounced", cls: "failed", line: "Bounced: " + (d.bounce.reason || "the address doesn't accept mail"), bad: true };
+  if (d.spamAt) return { key: "spam", label: "Marked spam", cls: "failed", line: "The customer marked it as spam", bad: true };
+  if (d.openedAt) return { key: "opened", label: "Opened", cls: "sent", line: "Opened" + (d.opens > 1 ? " " + d.opens + " times" : "") + " · last " + relInbox(d.lastOpenedAt || d.openedAt) };
+  if (d.bounce && d.bounce.type === "soft") return { key: "delayed", label: "Delayed", cls: "notsent", line: "Delayed: " + (d.bounce.reason || "Zoho is still trying") };
+  if (d.deliveredAt) return { key: "delivered", label: "Delivered", cls: "sent", line: "Delivered " + relInbox(d.deliveredAt) };
+  return { key: "sent", label: "Sent", cls: "sent", line: e.subject };
+}
+function isProblem(e) {
+  const ds = deliveryState(e);
+  return e.status === "failed" || (ds && ds.bad) || (e.status === "not_sent" && e.reason === "pending" && e.orderStatus !== "cancelled");
+}
+function emailAttention() { return emailList().filter(isProblem).length + (mailConnected() ? MAIL_UNREAD : 0); }
+function emailChip(e) {
+  const ds = deliveryState(e);
+  if (ds) return chip(ds.cls, ds.label);
+  return e.status === "failed" ? chip("failed", "Failed") : chip("notsent", "Not sent");
 }
 async function loadEmails(force) {
   if (!force && EMAILS && Date.now() - EMAILS_AT < 60000) { renderEmails(); return; }
   const r = await api("/api/admin/emails");
   if (r.ok) { EMAILS = r.data.emails || []; EMAIL_STATUS = r.data.status || null; EMAILS_AT = Date.now(); }
-  renderEmails();
-  renderNav();
-  if (EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected && !INBOX) loadInbox();
-}
-async function loadInbox() {
-  const r = await api("/api/admin/inbox?limit=40");
-  INBOX = r.ok ? r.data : { connected: true, error: r.data.error || "Could not read the inbox", messages: [] };
+  if (!S.emailFilter) S.emailFilter = mailConnected() ? "inbox" : "orders";
   if (S.view === "emails") renderEmails();
+  renderNav();
+  if (mailConnected()) {
+    if (!MAIL.inbox) loadMail("inbox");
+    if (S.emailFilter === "sent" && !MAIL.sent) loadMail("sent");
+  }
+}
+async function loadMail(folder, more) {
+  const cur = MAIL[folder];
+  if (cur && cur.loading) return;
+  const start = more && cur ? cur.messages.length + 1 : 1;
+  MAIL[folder] = Object.assign({}, more ? cur : { messages: [] }, { loading: true });
+  if (S.view === "emails" && S.emailFilter === folder && !more) renderEmails();
+  const r = await api("/api/admin/mail?folder=" + folder + "&limit=40&start=" + start);
+  const prev = more && cur ? cur.messages : [];
+  if (r.ok && r.data.connected === false) { MAIL[folder] = null; if (EMAIL_STATUS && EMAIL_STATUS.inbox) EMAIL_STATUS.inbox.connected = false; }
+  else MAIL[folder] = r.ok
+    ? { messages: prev.concat(r.data.messages || []), hasMore: !!r.data.hasMore, account: r.data.account, at: Date.now() }
+    : { messages: prev, error: r.data.error || "Could not read the mailbox", reconnect: !!r.data.reconnect };
+  if (folder === "inbox" && r.ok && !more) { MAIL_UNREAD = (r.data.messages || []).filter(function (m) { return m.unread; }).length; renderNav(); }
+  if (S.view === "emails") renderEmails();
+  if (S.selectedId && S.view === "orders") renderDetail(true);
+}
+async function pollUnread() {
+  if (!mailConnected() || document.hidden) return;
+  const r = await api("/api/admin/mail/unread");
+  if (!r.ok || r.data.connected === false) return;
+  const before = MAIL_UNREAD;
+  MAIL_UNREAD = r.data.unread || 0;
+  const latest = r.data.latest;
+  const known = MAIL.inbox && latest && MAIL.inbox.messages.some(function (m) { return m.messageId === latest.messageId; });
+  if (latest && !known && MAIL_UNREAD > before) {
+    loadMail("inbox");
+    toast("New email from " + (latest.fromName || latest.from), { label: "Read", run: function () { openMailFromAnywhere("inbox", latest.folderId + ":" + latest.messageId); } });
+  }
+  renderNav();
+}
+/** The customer behind an email address, from the orders. */
+function customerByEmail(addr) {
+  const a = String(addr || "").trim().toLowerCase();
+  if (!a) return null;
+  const mine = ORDERS.filter(function (o) { return orderEmail(o).toLowerCase() === a; });
+  if (!mine.length) return null;
+  mine.sort(function (x, y) { return String(y.createdAt || "").localeCompare(String(x.createdAt || "")); });
+  return { latest: mine[0], count: mine.filter(function (o) { return o.status !== "cancelled"; }).length || mine.length };
+}
+function firstAddress(s) { const m = /<([^>]+)>/.exec(String(s || "")); return (m ? m[1] : String(s || "").split(/[,;]/)[0]).trim(); }
+function zcell(icon, cls, k, title, sub, extra) {
+  return '<div class="zcell"><span class="zic ' + cls + '">' + ic(icon, 16) + '</span><div class="min0"><span class="k">' + esc(k) + "</span><b>" + esc(title) + "</b><p>" + esc(sub) + "</p>" + (extra || "") + "</div></div>";
+}
+function zohoCells() {
+  const st = EMAIL_STATUS;
+  const more = function (which, label) { return '<button type="button" class="more" data-action="zoho-help" data-which="' + which + '">' + esc(label || "What’s needed") + " " + ic("chevron", 12) + "</button>"; };
+  if (!st) return [zcell("check", "", "Sending", "Checking", "Zoho CPaaS"), zcell("eye", "", "Delivery status", "Checking", "Zoho webhooks"), zcell("inbox", "", "Mailbox", "Checking", "Zoho Mail")];
+  const s = st.sending, d = st.deliveryLogs || {}, m = st.inbox || {};
+  return [
+    s.connected ? zcell("check", "ok", "Sending", "Connected", "Zoho CPaaS · " + (s.from || "orders@getyolko.com")) : zcell("alert", "bad", "Sending", "Not set up", "The Worker is missing the Zoho send key", more("sending")),
+    d.connected
+      ? zcell("eye", "ok", "Delivery status", "Connected", d.lastEventAt ? "Last update from Zoho " + rel(d.lastEventAt) : "Waiting for Zoho’s first update")
+      : zcell("eye", "", "Delivery status", "Not set up", "Delivered, opened and bounced come from Zoho", more("delivery")),
+    m.connected
+      ? zcell("inbox", "ok", "Mailbox", "Connected", "Zoho Mail · " + (m.account || "orders@getyolko.com"), m.source === "login" ? '<button type="button" class="more" data-action="zoho-disconnect">Disconnect ' + ic("chevron", 12) + "</button>" : "")
+      : m.clientReady
+        ? zcell("inbox", "", "Mailbox", "Not connected", "Read and answer orders@getyolko.com here", '<button type="button" class="more" data-action="zoho-connect">Connect Zoho Mail ' + ic("chevron", 12) + "</button>")
+        : zcell("inbox", "", "Mailbox", "Not set up", "Needs the Zoho client on the Worker", more("inbox")),
+  ];
 }
 function renderEmailStatus() {
   const st = EMAIL_STATUS;
-  const sending = st ? st.sending : null;
-  const inboxOn = !!(st && st.inbox && st.inbox.connected);
-  const cell = function (icon, cls, k, title, sub, more) {
-    return '<div class="zcell"><span class="zic ' + cls + '">' + ic(icon, 16) + '</span><div class="min0"><span class="k">' + esc(k) + "</span><b>" + esc(title) + "</b><p>" + esc(sub) + "</p>" + (more ? '<button type="button" class="more" data-action="zoho-help" data-which="' + more + '">What’s needed ' + ic("chevron", 12) + "</button>" : "") + "</div></div>";
-  };
-  $("e-status").innerHTML =
-    (!st ? cell("check", "", "Sending", "Checking", "Zoho CPaaS", "")
-      : sending.connected ? cell("check", "ok", "Sending", "Connected", "Zoho CPaaS · " + (sending.from || "orders@getyolko.com"), "")
-      : cell("alert", "bad", "Sending", "Not set up", "The Worker is missing the Zoho send key", "sending")) +
-    cell("eye", "", "Delivery status", "Not connected yet", "Opens and bounces need Zoho read access", "delivery") +
-    (inboxOn ? cell("inbox", "ok", "Inbox", "Connected", "Zoho Mail · " + ((INBOX && INBOX.account) || "orders mailbox"), "")
-      : cell("inbox", "", "Inbox", "Not connected yet", "Reading replies needs Zoho Mail access", "inbox"));
+  const cells = zohoCells();
+  let line = "Checking Zoho";
+  if (st) {
+    const okCount = [st.sending.connected, st.deliveryLogs && st.deliveryLogs.connected, st.inbox && st.inbox.connected].filter(Boolean).length;
+    line = okCount === 3 ? "Sending, tracking and mailbox connected" : !st.sending.connected ? "Sending isn’t set up" : !(st.inbox && st.inbox.connected) ? "Mailbox not connected" : "Delivery status not set up";
+  }
+  const ok = st && st.sending.connected && st.inbox && st.inbox.connected && st.deliveryLogs && st.deliveryLogs.connected;
+  // Phones get one line that opens the full status as a sheet.
+  $("e-status").innerHTML = cells.join("") +
+    '<button type="button" class="zline" data-action="zoho-sheet"><span class="zic ' + (ok ? "ok" : st && !st.sending.connected ? "bad" : "") + '">' + ic(ok ? "check" : "mail", 16) + '</span><span class="min0"><b>Zoho email</b><span class="s">' + esc(line) + "</span></span>" + ic("chevron", 16) + "</button>";
 }
 function renderEmails() {
   renderEmailStatus();
+  // Pick the starting tab only once we know whether the mailbox is connected.
+  if (!S.emailFilter) {
+    if (!EMAIL_STATUS) { $("e-list").innerHTML = '<div class="empty-state"><span class="sk" style="width:60%;height:14px"></span></div>'; return; }
+    S.emailFilter = mailConnected() ? "inbox" : "orders";
+  }
   const list = emailList();
-  const counts = { all: list.length, sent: 0, failed: 0, not_sent: 0 };
-  list.forEach(function (e) { counts[e.status]++; });
+  const problems = list.filter(isProblem).length;
   $("e-filters").innerHTML = EMAIL_FILTERS.map(function (f) {
-    const n = f[0] === "inbox" ? (INBOX && INBOX.messages ? INBOX.messages.length : "") : counts[f[0]];
-    return '<button type="button" role="tab" class="' + (S.emailFilter === f[0] ? "on" : "") + '" aria-selected="' + (S.emailFilter === f[0]) + '" data-action="email-filter" data-f="' + f[0] + '">' + f[1] + (n !== "" && S.ordersLoaded ? ' <span class="c num">' + n + "</span>" : "") + "</button>";
+    const n = f[0] === "inbox" ? (mailConnected() && MAIL_UNREAD ? MAIL_UNREAD : "") : f[0] === "orders" ? (S.ordersLoaded ? list.length : "") : f[0] === "problems" ? (problems || "") : "";
+    return '<button type="button" role="tab" class="' + (S.emailFilter === f[0] ? "on" : "") + '" aria-selected="' + (S.emailFilter === f[0]) + '" data-action="email-filter" data-f="' + f[0] + '">' + f[1] + (n !== "" ? ' <span class="c num">' + n + "</span>" : "") + "</button>";
   }).join("");
   const el = $("e-list");
+  if (S.emailFilter === "inbox" || S.emailFilter === "sent") { renderMailList(el, S.emailFilter); renderEmailDetail(); return; }
   if (!S.ordersLoaded) { el.innerHTML = '<div class="empty-state"><span class="sk" style="width:60%;height:14px"></span></div>'; return; }
-  if (S.emailFilter === "inbox") { renderInboxList(el); renderEmailDetail(); return; }
-  const shown = list.filter(function (e) { return S.emailFilter === "all" || e.status === S.emailFilter; });
+  const shown = list.filter(function (e) { return S.emailFilter === "orders" || isProblem(e); });
   if (!shown.length) {
-    el.innerHTML = '<div class="empty-state">' + ic("mail", 28) + "<b>" + (S.emailFilter === "failed" ? "No failed emails" : S.emailFilter === "not_sent" ? "Nothing waiting to send" : "No order emails yet") + "</b><p>Every paid order gets a confirmation from orders@getyolko.com.</p></div>";
+    el.innerHTML = '<div class="empty-state">' + ic("mail", 28) + "<b>" + (S.emailFilter === "problems" ? "No problems" : "No order emails yet") + "</b><p>" + (S.emailFilter === "problems" ? "Every confirmation went out. Bounces and failed sends show here." : "Every paid order gets a confirmation from orders@getyolko.com.") + "</p></div>";
   } else {
     const keep = el.scrollTop;
     el.innerHTML = shown.map(function (e) {
-      const line = e.status === "sent" ? e.subject : e.status === "failed" ? "Not sent: " + e.reason + (e.attempts ? " · " + plural(e.attempts, "try", "tries") : "") : reasonText(e.reason) + (e.reason === "pending" && e.to ? " · Send now" : "");
-      const c = e.status === "sent" ? chip("sent", "Sent") : e.status === "failed" ? chip("failed", "Failed") : chip("notsent", "Not sent");
-      return '<button type="button" class="row erow' + (S.emailSel === e.orderId ? " sel" : "") + '" data-action="open-email" data-id="' + esc(e.orderId) + '"><span class="min0"><span class="nm"><b>' + esc(e.name || e.to || "Customer") + "</b>" + c + '</span><span class="mt' + (e.status === "failed" ? " bad" : "") + '">' + esc(line) + '</span></span><span class="rt"><span class="tm">' + esc(relInbox(emailTime(e))) + "</span></span></button>";
+      const ds = deliveryState(e);
+      const line = ds ? ds.line : e.status === "failed" ? "Not sent: " + e.reason + (e.attempts ? " · " + plural(e.attempts, "try", "tries") : "") : reasonText(e.reason) + (e.reason === "pending" && e.to ? " · Send now" : "");
+      const bad = e.status === "failed" || (ds && ds.bad);
+      return '<button type="button" class="row erow' + (S.emailSel === e.orderId ? " sel" : "") + '" data-action="open-email" data-id="' + esc(e.orderId) + '"><span class="min0"><span class="nm"><b>' + esc(e.name || e.to || "Customer") + "</b>" + emailChip(e) + '</span><span class="mt' + (bad ? " bad" : "") + '">' + esc(line) + '</span></span><span class="rt"><span class="tm">' + esc(relInbox(emailTime(e))) + "</span></span></button>";
     }).join("");
     el.scrollTop = keep;
   }
   if (!S.emailSel && !OVERLAY_MQ.matches && shown.length) S.emailSel = shown[0].orderId;
   renderEmailDetail();
 }
-function renderInboxList(el) {
-  const on = EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected;
-  if (!on) {
-    el.innerHTML = '<div class="empty-state">' + ic("inbox", 28) + "<b>The inbox isn’t connected yet</b><p>Customer replies go to " + esc((EMAIL_STATUS && EMAIL_STATUS.sending && EMAIL_STATUS.sending.replyTo) || "your Gmail") + " for now. Connect Zoho Mail to read orders@getyolko.com here.</p><button type=\"button\" class=\"btn sm ghost\" style=\"margin-top:10px\" data-action=\"zoho-help\" data-which=\"inbox\">What’s needed</button></div>";
+function renderMailList(el, folder) {
+  const st = EMAIL_STATUS && EMAIL_STATUS.inbox;
+  if (!mailConnected()) {
+    const ready = st && st.clientReady;
+    el.innerHTML = '<div class="empty-state">' + ic("inbox", 28) + "<b>" + (ready ? "Connect the orders mailbox" : "The mailbox isn’t set up yet") + "</b><p>" +
+      (ready ? "Sign in to Zoho once and orders@getyolko.com shows here. You can read, reply and write to customers without leaving the admin." : "The Worker needs the Zoho client before the mailbox can connect.") + "</p>" +
+      (ready ? '<button type="button" class="btn primary" style="margin-top:12px" data-action="zoho-connect">' + ic("link", 16) + "Connect Zoho Mail</button>" : '<button type="button" class="btn sm ghost" style="margin-top:10px" data-action="zoho-help" data-which="inbox">What’s needed</button>') + "</div>";
     return;
   }
-  if (!INBOX) { el.innerHTML = '<div class="empty-state"><span class="sk" style="width:60%;height:14px"></span></div>'; return; }
-  if (INBOX.error) { el.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not read the inbox</b><p>" + esc(INBOX.error) + "</p></div>"; return; }
-  const msgs = INBOX.messages || [];
-  if (!msgs.length) { el.innerHTML = '<div class="empty-state">' + ic("inbox", 28) + "<b>Inbox is empty</b><p>Mail sent to the orders mailbox shows here.</p></div>"; return; }
-  el.innerHTML = msgs.map(function (m) {
+  const box = MAIL[folder];
+  if (!box || (box.loading && !box.messages.length)) {
+    if (!box) loadMail(folder);
+    el.innerHTML = Array.from({ length: 6 }).map(function () { return '<div class="row erow" aria-hidden="true"><span><span class="sk" style="width:40%;height:14px"></span><span class="sk" style="width:75%;height:12px;margin-top:8px"></span></span><span class="sk" style="width:36px;height:12px"></span></div>'; }).join("");
+    return;
+  }
+  if (box.error && !box.messages.length) {
+    el.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not read the mailbox</b><p>" + esc(box.error) + "</p>" +
+      (box.reconnect ? '<button type="button" class="btn primary" style="margin-top:12px" data-action="zoho-connect">Connect again</button>' : '<button type="button" class="btn sm ghost" style="margin-top:10px" data-action="mail-refresh">Try again</button>') + "</div>";
+    return;
+  }
+  if (!box.messages.length) {
+    el.innerHTML = '<div class="empty-state">' + ic(folder === "sent" ? "send" : "inbox", 28) + "<b>" + (folder === "sent" ? "Nothing sent yet" : "Inbox is empty") + "</b><p>" + (folder === "sent" ? "Emails you send or reply from orders@getyolko.com show here." : "Mail to orders@getyolko.com shows here, including replies to order emails.") + "</p></div>";
+    return;
+  }
+  const sel = S.mailSel[folder];
+  const keep = el.scrollTop;
+  el.innerHTML = box.messages.map(function (m) {
     const id = m.folderId + ":" + m.messageId;
-    return '<button type="button" class="row erow' + (S.inboxSel === id ? " sel" : "") + '" data-action="open-inbox" data-id="' + esc(id) + '"><span class="min0"><span class="nm">' + (m.unread ? '<span class="unread" title="Unread"></span>' : "") + "<b>" + esc(m.fromName || m.from || "Unknown") + '</b></span><span class="mt">' + esc(m.subject || "(no subject)") + '</span></span><span class="rt"><span class="tm">' + esc(relInbox(m.receivedAt)) + "</span></span></button>";
-  }).join("");
+    const who = folder === "sent" ? "To " + (firstAddress(m.to) || "someone") : (m.fromName || m.from || "Unknown");
+    const cust = customerByEmail(folder === "sent" ? firstAddress(m.to) : m.from);
+    return '<button type="button" class="row erow mrow' + (sel === id ? " sel" : "") + (m.unread ? " unread-row" : "") + '" data-action="open-mail" data-folder="' + folder + '" data-id="' + esc(id) + '"><span class="min0"><span class="nm">' + (m.unread ? '<span class="unread" title="Unread"></span>' : "") + "<b>" + esc(who) + "</b>" + (cust ? chip("plain", "#" + orderRef(cust.latest)) : "") + (m.hasAttachment ? ic("clip", 14) : "") + '</span><span class="mt"><span class="subj">' + esc(m.subject || "(no subject)") + "</span>" + (m.summary ? " · " + esc(m.summary) : "") + '</span></span><span class="rt"><span class="tm">' + esc(relInbox(m.receivedAt)) + "</span></span></button>";
+  }).join("") + (box.hasMore ? '<div class="more-row"><button type="button" class="btn sm ghost' + (box.loading ? " busy" : "") + '" data-action="mail-more" data-folder="' + folder + '">Show older</button></div>' : "");
+  el.scrollTop = keep;
+  if (!sel && !OVERLAY_MQ.matches) S.mailSel[folder] = box.messages[0].folderId + ":" + box.messages[0].messageId;
 }
 function markEmailRow() {
   qsa("#e-list .row.sel").forEach(function (r) { r.classList.remove("sel"); });
-  const id = S.emailFilter === "inbox" ? S.inboxSel : S.emailSel;
+  const f = S.emailFilter;
+  const id = f === "inbox" || f === "sent" ? S.mailSel[f] : S.emailSel;
   if (!id) return;
   const r = document.querySelector('#e-list .row[data-id="' + CSS.escape(id) + '"]');
   if (r) r.classList.add("sel");
@@ -1911,24 +2563,31 @@ function mountEmailFrame(html) {
   const fr = $("ep-frame");
   if (!fr) return;
   fr.onload = function () {
-    try { fr.style.height = Math.max(420, fr.contentDocument.documentElement.scrollHeight + 4) + "px"; } catch (e) {}
+    try { fr.style.height = Math.max(300, fr.contentDocument.documentElement.scrollHeight + 4) + "px"; } catch (e) {}
   };
   fr.srcdoc = emailFrameDoc(html);
 }
 async function renderEmailDetail() {
   const pane = $("e-detail");
-  if (S.emailFilter === "inbox") return renderInboxDetail(pane);
+  if (S.emailFilter === "inbox" || S.emailFilter === "sent") return renderMailDetail(pane, S.emailFilter);
   const e = S.emailSel ? emailList().find(function (x) { return x.orderId === S.emailSel; }) : null;
   if (!e) { pane.innerHTML = '<div class="dp-empty">' + ic("mail", 30) + "<b>Pick an email</b><p>You’ll see exactly what the customer got.</p></div>"; return; }
-  const c = e.status === "sent" ? chip("sent", "Sent") : e.status === "failed" ? chip("failed", "Failed") : chip("notsent", "Not sent");
+  const ds = deliveryState(e);
   const sendLabel = e.status === "sent" ? "Resend" : e.status === "failed" ? "Try again" : "Send now";
   const from = (EMAIL_STATUS && EMAIL_STATUS.sending && EMAIL_STATUS.sending.from) || "orders@getyolko.com";
   const when = e.status === "sent" ? ["Sent", fmtDateTime(e.sentAt)] : e.status === "failed" ? ["Last try", fmtDateTime(e.lastTriedAt)] : ["Paid", fmtDateTime(e.paidAt || e.createdAt)];
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + '</b><span style="width:40px"></span></div>' +
-    '<div class="ep-head"><div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + c + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
+  const d = e.delivery || {};
+  const track = [];
+  if (d.deliveredAt) track.push("<span>Delivered<b>" + esc(fmtDateTime(d.deliveredAt)) + "</b></span>");
+  if (d.openedAt) track.push("<span>Opened<b>" + esc(fmtDateTime(d.openedAt) + (d.opens > 1 ? " · " + d.opens + " times" : "")) + "</b></span>");
+  if (d.clickedAt) track.push("<span>Clicked<b>" + esc(fmtDateTime(d.clickedAt)) + "</b></span>");
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + '</b><span style="width:44px"></span></div>' +
+    '<div class="ep-head"><div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + emailChip(e) + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
+      (e.to && mailConnected() ? '<button type="button" class="btn sm ghost" data-action="compose-order" data-id="' + esc(e.orderId) + '">' + ic("pencil", 16) + "Write</button>" : "") +
       (e.to ? '<button type="button" class="btn sm ghost" data-action="send-email" data-id="' + esc(e.orderId) + '">' + ic("send", 16) + sendLabel + "</button>" : "") + "</div></div>" +
-      '<div class="ep-meta"><span>To<b>' + esc(e.name ? e.name + " <" + (e.to || "no email") + ">" : (e.to || "No email address")) + "</b></span><span>From<b>YOLKO &lt;" + esc(from) + "&gt;</b></span><span>" + esc(when[0]) + "<b>" + esc(when[1]) + "</b></span></div>" +
+      '<div class="ep-meta"><span>To<b>' + esc(e.name ? e.name + " <" + (e.to || "no email") + ">" : (e.to || "No email address")) + "</b></span><span>From<b>YOLKO &lt;" + esc(from) + "&gt;</b></span><span>" + esc(when[0]) + "<b>" + esc(when[1]) + "</b></span>" + track.join("") + "</div>" +
       (e.status === "failed" ? '<div class="alert">' + ic("alert", 16) + "<div>" + esc("Zoho said: " + e.reason) + "</div></div>" : "") +
+      (ds && ds.bad ? '<div class="alert">' + ic("alert", 16) + "<div><b>" + esc(ds.line) + ".</b> Check the address with the customer, then use Write to reach them, or call.</div></div>" : "") +
     "</div>" +
     '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:420px;margin:0 auto;border-radius:12px"></span></div>';
   const id = e.orderId;
@@ -1938,32 +2597,52 @@ async function renderEmailDetail() {
     if (!r.ok) { const b = $("ep-body"); if (b && S.emailSel === id) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not load the preview</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
     p = PREVIEWS[id] = r.data;
   }
-  if (S.emailSel !== id || S.emailFilter === "inbox") return;
+  if (S.emailSel !== id || S.emailFilter === "inbox" || S.emailFilter === "sent") return;
   const b = $("ep-body");
   if (!b) return;
   b.innerHTML = '<iframe id="ep-frame" title="Email preview" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe><p class="ep-note">' +
-    esc(e.status === "sent" ? "Rebuilt from the order, the same way Zoho sent it. Replies go to " + (p.replyTo || "your Gmail") + "." : "This is what the customer gets when it sends. Replies go to " + (p.replyTo || "your Gmail") + ".") + "</p>";
+    esc((e.status === "sent" ? "Rebuilt from the order, the same way Zoho sent it." : "This is what the customer gets when it sends.") + " Replies come to " + (p.replyTo || "orders@getyolko.com") + " and show in the Inbox.") + "</p>";
   mountEmailFrame(p.html || "");
 }
-async function renderInboxDetail(pane) {
-  const m = S.inboxSel && INBOX && INBOX.messages ? INBOX.messages.find(function (x) { return x.folderId + ":" + x.messageId === S.inboxSel; }) : null;
-  if (!m) { pane.innerHTML = '<div class="dp-empty">' + ic("inbox", 30) + "<b>" + (EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected ? "Pick a message" : "Inbox not connected") + "</b><p>" + (EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected ? "Mail to the orders mailbox shows here." : "Once Zoho Mail is connected, replies and other mail show here.") + "</p></div>"; return; }
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + '</button><b>Message</b><span style="width:40px"></span></div>' +
-    '<div class="ep-head"><div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + "</h2>" + (m.from ? '<div class="ep-tools"><a class="btn sm ghost" href="mailto:' + esc(m.from) + "?subject=" + encodeURIComponent("Re: " + (m.subject || "")) + '">' + ic("send", 16) + "Reply</a></div>" : "") + "</div>" +
-    '<div class="ep-meta"><span>From<b>' + esc((m.fromName ? m.fromName + " " : "") + "<" + (m.from || "") + ">") + "</b></span><span>To<b>" + esc(m.to || "") + "</b></span><span>Received<b>" + esc(fmtDateTime(m.receivedAt)) + "</b></span></div></div>" +
-    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div>';
-  const key = "inbox:" + S.inboxSel;
-  let html = PREVIEWS[key];
-  if (html == null) {
-    const r = await api("/api/admin/inbox/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId));
-    if (!r.ok) { const b = $("ep-body"); if (b) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not open this message</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
-    html = PREVIEWS[key] = r.data.html || "";
+function mailMsg(folder, id) {
+  const box = MAIL[folder];
+  return id && box ? box.messages.find(function (x) { return x.folderId + ":" + x.messageId === id; }) || null : null;
+}
+function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+async function renderMailDetail(pane, folder) {
+  const id = S.mailSel[folder];
+  const m = mailMsg(folder, id);
+  if (!m) {
+    pane.innerHTML = '<div class="dp-empty">' + ic(folder === "sent" ? "send" : "inbox", 30) + "<b>" + (mailConnected() ? "Pick a message" : "Mailbox not connected") + "</b><p>" + (mailConnected() ? "Open one to read it and reply." : "Connect Zoho Mail to read orders@getyolko.com here.") + "</p></div>";
+    return;
   }
-  if (S.inboxSel !== m.folderId + ":" + m.messageId) return;
+  const key = "mail:" + id;
+  const full = PREVIEWS[key];
+  const fromAddr = folder === "sent" ? firstAddress(m.to) : m.from;
+  const cust = customerByEmail(fromAddr);
+  const meta = full || m;
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + '</b><span style="width:44px"></span></div>' +
+    '<div class="ep-head"><div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + '</h2><div class="ep-tools">' +
+      '<button type="button" class="btn sm dark" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '">' + ic("reply", 16) + (folder === "sent" ? "Write again" : "Reply") + "</button>" +
+      (folder === "inbox" ? '<button type="button" class="btn sm ghost" data-action="mail-unread" data-id="' + esc(id) + '" title="Mark as unread">' + ic("unread", 16) + '<span class="lbl">Mark unread</span></button>' : "") +
+    "</div></div>" +
+    '<div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
+    (cust ? '<div class="cust-strip">' + ic("users", 16) + '<span class="min0"><b>' + esc(cust.latest.name || "Customer") + "</b> · " + esc(plural(cust.count, "order")) + " · latest #" + esc(orderRef(cust.latest)) + ", " + esc(dayLabel(cust.latest)) + '</span><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(cust.latest.id) + '">Open order</button></div>' : "") +
+    (full && full.attachments && full.attachments.length ? '<div class="atts">' + full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") + "</div>" : "") +
+    "</div>" +
+    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div>';
+  if (!full) {
+    const r = await api("/api/admin/mail/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + (m.unread ? "&markRead=1" : ""));
+    if (!r.ok) { const b = $("ep-body"); if (b && S.mailSel[folder] === id) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not open this message</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
+    PREVIEWS[key] = r.data;
+    if (m.unread) { m.unread = false; MAIL_UNREAD = Math.max(0, MAIL_UNREAD - 1); renderNav(); renderEmails(); return; }
+    if (S.mailSel[folder] === id && S.emailFilter === folder) renderMailDetail(pane, folder);
+    return;
+  }
   const b = $("ep-body");
   if (!b) return;
   b.innerHTML = '<iframe id="ep-frame" title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>';
-  mountEmailFrame('<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#171714;background:#fff;margin:0;padding:20px;word-wrap:break-word}img{max-width:100%;height:auto}</style></head><body>' + html + "</body></html>");
+  mountEmailFrame('<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#171714;background:#fff;margin:0;padding:20px;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:0 0 0 4px;padding-left:12px;border-left:3px solid #e5e0d5;color:#3d3b36}</style></head><body>' + (full.html || "") + "</body></html>");
 }
 function openEmail(id) {
   S.emailSel = id;
@@ -1971,37 +2650,170 @@ function openEmail(id) {
   renderEmailDetail();
   openOverlay($("e-detail"));
 }
-function openInbox(id) {
-  S.inboxSel = id;
+function openMail(folder, id) {
+  S.mailSel[folder] = id;
   markEmailRow();
   renderEmailDetail();
   openOverlay($("e-detail"));
 }
+function openMailFromAnywhere(folder, id) {
+  S.emailFilter = folder;
+  S.mailSel[folder] = id;
+  go("emails");
+  if (OVERLAY_MQ.matches) setTimeout(function () { openOverlay($("e-detail")); }, 30);
+}
+/** HTML email to plain text, for quoting under a reply. */
+function htmlToText(html) {
+  const d = document.createElement("div");
+  d.innerHTML = String(html || "").replace(/<(br|\/p|\/div|\/li|\/tr|\/h\d)[^>]*>/gi, "\n").replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  return (d.textContent || "").replace(/ /g, " ").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function draftGet(k) { try { return JSON.parse(localStorage.getItem("yolko_draft:" + k) || "null"); } catch (e) { return null; } }
+function draftSet(k, v) { try { if (v) localStorage.setItem("yolko_draft:" + k, JSON.stringify(v)); else localStorage.removeItem("yolko_draft:" + k); } catch (e) {} }
+/** Write an email from orders@getyolko.com. A reply keeps Zoho's thread and quotes their message. */
+function composeMail(o) {
+  o = o || {};
+  if (!mailConnected()) {
+    if (o.to) { location.href = "mailto:" + encodeURIComponent(o.to) + "?subject=" + encodeURIComponent(o.subject || ""); return; }
+    zohoHelp("inbox");
+    return;
+  }
+  const dkey = o.replyTo ? "r:" + o.replyTo.messageId : o.orderId ? "o:" + o.orderId : "new";
+  const saved = draftGet(dkey) || {};
+  const val = function (k) { return saved[k] != null ? saved[k] : (o[k] || ""); };
+  let sent = false;
+  openModal({
+    title: o.replyTo ? "Reply" : "New email",
+    cls: "compose",
+    html: '<div class="cfrom">From <b>YOLKO &lt;' + esc((EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.account) || "orders@getyolko.com") + "&gt;</b></div>" +
+      '<label class="field"><span>To</span><input class="inp" id="cm-to" type="email" inputmode="email" autocomplete="off" multiple value="' + esc(val("to")) + '" placeholder="customer@example.com"></label>' +
+      '<label class="field"><span>Subject</span><input class="inp" id="cm-subject" type="text" autocomplete="off" maxlength="200" value="' + esc(val("subject")) + '"></label>' +
+      '<label class="field"><span>Message</span><textarea class="inp ta" id="cm-text" rows="9" autofocus placeholder="Write your message">' + esc(val("text")) + "</textarea></label>" +
+      '<p class="chint">' + (o.quote ? "Their message is quoted underneath. " : "") + "Ends with “YOLKO · getyolko.com”. Replies come back to this inbox.</p>" +
+      (o.quote ? '<details class="cquote"><summary>' + esc(o.quote.header) + "</summary><pre>" + esc(String(o.quote.text).slice(0, 4000)) + "</pre></details>" : ""),
+    actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Send", kind: "primary", value: true }],
+    onOpen: function (w) {
+      let t = null;
+      w.addEventListener("input", function () {
+        clearTimeout(t);
+        t = setTimeout(function () { draftSet(dkey, { to: w.querySelector("#cm-to").value, subject: w.querySelector("#cm-subject").value, text: w.querySelector("#cm-text").value }); }, 300);
+      });
+      const ta = w.querySelector("#cm-text");
+      if (ta && o.replyTo && !saved.text) { ta.setSelectionRange(0, 0); }
+    },
+    beforeClose: function () {
+      const w = $("modal-wrap");
+      if (!w || sent) return;
+      const text = w.querySelector("#cm-text").value.trim();
+      if (text) { draftSet(dkey, { to: w.querySelector("#cm-to").value, subject: w.querySelector("#cm-subject").value, text: w.querySelector("#cm-text").value }); toast("Draft kept. Open it again to carry on"); }
+      else draftSet(dkey, null);
+    },
+    validate: function (w) {
+      const to = w.querySelector("#cm-to").value.trim();
+      if (!to || to.split(/[,;]/).some(function (x) { return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(firstAddress(x)); })) return "Check the To address";
+      if (!w.querySelector("#cm-subject").value.trim()) return "Add a subject";
+      if (!w.querySelector("#cm-text").value.trim()) return "Write a message first";
+      return "";
+    },
+    collect: function (w) { return { to: w.querySelector("#cm-to").value.trim(), subject: w.querySelector("#cm-subject").value.trim(), text: w.querySelector("#cm-text").value }; },
+    submit: async function (v) {
+      const r = await api("/api/admin/mail/send", { method: "POST", body: { to: v.to, subject: v.subject, text: v.text, replyTo: o.replyTo || null, quote: o.quote || null } });
+      if (!r.ok) return "Not sent: " + (r.data.error || "Zoho said no");
+      sent = true;
+      draftSet(dkey, null);
+      toast("Sent to " + (r.data.to || v.to).replace(/,/g, ", "));
+      MAIL.sent = null;
+      if (S.view === "emails" && S.emailFilter === "sent") loadMail("sent");
+      return "";
+    },
+  });
+}
+function replyTo(folder, id) {
+  const m = mailMsg(folder, id);
+  if (!m) return;
+  const full = PREVIEWS["mail:" + id];
+  if (folder === "sent") { composeMail({ to: firstAddress(m.to), subject: m.subject }); return; }
+  const subj = /^re:/i.test(m.subject || "") ? m.subject : "Re: " + (m.subject || "");
+  const to = full && full.replyTo ? firstAddress(full.replyTo) : m.from;
+  composeMail({
+    to: to,
+    subject: subj,
+    replyTo: { folderId: m.folderId, messageId: m.messageId },
+    quote: { header: "On " + fmtDateTime(m.receivedAt) + ", " + (m.fromName || m.from) + " wrote:", text: full ? htmlToText(full.html) : (m.summary || "") },
+  });
+}
+async function downloadAttachment(t) {
+  const id = t.getAttribute("data-id");
+  const m = mailMsg(S.emailFilter, id);
+  if (!m) return;
+  t.classList.add("busy");
+  try {
+    const res = await fetch("/api/admin/mail/attachment?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + "&attachmentId=" + encodeURIComponent(t.getAttribute("data-att")), { headers: { Authorization: "Bearer " + KEY } });
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = t.getAttribute("data-name") || "attachment";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
+  } catch (e) { toast("Could not download that attachment"); }
+  t.classList.remove("busy");
+}
+async function markUnread(id) {
+  const m = mailMsg("inbox", id);
+  if (!m) return;
+  m.unread = true;
+  MAIL_UNREAD++;
+  S.mailSel.inbox = null;
+  if (OVERLAY_MQ.matches) closeOverlay($("e-detail"));
+  renderEmails(); renderNav();
+  const r = await api("/api/admin/mail/flag", { method: "POST", body: { messageId: m.messageId, read: false } });
+  if (!r.ok) { m.unread = false; MAIL_UNREAD = Math.max(0, MAIL_UNREAD - 1); renderEmails(); renderNav(); toast("Could not mark it unread"); return; }
+  toast("Marked unread", { label: "Undo", run: function () { m.unread = false; MAIL_UNREAD = Math.max(0, MAIL_UNREAD - 1); renderEmails(); renderNav(); api("/api/admin/mail/flag", { method: "POST", body: { messageId: m.messageId, read: true } }); } });
+}
+async function zohoConnect() {
+  const r = await api("/api/admin/zoho/connect", { method: "POST" });
+  if (!r.ok || !r.data.url) { toast(r.data.error || "Could not start the Zoho sign-in"); return; }
+  location.href = r.data.url;
+}
+async function zohoDisconnect() {
+  const ok = await confirmBox("Disconnect Zoho Mail?", "<p>The Inbox and Sent tabs stop showing orders@getyolko.com until you connect again. Mail keeps arriving in Zoho, and order emails still send.</p>", "Disconnect", true);
+  if (!ok) return;
+  const r = await api("/api/admin/zoho/disconnect", { method: "POST" });
+  if (!r.ok) { toast("Could not disconnect. Try again"); return; }
+  MAIL.inbox = null; MAIL.sent = null; MAIL_UNREAD = 0;
+  toast("Zoho Mail disconnected");
+  loadEmails(true);
+}
+function zohoSheet() {
+  openModal({ title: "Zoho email", html: '<div class="zstack">' + zohoCells().join("") + "</div>", actions: [{ label: "Done", kind: "primary", value: true }] });
+}
 function zohoHelp(which) {
-  const replyTo = (EMAIL_STATUS && EMAIL_STATUS.sending && EMAIL_STATUS.sending.replyTo) || "getyolkonow@gmail.com";
   const content = {
     sending: ["Sending isn’t set up", "<p>The Worker needs the Zoho CPaaS send key saved as the secret <code>ZEPTOMAIL_TOKEN</code>, and the sender address as <code>ORDER_EMAIL_FROM</code>.</p>"],
-    delivery: ["Delivery status (opens and bounces)", "<p>The key the shop uses can only <b>send</b> email. Zoho won’t share opens, bounces or spam reports with it.</p><p>To show them here, Zoho needs to give this shop <b>read access to its email logs</b>, which is a separate OAuth login on the Zoho account that owns orders@getyolko.com. Until then, a failed send still shows here as Failed, with Zoho’s reason.</p>"],
-    inbox: ["Reading mail here", "<p>Right now customers who reply to an order email reach <b>" + esc(replyTo) + "</b>, because that’s the reply-to address. Those replies are in Gmail, not Zoho.</p><p>To read the orders@getyolko.com mailbox on this page:</p><ol><li>In the Zoho API console (api-console.zoho.com), add a <b>Self Client</b> with these scopes: <code>ZohoMail.accounts.READ</code>, <code>ZohoMail.folders.READ</code>, <code>ZohoMail.messages.READ</code>.</li><li>Generate a code, swap it for a refresh token.</li><li>Save <code>ZOHO_CLIENT_ID</code>, <code>ZOHO_CLIENT_SECRET</code> and <code>ZOHO_REFRESH_TOKEN</code> as Worker secrets.</li></ol><p>The Inbox tab switches on by itself. To have replies land there too, the reply-to address would change to orders@getyolko.com.</p>"],
+    delivery: ["Delivery status", "<p>Zoho tells the shop when an order email is delivered, opened or bounced, by calling getyolko.com/api/zoho/email-events.</p><p>It needs the secret <code>ZOHO_WEBHOOK_TOKEN</code> on the Worker, and a webhook in Zoho’s Transactional Emails settings that sends the same token in its Authorization header. Until then, a failed send still shows as Failed, with Zoho’s reason.</p>"],
+    inbox: ["Connecting the mailbox", "<p>The Worker needs a Zoho API client, saved as the secrets <code>ZOHO_CLIENT_ID</code> and <code>ZOHO_CLIENT_SECRET</code>, with the redirect address <code>https://getyolko.com/api/zoho/callback</code>.</p><p>Then Connect Zoho Mail appears here. Sign in once and orders@getyolko.com shows in the Inbox and Sent tabs.</p>"],
   }[which] || ["", ""];
   openModal({ title: content[0], html: content[1], actions: [{ label: "Got it", kind: "primary", value: true }] });
 }
 async function testEmail() {
   let last = "";
   try { last = localStorage.getItem("yolko_test_email") || ""; } catch (e) {}
-  const def = last || (EMAIL_STATUS && EMAIL_STATUS.sending && EMAIL_STATUS.sending.replyTo) || "";
   const to = await openModal({
     title: "Send a test email",
-    html: "<p>We’ll send a sample order confirmation from orders@getyolko.com through Zoho, marked [Test].</p><label class=\"field\"><span>Send it to</span><input class=\"inp\" id=\"test-to\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" value=\"" + esc(def) + "\" placeholder=\"you@example.com\"></label>",
+    html: "<p>We’ll send a sample order confirmation from orders@getyolko.com through Zoho, marked [Test].</p><label class=\"field\"><span>Send it to</span><input class=\"inp\" id=\"test-to\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" value=\"" + esc(last) + "\" placeholder=\"you@example.com\"></label>",
     actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Send test", kind: "primary", value: true }],
     validate: function (w) { const v = w.querySelector("#test-to").value.trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Enter an email address"; },
     collect: function (w) { return w.querySelector("#test-to").value.trim(); },
+    submit: async function (v) {
+      try { localStorage.setItem("yolko_test_email", v); } catch (e) {}
+      const r = await api("/api/admin/test-email", { method: "POST", body: { to: v } });
+      if (!r.ok) return "Not sent: " + (r.data.error || r.data.reason || "Zoho said no");
+      toast("Test sent. Check " + v);
+      return "";
+    },
   });
-  if (!to) return;
-  try { localStorage.setItem("yolko_test_email", to); } catch (e) {}
-  toast("Sending a test to " + to + "…");
-  const r = await api("/api/admin/test-email", { method: "POST", body: { to: to } });
-  toast(r.ok ? "Test sent. Check " + to : "Not sent: " + (r.data.error || r.data.reason || "Zoho said no"));
+  return to;
 }
 
 /* ============================== customers ============================== */
@@ -2018,8 +2830,8 @@ function sparkline(history, maxV) {
   const line = pts.map(function (p) { return p[0] + "," + p[1]; }).join(" ");
   const area = "M" + pts[0][0] + "," + H + " L" + pts.map(function (p) { return p[0] + "," + p[1]; }).join(" L") + " L" + pts[pts.length - 1][0] + "," + H + " Z";
   return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" aria-hidden="true"><path d="' + area + '" fill="rgba(255,211,42,.28)"/>' +
-    (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="#171714" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>' : "") +
-    pts.map(function (p) { return '<path d="M' + p[0] + "," + p[1] + 'h0" stroke="#171714" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'; }).join("") + "</svg>";
+    (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>' : "") +
+    pts.map(function (p) { return '<path d="M' + p[0] + "," + p[1] + 'h0" stroke="currentColor" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'; }).join("") + "</svg>";
 }
 function renderCustomers() {
   const body = $("c-body");
@@ -2338,7 +3150,15 @@ function closeLightbox() {
 
 /* ============================== routing ============================== */
 function route() {
-  const h = location.hash.replace(/^#/, "").split(/[/?]/)[0];
+  const raw = location.hash.replace(/^#/, "");
+  const h = raw.split(/[/?]/)[0];
+  const q = new URLSearchParams(raw.split("?")[1] || "");
+  if (q.get("zoho")) {
+    // Back from the Zoho sign-in.
+    history.replaceState(null, "", "#" + h);
+    if (q.get("zoho") === "connected") { toast("Zoho Mail connected. The inbox is ready"); S.emailFilter = "inbox"; MAIL.inbox = null; MAIL.sent = null; loadEmails(true); }
+    else toast("Zoho didn’t connect: " + (q.get("msg") || "try again"));
+  }
   showView(HASH_TO_VIEW[h] || "orders");
 }
 function showView(v) {
@@ -2347,14 +3167,16 @@ function showView(v) {
   ["o-detail", "e-detail"].forEach(function (id) { const p = $(id); if (p && changed && p.classList.contains("open")) { p.classList.remove("open"); $("scrim").classList.remove("on"); document.body.style.overflow = ""; } });
   S.view = v;
   qsa(".view").forEach(function (el) { el.hidden = el.getAttribute("data-view") !== v; });
-  const label = (VIEWS.find(function (x) { return x.id === v; }) || VIEWS[0]).label;
-  document.title = label + " · YOLKO Admin";
+  if (v === "orders") seenOrders();
+  setTitle();
   renderNav();
   updateSaveBar();
   if (changed) window.scrollTo(0, 0);
   if (v === "stock" && !$("stock-body").innerHTML) renderStock();
   if (v === "emails") { renderEmails(); loadEmails(); }
   if (v === "customers") renderCustomers();
+  if (v === "run") { if (changed) S.runOpen = null; renderRun(); }
+  syncWakeLock();
   if (v === "competitors" && changed) loadPriceWatch();
   if (v === "visits" && changed) loadVisits();
   if (v === "images" && changed) loadAssets();
@@ -2368,6 +3190,14 @@ const ACTIONS = {
   "filter": function (t) { S.filter = t.getAttribute("data-f"); renderOrdersMeta(); renderOrderList(); const l = $("o-list"); if (l) l.scrollTop = 0; },
   "kpi-waiting": function () { S.filter = "waiting"; renderOrdersMeta(); renderOrderList(); },
   "kpi-upcoming": function () { S.filter = "upcoming"; renderOrdersMeta(); renderOrderList(); },
+  "kpi-run": function () { go("run"); },
+  "run-open": function (t) { const id = t.getAttribute("data-id"); S.runOpen = S.runOpen === id ? null : id; renderRun(); },
+  "run-done": function (t) { runDone(t.getAttribute("data-id")); },
+  "run-move": function (t) { moveStop(t.getAttribute("data-id"), Number(t.getAttribute("data-d"))); },
+  "run-reset": resetRunOrder,
+  "copy-run": copyRun,
+  "open-order-from-run": function (t) { ACTIONS["goto-order"](t); },
+  "alerts": alertsSheet,
   "kpi-stock": function () { go("stock"); },
   "refresh": function () { loadOrders(true); refreshSettingsQuiet(); },
   "toggle-search": function () { const v = $("v-orders"); v.classList.toggle("searching"); if (v.classList.contains("searching")) $("o-q").focus(); },
@@ -2378,7 +3208,7 @@ const ACTIONS = {
   "receipt": function (t) { openReceipt(t.getAttribute("data-id")); },
   "check-stripe": function (t) { hydrateStripeReceipt(t.getAttribute("data-id"), true); },
   "send-email": function (t) { sendOrderEmail(t.getAttribute("data-id")); },
-  "view-email": function (t) { S.emailFilter = "all"; S.emailSel = t.getAttribute("data-id"); go("emails"); if (OVERLAY_MQ.matches) setTimeout(function () { openOverlay($("e-detail")); }, 30); },
+  "view-email": function (t) { S.emailFilter = "orders"; S.emailSel = t.getAttribute("data-id"); go("emails"); if (OVERLAY_MQ.matches) setTimeout(function () { openOverlay($("e-detail")); }, 30); },
   "goto-order": function (t) {
     const id = t.getAttribute("data-id");
     const o = findOrder(id);
@@ -2391,21 +3221,26 @@ const ACTIONS = {
     const row = document.querySelector('#o-list .row[data-id="' + CSS.escape(id) + '"]');
     if (row) row.scrollIntoView({ block: "center" });
   },
-  "email-filter": function (t) { S.emailFilter = t.getAttribute("data-f"); renderEmails(); if (S.emailFilter === "inbox" && EMAIL_STATUS && EMAIL_STATUS.inbox && EMAIL_STATUS.inbox.connected && !INBOX) loadInbox(); },
+  "email-filter": function (t) { S.emailFilter = t.getAttribute("data-f"); const l = $("e-list"); if (l) l.scrollTop = 0; renderEmails(); },
   "open-email": function (t) { openEmail(t.getAttribute("data-id")); },
-  "open-inbox": function (t) { openInbox(t.getAttribute("data-id")); },
+  "open-mail-any": function (t) { openMailFromAnywhere("inbox", t.getAttribute("data-id")); },
+  "open-mail": function (t) { openMail(t.getAttribute("data-folder"), t.getAttribute("data-id")); },
+  "mail-reply": function (t) { replyTo(t.getAttribute("data-folder"), t.getAttribute("data-id")); },
+  "mail-unread": function (t) { markUnread(t.getAttribute("data-id")); },
+  "mail-attachment": downloadAttachment,
+  "mail-more": function (t) { loadMail(t.getAttribute("data-folder"), true); },
+  "mail-refresh": function () { if (S.emailFilter === "inbox" || S.emailFilter === "sent") loadMail(S.emailFilter); },
+  "compose": function () { composeMail({}); },
+  "compose-order": function (t) {
+    const o = findOrder(t.getAttribute("data-id"));
+    if (o) composeMail({ to: orderEmail(o), subject: "Your YOLKO order #" + orderRef(o), orderId: o.id });
+  },
+  "zoho-connect": zohoConnect,
+  "zoho-disconnect": zohoDisconnect,
+  "zoho-sheet": zohoSheet,
   "zoho-help": function (t) { zohoHelp(t.getAttribute("data-which")); },
   "test-email": testEmail,
   "logout": function () { try { localStorage.removeItem("yolko_admin_key"); } catch (e) {} location.replace("/admin"); },
-  "more": function () {
-    openModal({
-      title: "More",
-      html: '<div class="sheet-list">' + VIEWS.slice(4).map(function (v) { return '<a href="#' + v.hash + '" data-close-modal>' + ic(v.icon) + esc(v.label) + "</a>"; }).join("") +
-        '<a href="/" target="_blank" rel="noopener" data-close-modal>' + ic("external") + "Open shop</a>" +
-        '<button type="button" data-action="logout">' + ic("logout") + "Sign out</button></div>",
-      actions: [{ label: "Close", kind: "ghost", value: null }],
-    });
-  },
   "save": saveSettings,
   "discard": discardSettings,
   "step": function (t) {
@@ -2413,12 +3248,6 @@ const ACTIONS = {
     if (!input) return;
     input.value = Math.max(0, (Number(input.value) || 0) + Number(t.getAttribute("data-d")));
     onStockInput(input);
-  },
-  "pickup-day": function (t) {
-    const d = t.getAttribute("data-day");
-    DRAFT.pickup[d].enabled = !DRAFT.pickup[d].enabled;
-    $("st-pickup-body").innerHTML = pickupHtml();
-    updateSaveBar();
   },
   "pw-poll": pollPriceWatchNow,
   "visits-filter": function (t) { loadVisits(t.getAttribute("data-f")); },
@@ -2454,7 +3283,6 @@ document.addEventListener("change", function (e) {
     updateStockDerived(); updateSaveBar(); return;
   }
   if (t.name === "st-weight") { DRAFT.trayWeight = t.value; updateSaveBar(); return; }
-  if (t.matches && t.matches('select[data-f="hours"]')) { onStockInput(t); return; }
   if (t.id === "st-trays" || t.id === "st-dozens") { if (t.value === "") { t.value = 0; onStockInput(t); } return; }
   if (t.id === "im-cat") { AF.cat = t.value; renderAssets(); return; }
   if (t.id === "im-view") { AF.view = t.value; renderAssets(); return; }
@@ -2499,15 +3327,21 @@ document.addEventListener("keydown", function (e) {
   } else if (S.view === "emails" && (e.key === "j" || e.key === "k")) {
     const ids = qsa("#e-list .row").map(function (r) { return r.getAttribute("data-id"); });
     if (!ids.length) return;
-    const cur = S.emailFilter === "inbox" ? S.inboxSel : S.emailSel;
+    const mailTab = S.emailFilter === "inbox" || S.emailFilter === "sent";
+    const cur = mailTab ? S.mailSel[S.emailFilter] : S.emailSel;
     const i = ids.indexOf(cur);
     const n = e.key === "j" ? Math.min(ids.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1);
-    if (S.emailFilter === "inbox") openInbox(ids[n]); else openEmail(ids[n]);
+    if (mailTab) openMail(S.emailFilter, ids[n]); else openEmail(ids[n]);
   } else if (e.key === "Escape") closeDetail();
 });
 window.addEventListener("hashchange", route);
 window.addEventListener("beforeunload", function (e) { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
-document.addEventListener("visibilitychange", function () { if (!document.hidden && KEY && Date.now() - S.lastLoad > 15000) loadOrders(); });
+document.addEventListener("visibilitychange", function () {
+  if (!document.hidden && KEY && Date.now() - S.lastLoad > 15000) loadOrders();
+  if (!document.hidden && S.view === "orders") seenOrders();
+  syncWakeLock();
+});
+window.addEventListener("focus", function () { if (S.view === "orders") seenOrders(); });
 OVERLAY_MQ.addEventListener && OVERLAY_MQ.addEventListener("change", function () {
   // Crossing the breakpoint: drop any open drawer so the side panel takes over.
   ["o-detail", "e-detail"].forEach(function (id) { $(id).classList.remove("open"); });
@@ -2569,8 +3403,17 @@ function boot() {
     // Wide screens open the first order so the detail panel is never blank.
     if (!S.selectedId && !OVERLAY_MQ.matches && S.view === "orders" && VISIBLE_IDS.length) selectOrder(VISIBLE_IDS[0]);
   });
+  renderBell();
+  pollHead();
+  loadEmails();
   if (POLL) clearInterval(POLL);
-  POLL = setInterval(function () { if (!document.hidden) loadOrders(); else renderOrdersSub(); }, 30000);
+  let ticks = 0;
+  POLL = setInterval(function () {
+    ticks++;
+    pollHead();
+    if (!document.hidden) loadOrders(); else renderOrdersSub();
+    if (ticks % 4 === 0) pollUnread();
+  }, 30000);
 }
 if (KEY) boot(); else showLogin("");
 </script>

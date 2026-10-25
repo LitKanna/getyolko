@@ -66,10 +66,33 @@ email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN
 returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
 sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
 The admin Emails page uses `GET /api/admin/emails`, `GET /api/admin/email-preview?id=` and
-`POST /api/admin/test-email {to}`. Its Inbox tab reads the Zoho Mail mailbox only once the
-secrets `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` and `ZOHO_REFRESH_TOKEN` are set (a Zoho Self
-Client with `ZohoMail.accounts.READ`, `ZohoMail.folders.READ`, `ZohoMail.messages.READ`); the
-CPaaS send key can't read mail or delivery logs.
+`POST /api/admin/test-email {to}`. All shop email is orders@getyolko.com on Zoho (order emails
+reply to it too); getyolkonow@gmail.com is only for Google sign-ins, never for mail.
+
+Zoho Mail (the admin Inbox, Sent, reply and compose) is an OAuth connection, not a pasted token.
+Secrets `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET` come from a Server-based app in
+api-console.zoho.com (redirect `https://getyolko.com/api/zoho/callback`, scopes
+`ZohoMail.accounts.READ,ZohoMail.folders.READ,ZohoMail.messages.ALL`). "Connect Zoho Mail" in the
+admin calls `POST /api/admin/zoho/connect`, and the callback stores the refresh token in KV
+(`zoho:mail:auth`) sealed with AES-GCM under a key derived from the client secret.
+`POST /api/admin/zoho/disconnect` removes it. Mailbox endpoints: `GET /api/admin/mail?folder=inbox|sent`,
+`GET /api/admin/mail/unread`, `GET /api/admin/mail/message?folderId=&messageId=&markRead=1`,
+`GET /api/admin/mail/attachment`, `POST /api/admin/mail/flag {messageId, read}`,
+`POST /api/admin/mail/send {to, subject, text, replyTo?, quote?}`. Optional `ZOHO_ACCOUNTS_URL` /
+`ZOHO_MAIL_URL` override the Zoho hosts (used for local tests against a fake Zoho).
+Delivery status (delivered, opened, clicked, bounced, spam) comes from the Zoho CPaaS webhook
+`POST /api/zoho/email-events`, authorised by `Authorization: Bearer <ZOHO_WEBHOOK_TOKEN>`; events are
+matched to orders through `email:req:<requestId>` keys written on each send.
+
+### Admin page design (Apple HIG, Oct 2026)
+`infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
+under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system, 16px inputs on
+phones (no iOS zoom), safe-area padding. Prefer an Undo toast over a confirm dialog; dialogs say
+Cancel, and a destructive button is never the default. Sheets have a grabber and swipe down to
+close. The phone tab bar (Orders, Run, Stock, Emails, More) is navigation only, so everything else
+lives on the More page. Buttons show a spinner while working. The stock page hides pickup days
+while the shop is delivery only. Before calling an admin change live, look at full-page
+screenshots at desktop and phone sizes in light and dark.
 
 ### No lint / test / build tooling
 There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder
