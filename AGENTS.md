@@ -81,8 +81,9 @@ admin calls `POST /api/admin/zoho/connect`, and the callback stores the refresh 
 `POST /api/admin/mail/send {to, subject, text, replyTo?, quote?}`. Optional `ZOHO_ACCOUNTS_URL` /
 `ZOHO_MAIL_URL` override the Zoho hosts (used for local tests against a fake Zoho).
 Delivery status (delivered, opened, clicked, bounced, spam) comes from the Zoho CPaaS webhook
-`POST /api/zoho/email-events`, authorised by `Authorization: Bearer <ZOHO_WEBHOOK_TOKEN>`; events are
-matched to orders through `email:req:<requestId>` keys written on each send.
+`POST /api/zoho/email-events` (set in CPaaS > Agents > agent_1 > Webhooks). Zoho webhooks carry no
+credentials, so there is no token: an event only counts when its request id matches an
+`email:req:<requestId>` key written when the Worker sent that email.
 
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
