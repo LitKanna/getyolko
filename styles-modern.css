@@ -956,6 +956,27 @@ body.local .hero > .hero-grid {
   animation: summary-bump 280ms var(--ease);
 }
 
+/* Opt-in for the Thursday reorder email: unticked until the customer asks. */
+.remind-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: -8px 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.remind-opt input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
 .cta-row {
   display: grid;
   grid-template-columns: 1fr;
