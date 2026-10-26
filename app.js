@@ -41,6 +41,7 @@ const receipt = {
 
 let lastOrderMessage = "";
 let lastOrderId = null;
+let referral = null;
 
 const OPEN_CHECKOUT_KEY = "yolko_open_checkout";
 
@@ -54,6 +55,8 @@ function bookingFingerprint(b) {
     b.deliverySuburb || "",
     b.pickupDay,
     b.remind ? "remind" : "",
+    b.deliveryStreet || "",
+    b.ref || "",
   ].join("|");
 }
 
@@ -989,7 +992,9 @@ if (paidSession && paidSession.startsWith("cs_")) {
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
       if (d && d.paid) {
-        showToast("Payment received. Your eggs are booked for Saturday delivery.");
+        clearReferral();
+        if (d.share && d.share.link) showShareSheet(d.share.link);
+        else showToast("Payment received. Your eggs are booked for Saturday delivery.");
         trackMetaPurchase(d.purchase);
       }
     })
@@ -1075,6 +1080,7 @@ function collectBooking() {
     total: bundle.price * quantity + deliveryFee,
     orderLabel: describeOrder(bundleKey, quantity),
     remind: data.get("remind") === "1",
+    ref: referral ? referral.code : "",
     company: String(data.get("yolko_hp") || data.get("company") || "").trim(),
   };
 }
@@ -1101,6 +1107,7 @@ function createOrder(b) {
           yolko_hp: b.company || "",
           company: b.company || "",
           remind: !!b.remind,
+          ref: b.ref || "",
           token: token || "",
           visitorId: window.YOLKO_VISITOR_ID || "",
         }),
@@ -1254,6 +1261,7 @@ async function buyNowCheckout(b) {
       deliveryAddress: b.deliveryAddress || "",
       yolko_hp: b.company || "",
       remind: !!b.remind,
+      ref: b.ref || "",
       token,
     }),
   });
@@ -1454,6 +1462,116 @@ if (window.YOLKO_REORDER) {
     if (d && d.ok) applyReorder(d);
     else showToast("That reorder link has expired. Pick your eggs below.");
   });
+}
+
+/* ---------- Share links: free delivery for a friend's first order ---------- */
+// getyolko.com/r/CODE lands here as ?ref=CODE. Keep it for a while, so a friend who
+// orders next week still gets it. The server decides at checkout (first orders only).
+const REF_KEY = "yolko.ref";
+const REF_DAYS = 60;
+const REF_RE = /^[A-HJKMNP-Z2-9]{6}$/;
+
+function savedReferral() {
+  try {
+    const r = JSON.parse(localStorage.getItem(REF_KEY) || "null");
+    if (r && REF_RE.test(r.code) && Date.now() - Number(r.at) < REF_DAYS * 864e5) return r;
+  } catch {
+    /* storage blocked */
+  }
+  return null;
+}
+
+function showReferral(r) {
+  referral = r;
+  const note = document.getElementById("ref-note");
+  if (!note) return;
+  note.textContent = `${r.name ? `${r.name} sent you` : "A friend sent you"} free delivery. It comes off your first order at checkout.`;
+  note.hidden = false;
+}
+
+function clearReferral() {
+  referral = null;
+  try {
+    localStorage.removeItem(REF_KEY);
+  } catch {
+    /* storage blocked */
+  }
+  const note = document.getElementById("ref-note");
+  if (note) note.hidden = true;
+}
+
+(function initReferral() {
+  const code = String(new URLSearchParams(location.search).get("ref") || "").toUpperCase();
+  const saved = savedReferral();
+  if (!REF_RE.test(code) || code === saved?.code) {
+    if (saved) showReferral(saved);
+    return;
+  }
+  fetch(`${API_BASE}/api/referral?code=${code}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (!d || !d.ok) {
+        if (saved) showReferral(saved);
+        return;
+      }
+      const r = { code: d.code, name: d.name || "", at: Date.now() };
+      try {
+        localStorage.setItem(REF_KEY, JSON.stringify(r));
+      } catch {
+        /* private mode: still good for this visit */
+      }
+      showReferral(r);
+      showToast(`${r.name || "A friend"} sent you free delivery on your first order.`);
+    })
+    .catch(() => saved && showReferral(saved));
+})();
+
+/** After paying: the customer's own link, to pass the free delivery on. */
+function showShareSheet(link) {
+  const short = link.replace(/^https:\/\//, "");
+  const text = "Fresh eggs delivered on Saturday. Your first delivery is free with my link:";
+  const sheet = document.createElement("div");
+  sheet.className = "share-sheet";
+  sheet.innerHTML = `
+    <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" tabindex="-1">
+      <button type="button" class="share-close" aria-label="Close">&times;</button>
+      <p class="share-kicker">Payment received</p>
+      <h2 id="share-title">Your eggs are booked for Saturday</h2>
+      <p>Know someone nearby who buys eggs? Send them your link. Their first delivery is free, and so is your next one.</p>
+      <p class="share-link"></p>
+      <div class="share-actions">
+        <button type="button" class="btn btn-ink" data-share>Share link</button>
+        <button type="button" class="btn btn-ghost" data-copy>Copy</button>
+      </div>
+    </div>`;
+  sheet.querySelector(".share-link").textContent = short;
+  const close = () => {
+    sheet.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") close();
+  };
+  const copy = () =>
+    navigator.clipboard.writeText(link).then(
+      () => showToast("Link copied. Paste it in a message to a neighbour."),
+      () => showToast(`Your link: ${short}`)
+    );
+  sheet.addEventListener("click", (e) => {
+    if (e.target === sheet || e.target.closest(".share-close")) close();
+  });
+  sheet.querySelector("[data-copy]").addEventListener("click", copy);
+  const shareBtn = sheet.querySelector("[data-share]");
+  if (navigator.share) {
+    shareBtn.addEventListener("click", () => navigator.share({ title: "YOLKO eggs", text, url: link }).catch(() => {}));
+  } else {
+    shareBtn.textContent = "Copy link";
+    sheet.querySelector("[data-copy]").remove();
+    shareBtn.addEventListener("click", copy);
+  }
+  document.addEventListener("keydown", onKey);
+  document.body.appendChild(sheet);
+  sheet.querySelector(".share-card").focus({ preventScroll: true });
 }
 
 /* Re-measure after fonts/layout settle (iOS Safari chrome can shift post-load). */

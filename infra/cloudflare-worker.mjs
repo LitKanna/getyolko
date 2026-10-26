@@ -503,8 +503,9 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   const unitPrice = Number(settings.prices[bundle]);
   const subtotal = unitPrice * quantity;
   const isDelivery = order.fulfillment === "delivery";
+  // A referral, same-building or earned free delivery is decided when the order is made.
   const deliveryFee = isDelivery
-    ? (Number(order.deliveryFee) > 0 ? Number(order.deliveryFee) : SITE_DELIVERY_FEE)
+    ? (order.deliveryPerk ? 0 : Number(order.deliveryFee) > 0 ? Number(order.deliveryFee) : SITE_DELIVERY_FEE)
     : 0;
   const total = subtotal + deliveryFee;
   const unitAmount = Math.round(unitPrice * 100);
@@ -515,7 +516,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   order.price = total;
 
   const fulfillDesc = isDelivery
-    ? `Saturday ${order.pickupDate || ""} delivery · ${order.deliveryAddress || "Sydney area"}`.trim()
+    ? `Saturday ${order.pickupDate || ""} delivery · ${order.deliveryAddress || "Sydney area"}${order.deliveryPerk ? " · Free delivery" : ""}`.trim()
     : `Pickup ${order.pickupDay}${order.pickupDate ? " " + order.pickupDate : ""} at Paddy's Markets Flemington`;
 
   const params = new URLSearchParams({
@@ -530,6 +531,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
     "metadata[quantity]": String(quantity),
     "metadata[subtotal]": String(subtotal),
     "metadata[deliveryFee]": String(deliveryFee),
+    ...(order.deliveryPerk ? { "metadata[deliveryPerk]": order.deliveryPerk } : {}),
     success_url: "https://getyolko.com/?paid={CHECKOUT_SESSION_ID}",
     cancel_url: "https://getyolko.com/#order",
   });
@@ -716,6 +718,7 @@ async function markOrderPaid(env, order, session) {
     await env.DATA.put(order.id, JSON.stringify(order));
     if (order.phone) await clearOpenOrder(env, order.phone, order.id);
     await noteReminderOrder(env, order).catch((err) => console.log("reminder signup failed", order.id, String(err?.message || err)));
+    await noteReferralOrder(env, order).catch((err) => console.log("referral note failed", order.id, String(err?.message || err)));
     return { order, newlyPaid: true };
   }
   if (!order.stripe?.amountTotal) {
@@ -773,7 +776,7 @@ function buildOrderEmail(order) {
 ${row("Order", "#" + ref)}
 ${row("Item", `${qty} x ${item}`)}
 ${order.subtotal != null ? row("Subtotal", money(order.subtotal)) : ""}
-${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : ""}
+${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : order.deliveryPerk ? row("Delivery", "Free") : ""}
 <tr><td style="padding:12px 0 0;border-top:1px solid ${C.line};font-weight:700;color:${C.ink}">Total paid</td><td style="padding:12px 0 0;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink}">${htmlEscape(money(total))} AUD</td></tr>
 </table></td></tr>
 ${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:${C.ink};color:${C.paper};text-decoration:none;font-weight:600;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">View receipt</a></td></tr>` : ""}
@@ -790,7 +793,7 @@ ${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" s
     `Order #${ref}`,
     `${qty} x ${item}`,
     order.subtotal != null ? `Subtotal: ${money(order.subtotal)}` : null,
-    Number(order.deliveryFee) > 0 ? `Delivery: ${money(order.deliveryFee)}` : null,
+    Number(order.deliveryFee) > 0 ? `Delivery: ${money(order.deliveryFee)}` : order.deliveryPerk ? "Delivery: Free" : null,
     `Total paid: ${money(total)} AUD`,
     "",
     `Delivery: ${when}`,
@@ -1220,7 +1223,7 @@ async function setRemindIndex(env, list) {
 }
 
 /** What a reminder offers: their last order, or one tray when dozen packs are off this week. */
-function reminderItem(rec, settings) {
+function reminderItem(rec, settings, freeDelivery = false) {
   let bundle = BUNDLE_KEYS.includes(rec.bundle) ? rec.bundle : "tray1";
   let quantity = Math.min(10, Math.max(1, Math.floor(Number(rec.quantity)) || 1));
   const dozenItem = DOZEN_KEYS.includes(bundle) || CASE_KEYS.includes(bundle);
@@ -1229,7 +1232,8 @@ function reminderItem(rec, settings) {
     quantity = 1;
   }
   const subtotal = (Number(settings.prices?.[bundle]) || 0) * quantity;
-  return { bundle, quantity, subtotal, deliveryFee: SITE_DELIVERY_FEE, total: subtotal + SITE_DELIVERY_FEE };
+  const deliveryFee = freeDelivery ? 0 : SITE_DELIVERY_FEE;
+  return { bundle, quantity, subtotal, deliveryFee, total: subtotal + deliveryFee };
 }
 
 /**
@@ -1289,9 +1293,10 @@ function reminderLinks(token) {
   };
 }
 
-function buildReminderEmail(rec, settings, sat) {
+function buildReminderEmail(rec, settings, sat, ref = null) {
   const first = String(rec.name || "").split(/\s+/)[0] || "there";
-  const item = reminderItem(rec, settings);
+  const free = Number(ref?.credits) > 0;
+  const item = reminderItem(rec, settings, free);
   const label = BUNDLE_CHECKOUT_LABELS[item.bundle] || "Eggs";
   const links = reminderLinks(rec.token);
   const subject = `Eggs this Saturday, ${sat.label}?`;
@@ -1309,9 +1314,11 @@ function buildReminderEmail(rec, settings, sat) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">Hi ${htmlEscape(first)}, eggs this Saturday?</td></tr>
 <tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We deliver on Saturday ${htmlEscape(sat.label)}, ${DELIVERY_HOURS}. Want the same again?</td></tr>
-<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Your order</span><strong style="font-weight:600">${htmlEscape(item.quantity > 1 ? `${item.quantity} x ${label}` : label)}</strong><br>${htmlEscape(`${money(item.subtotal)} + ${money(item.deliveryFee)} delivery = ${money(item.total)}`)}</td></tr></table></td></tr>
+<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Your order</span><strong style="font-weight:600">${htmlEscape(item.quantity > 1 ? `${item.quantity} x ${label}` : label)}</strong><br>${htmlEscape(free ? `${money(item.subtotal)} + free delivery = ${money(item.total)}` : `${money(item.subtotal)} + ${money(item.deliveryFee)} delivery = ${money(item.total)}`)}</td></tr></table></td></tr>
+${free ? `<tr><td style="padding-top:14px;font-size:15px;line-height:22px;color:${C.ink2}">You've earned a free delivery, so this one is on us. It comes off at checkout.</td></tr>` : ""}
 <tr><td style="padding-top:24px"><a href="${htmlEscape(links.reorder)}" style="display:inline-block;background:${C.yellow};color:${C.ink};text-decoration:none;font-weight:700;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">Order again</a></td></tr>
 <tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">It opens your order filled in, ready to pay. Not this week? Just ignore this email.</td></tr>
+${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid ${C.line};padding-top:18px;font-size:15px;line-height:22px;font-weight:600;color:${C.ink}">Free delivery for a neighbour</td></tr><tr><td style="padding-top:4px;font-size:14px;line-height:21px;color:${C.ink2}">Send them your link. Their first delivery is free, and so is your next one.</td></tr><tr><td style="padding-top:8px;font-size:15px;line-height:22px"><a href="${htmlEscape(ref.link)}" style="font-weight:600;color:${C.ink};text-decoration:underline">${htmlEscape(ref.link.replace("https://", ""))}</a></td></tr></table></td></tr>` : ""}
 </table>
 </td></tr>
 <tr><td style="padding:16px 4px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a> · ${SHOP_EMAIL}<br>You asked for a Thursday reminder when you ordered. <a href="${htmlEscape(links.stop)}" style="color:${C.muted};text-decoration:underline">Unsubscribe</a></td></tr>
@@ -1322,7 +1329,8 @@ function buildReminderEmail(rec, settings, sat) {
 
 /** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect? }. */
 async function sendReminderEmail(env, auth, rec, settings, sat, { test = false } = {}) {
-  const { subject, html } = buildReminderEmail(rec, settings, sat);
+  const ref = await referralFor(env, rec.phone, rec.name).catch(() => null);
+  const { subject, html } = buildReminderEmail(rec, settings, sat, ref);
   try {
     const acct = await zohoMailAccount(env, auth);
     await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
@@ -1422,6 +1430,216 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;min-he
     status,
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" },
   });
+}
+
+/* ---------- Referrals and same-building orders ----------
+ * Every paying customer gets a share link (getyolko.com/r/CODE). A friend's first
+ * order through it ships free, and the friend who shared it gets their next
+ * delivery free. Orders to one building for the same Saturday share a trip: later
+ * ones ship free, and anyone there who already paid for delivery gets their next
+ * one free. A free delivery owed is a credit on the customer's phone number,
+ * used up by their next checkout. Kanna chose "free delivery for both" (2026-10-26).
+ */
+const REF_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const REF_CODE_RE = /^[A-HJKMNP-Z2-9]{6}$/;
+const REF_MAX_CREDITS = 10;
+const REF_BACKFILL = "ref:backfill";
+const refCustKey = (phone) => `ref:cust:${phone}`;
+const refMineKey = (phone) => `ref:mine:${phone}`;
+const refCodeKey = (code) => `ref:code:${code}`;
+const bldgKey = (date, h) => `bldg:${date}:${h}`;
+const AU_MOBILE_RE = /^04\d{8}$/;
+const STREET_TYPES = {
+  street: "st", road: "rd", avenue: "ave", av: "ave", parade: "pde", drive: "dr", place: "pl",
+  crescent: "cres", cr: "cres", court: "ct", lane: "ln", highway: "hwy", boulevard: "blvd",
+  terrace: "tce", close: "cl", circuit: "cct", square: "sq", grove: "gr", esplanade: "esp",
+};
+const UNIT_WORDS = "unit|units|u|apartment|apt|flat|suite|ste|level|lvl|shop|villa|townhouse|th";
+
+function newRefCode() {
+  return [...crypto.getRandomValues(new Uint8Array(6))].map((b) => REF_ALPHABET[b % REF_ALPHABET.length]).join("");
+}
+
+function cleanRefCode(code) {
+  const c = String(code || "").trim().toUpperCase();
+  return REF_CODE_RE.test(c) ? c : null;
+}
+
+function firstNameOf(name) {
+  return String(name || "").trim().split(/\s+/)[0].slice(0, 30);
+}
+
+function shareLink(code) {
+  return `https://getyolko.com/r/${code}`;
+}
+
+/** The customer's share code, made the first time it's needed. */
+async function ensureRefCode(env, phone, name) {
+  if (!AU_MOBILE_RE.test(phone || "")) return null;
+  const mine = await env.DATA.get(refMineKey(phone));
+  if (mine) return mine;
+  let code = newRefCode();
+  for (let i = 0; i < 3 && (await env.DATA.get(refCodeKey(code))); i++) code = newRefCode();
+  await env.DATA.put(refCodeKey(code), JSON.stringify({ phone, name: firstNameOf(name), createdAt: new Date().toISOString() }));
+  await env.DATA.put(refMineKey(phone), code);
+  return code;
+}
+
+/**
+ * "Unit 4, 12 Smith Street" and "4/12 Smith St" are the same building: the street
+ * number and name without the unit, plus the postcode (or suburb).
+ */
+function buildingAddress(street, postcode, suburb) {
+  let s = String(street || "").toLowerCase().replace(/[.,#]/g, " ").replace(/\s+/g, " ").trim();
+  s = s.replace(new RegExp(`^(?:${UNIT_WORDS}) ?[a-z]?\\d+[a-z]? ?[/-]? ?`), "");
+  s = s.replace(/^[a-z]?\d+[a-z]? ?\/ ?/, "");
+  s = s.replace(new RegExp(` (?:${UNIT_WORDS}) ?[a-z]?\\d+[a-z]?$`), "");
+  const m = /^(\d+[a-z]?(?:-\d+[a-z]?)?) (.+)$/.exec(s.replace(/ ?- ?/g, "-"));
+  if (!m) return null;
+  const name = m[2].split(" ").map((w) => STREET_TYPES[w] || w).join(" ");
+  const area = /^2\d{3}$/.test(postcode || "") ? postcode : String(suburb || "").toLowerCase().trim();
+  return area ? `${m[1]} ${name} ${area}` : null;
+}
+
+/**
+ * Whether this order ships free and why: another order to the same building that
+ * Saturday, a friend's link on a first order, or a free delivery already earned.
+ * `refFrom` is the friend's code whenever the order should earn them a credit.
+ */
+async function deliveryPerk(env, { phone, ref, street, postcode, suburb, pickupDate }) {
+  const addr = buildingAddress(street, postcode, suburb);
+  const building = addr ? (await sha256Hex(addr)).slice(0, 24) : null;
+  const code = cleanRefCode(ref);
+  const [cust, bldg, friend] = await Promise.all([
+    env.DATA.get(refCustKey(phone), "json").catch(() => null),
+    building && pickupDate ? env.DATA.get(bldgKey(pickupDate, building), "json").catch(() => null) : null,
+    code ? env.DATA.get(refCodeKey(code), "json").catch(() => null) : null,
+  ]);
+  const firstOrder = !(Number(cust?.paidOrders) > 0);
+  const refFrom = friend?.phone && friend.phone !== phone && firstOrder ? code : null;
+  let perk = null;
+  if (bldg?.orders?.length) perk = "building";
+  else if (refFrom) perk = "friend";
+  else if (Number(cust?.credits) > 0) perk = "credit";
+  return { perk, refFrom, refBy: refFrom ? friend.name || "" : "", building };
+}
+
+function perkInput(order, body) {
+  return {
+    phone: order.phone,
+    ref: body?.ref,
+    street: order.deliveryStreet,
+    postcode: order.deliveryPostcode,
+    suburb: order.deliverySuburb,
+    pickupDate: order.pickupDate,
+  };
+}
+
+function applyDeliveryPerk(order, p) {
+  for (const k of ["deliveryPerk", "refFrom", "refBy", "building"]) delete order[k];
+  if (order.fulfillment !== "delivery" || !p) return;
+  if (p.building) order.building = p.building;
+  if (p.refFrom) {
+    order.refFrom = p.refFrom;
+    order.refBy = p.refBy;
+  }
+  if (p.perk) {
+    order.deliveryPerk = p.perk;
+    order.deliveryFee = 0;
+    order.price = Number(order.subtotal) || 0;
+  }
+}
+
+async function addRefCredit(env, phone, entry) {
+  const cust = (await env.DATA.get(refCustKey(phone), "json")) || {};
+  const earned = Array.isArray(cust.earned) ? cust.earned : [];
+  if (earned.some((e) => e.orderId === entry.orderId && e.why === entry.why)) return;
+  const credits = Math.min(REF_MAX_CREDITS, (Number(cust.credits) || 0) + 1);
+  await env.DATA.put(refCustKey(phone), JSON.stringify({ ...cust, credits, earned: [entry, ...earned].slice(0, 20) }));
+}
+
+/** After a paid order: count it, use up a credit, and pay out referral and building credits. */
+async function noteReferralOrder(env, order) {
+  const phone = order.phone;
+  if (!AU_MOBILE_RE.test(phone || "")) return;
+  const cust = (await env.DATA.get(refCustKey(phone), "json")) || {};
+  const seen = Array.isArray(cust.orders) ? cust.orders : [];
+  if (seen.includes(order.id)) return;
+  const at = new Date().toISOString();
+  const next = {
+    ...cust,
+    name: firstNameOf(order.name) || cust.name || "",
+    orders: [order.id, ...seen].slice(0, 30),
+    paidOrders: (Number(cust.paidOrders) || 0) + 1,
+    lastPaidAt: at,
+    credits: Number(cust.credits) || 0,
+  };
+  if (order.deliveryPerk === "credit") next.credits = Math.max(0, next.credits - 1);
+
+  if (order.refFrom) {
+    const friend = await env.DATA.get(refCodeKey(order.refFrom), "json");
+    if (friend?.phone && friend.phone !== phone) await addRefCredit(env, friend.phone, { why: "friend", orderId: order.id, at });
+  }
+
+  if (order.building && order.pickupDate) {
+    const key = bldgKey(order.pickupDate, order.building);
+    const b = (await env.DATA.get(key, "json")) || { orders: [] };
+    if (!b.orders.some((o) => o.id === order.id)) {
+      b.orders.push({ id: order.id, phone, fee: Number(order.deliveryFee) || 0 });
+      b.credited = Array.isArray(b.credited) ? b.credited : [];
+      // A shared trip: everyone who paid for delivery to this building gets the next one free.
+      if (new Set(b.orders.map((o) => o.phone)).size > 1) {
+        for (const o of b.orders) {
+          if (!(o.fee > 0) || b.credited.includes(o.phone)) continue;
+          b.credited.push(o.phone);
+          if (o.phone === phone) next.credits = Math.min(REF_MAX_CREDITS, next.credits + 1);
+          else await addRefCredit(env, o.phone, { why: "building", orderId: o.id, at });
+        }
+      }
+      await env.DATA.put(key, JSON.stringify(b), { expirationTtl: 14 * 86400 });
+    }
+  }
+  await env.DATA.put(refCustKey(phone), JSON.stringify(next));
+}
+
+/** What the reminder email shows: their share link and any free delivery they've earned. */
+async function referralFor(env, phone, name) {
+  if (!AU_MOBILE_RE.test(phone || "")) return null;
+  const [code, cust] = await Promise.all([ensureRefCode(env, phone, name), env.DATA.get(refCustKey(phone), "json").catch(() => null)]);
+  return code ? { code, link: shareLink(code), credits: Number(cust?.credits) || 0 } : null;
+}
+
+/**
+ * Cron, once after launch: count orders paid before referrals existed, so a past
+ * customer doesn't get a friend's first-order discount. 40 orders a tick.
+ */
+async function runReferralBackfill(env) {
+  const state = (await env.DATA.get(REF_BACKFILL, "json")) || { at: 0 };
+  if (state.done) return { skipped: "done" };
+  const ids = await getOrderIndex(env);
+  const chunk = ids.slice(state.at, state.at + 40);
+  const byPhone = new Map();
+  for (const id of chunk) {
+    const o = await env.DATA.get(id, "json").catch(() => null);
+    if (!o || o.paymentStatus !== "paid" || !AU_MOBILE_RE.test(o.phone || "")) continue;
+    byPhone.set(o.phone, [...(byPhone.get(o.phone) || []), o]);
+  }
+  for (const [phone, orders] of byPhone) {
+    const cust = (await env.DATA.get(refCustKey(phone), "json")) || {};
+    const seen = Array.isArray(cust.orders) ? cust.orders : [];
+    const fresh = orders.map((o) => o.id).filter((id) => !seen.includes(id));
+    if (!fresh.length) continue;
+    await env.DATA.put(refCustKey(phone), JSON.stringify({
+      ...cust,
+      name: cust.name || firstNameOf(orders[0].name),
+      orders: [...seen, ...fresh].slice(0, 30),
+      paidOrders: (Number(cust.paidOrders) || 0) + fresh.length,
+    }));
+  }
+  const at = state.at + chunk.length;
+  const done = at >= ids.length;
+  await env.DATA.put(REF_BACKFILL, JSON.stringify(done ? { done, at, finishedAt: new Date().toISOString() } : { at }));
+  return { at, done };
 }
 
 /** Delivery events for order emails, from Zoho's webhooks, keyed by the send's request id. */
@@ -1931,7 +2149,15 @@ async function handleApi(request, env, url, ctx) {
     return json({ token, ttlSec: 600 });
   }
 
-  // Public: check delivery suburb / postcode is within 45 km of Sydney Markets
+  // A friend's share link: whose it is, so the shop can say who sent the free delivery.
+  if (url.pathname === "/api/referral" && request.method === "GET") {
+    if (!(await allowRate(env, `referral:${clientIp(request) || "unknown"}`, 30, 3600))) return json({ error: "rate" }, 429);
+    const code = cleanRefCode(url.searchParams.get("code"));
+    const rec = code ? await env.DATA.get(refCodeKey(code), "json").catch(() => null) : null;
+    if (!rec) return json({ ok: false }, 404, { "Cache-Control": "no-store" });
+    return json({ ok: true, code, name: rec.name || "" }, 200, { "Cache-Control": "no-store" });
+  }
+
   // "Order again" in a reminder email: the customer's last order, to fill in the form.
   if (url.pathname === "/api/reorder" && request.method === "GET") {
     if (!(await allowRate(env, `reorder:${clientIp(request) || "unknown"}`, 30, 3600))) return json({ error: "rate" }, 429);
@@ -1981,6 +2207,7 @@ async function handleApi(request, env, url, ctx) {
     return done;
   }
 
+  // Public: check delivery suburb / postcode is within 45 km of Sydney Markets
   if (url.pathname === "/api/delivery-check" && request.method === "POST") {
     if (!isAllowedOrigin(request)) {
       return json({ error: "forbidden", code: "origin" }, 403);
@@ -2128,6 +2355,7 @@ async function handleApi(request, env, url, ctx) {
       existingOpen.updatedAt = new Date().toISOString();
       if (body?.remind === true) existingOpen.remindOptIn = true;
       else delete existingOpen.remindOptIn;
+      applyDeliveryPerk(existingOpen, await deliveryPerk(env, perkInput(existingOpen, body)));
       // Keep pending so checkout can mint a fresh session after cancel.
       if (existingOpen.paymentStatus !== "paid") existingOpen.paymentStatus = existingOpen.paymentStatus || "new";
       if (existingOpen.status === "cancelled") existingOpen.status = "new";
@@ -2137,7 +2365,8 @@ async function handleApi(request, env, url, ctx) {
         ok: true,
         id: existingOpen.id,
         price: existingOpen.price,
-        deliveryFee,
+        deliveryFee: existingOpen.deliveryFee,
+        deliveryPerk: existingOpen.deliveryPerk || null,
         deliveryKm: existingOpen.deliveryKm,
         deliveryAddress: existingOpen.deliveryAddress,
         reused: true,
@@ -2177,6 +2406,7 @@ async function handleApi(request, env, url, ctx) {
       visitorId: cleanVisitId(body?.visitorId),
       ...(body?.remind === true ? { remindOptIn: true } : {}),
     };
+    applyDeliveryPerk(order, await deliveryPerk(env, perkInput(order, body)));
     await env.DATA.put(id, JSON.stringify(order));
     await pushOrderIndex(env, id);
     await rememberOpenOrder(env, phone, id);
@@ -2184,7 +2414,8 @@ async function handleApi(request, env, url, ctx) {
       ok: true,
       id,
       price: order.price,
-      deliveryFee,
+      deliveryFee: order.deliveryFee,
+      deliveryPerk: order.deliveryPerk || null,
       deliveryKm: order.deliveryKm,
       deliveryAddress: order.deliveryAddress,
     });
@@ -2393,6 +2624,7 @@ async function handleApi(request, env, url, ctx) {
     // "Email me a reminder each Thursday" at checkout; signed up once the order is paid.
     if (body?.remind === true) order.remindOptIn = true;
     else delete order.remindOptIn;
+    applyDeliveryPerk(order, await deliveryPerk(env, perkInput(order, body)));
 
     let result = await createCheckoutForOrder(env, order, settings, ctx);
     if (result.alreadyPaid) {
@@ -2922,6 +3154,7 @@ async function handleApi(request, env, url, ctx) {
 
     let meta = null;
     let purchase = null;
+    let share = null;
     if (paid && orderId) {
       let order = await env.DATA.get(orderId, "json");
       if (order) {
@@ -2961,11 +3194,14 @@ async function handleApi(request, env, url, ctx) {
               : String(order.bundle || "eggs"),
           numItems: Math.max(1, Number(order.quantity) || 1),
         };
+        const code = await ensureRefCode(env, order.phone, order.name).catch(() => null);
+        if (code) share = { code, link: shareLink(code) };
       }
     }
     return json({
       paid,
       purchase,
+      share,
       meta: meta
         ? { ok: meta.ok, skipped: !!meta.skipped, reason: meta.reason || null, error: meta.error || null }
         : null,
@@ -3505,6 +3741,11 @@ export default {
         console.log("reminders failed", String(err?.message || err));
       })
     );
+    ctx.waitUntil(
+      runReferralBackfill(env).catch((err) => {
+        console.log("referral backfill failed", String(err?.message || err));
+      })
+    );
   },
 
   async fetch(request, env, ctx) {
@@ -3529,13 +3770,26 @@ export default {
       return Response.redirect(dest.toString(), 302);
     }
 
+    // A customer's share link → the shop, with their code for the free delivery.
+    const refPath = /^\/r\/([A-Za-z0-9]{6})\/?$/.exec(url.pathname);
+    if (refPath) {
+      const dest = new URL(url.origin + "/");
+      const code = cleanRefCode(refPath[1]);
+      if (code) {
+        dest.searchParams.set("ref", code);
+        dest.searchParams.set("utm_source", "referral");
+        dest.searchParams.set("utm_medium", url.searchParams.get("m") === "card" ? "card" : "share");
+      }
+      return Response.redirect(dest.toString(), 302);
+    }
+
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
       return new Response(ADMIN_HTML, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "116",
+          "X-Yolko-Admin": "117",
         },
       });
     }

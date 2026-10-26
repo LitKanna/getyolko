@@ -95,6 +95,16 @@ who already ordered for that Saturday, and everything while `remind:off` is set 
 visit log or Meta pixel can read it, and `app.js` fills the form from `GET /api/reorder?t=`.
 Unsubscribe is `/api/reminders/stop?t=` (GET asks, POST stops, so mail scanners can't unsubscribe).
 
+Free delivery (referrals and same building, Kanna's choice Oct 2026): each customer's share link
+is `/r/<CODE>` (6 characters, `ref:code:<CODE>` -> phone and first name, `ref:mine:<phone>` -> code),
+made on the paid screen (`/api/confirm-payment` returns `share`) and in reminder emails. It lands on
+`/?ref=CODE`; `app.js` keeps the code 60 days and sends `ref` with the order. At order time
+`deliveryPerk()` sets `deliveryFee` 0 for: another paid order to the same building that Saturday
+(`bldg:<pickupDate>:<hash of street number + street + postcode, unit stripped>`), a friend's code on
+a first order, or an earned credit (`ref:cust:<phone>`). `noteReferralOrder` (on paid) counts the
+order, uses a credit, and gives one credit to the friend and to everyone who paid for delivery to a
+shared building. A cron backfill (`ref:backfill`) counts orders paid before this existed.
+
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
 under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system, 16px inputs on
