@@ -1,5 +1,6 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
+import { qrcode } from "qrcode-generator";
 // The admin page lives in its own file; wrangler bundles .html as a text module.
 import ADMIN_HTML from "./admin.html";
 
@@ -1609,6 +1610,52 @@ async function referralFor(env, phone, name) {
   return code ? { code, link: shareLink(code), credits: Number(cust?.credits) || 0 } : null;
 }
 
+/** A QR code as a scalable SVG: black runs on white, with the 4-module quiet zone scanners need. */
+function qrSvg(text) {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  const size = n + 8;
+  let d = "";
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (!qr.isDark(r, c)) continue;
+      let w = 1;
+      while (c + w < n && qr.isDark(r, c + w)) w++;
+      d += `M${c + 4} ${r + 4}h${w}v1h-${w}z`;
+      c += w - 1;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" role="img" aria-label="QR code"><path fill="#fff" d="M0 0h${size}v${size}H0z"/><path fill="#000" d="${d}"/></svg>`;
+}
+
+/**
+ * One printed card per customer on a delivery run, for them to pass to a neighbour.
+ * The QR opens their share link tagged as a card, so the Visits page can count scans.
+ */
+async function refCardsFor(env, ids) {
+  const orders = (await Promise.all(ids.map((id) => env.DATA.get(id, "json").catch(() => null)))).filter(Boolean);
+  const seen = new Set();
+  const cards = [];
+  for (const o of orders) {
+    if (seen.has(o.phone)) continue;
+    seen.add(o.phone);
+    const code = await ensureRefCode(env, o.phone, o.name).catch(() => null);
+    if (!code) continue;
+    const first = firstNameOf(o.name);
+    const link = shareLink(code);
+    cards.push({
+      id: o.id,
+      first: first ? first.charAt(0).toUpperCase() + first.slice(1) : "",
+      code,
+      link: link.replace(/^https:\/\//, ""),
+      svg: qrSvg(`${link}?m=card`),
+    });
+  }
+  return cards;
+}
+
 /**
  * Cron, once after launch: count orders paid before referrals existed, so a past
  * customer doesn't get a friend's first-order discount. 40 orders a tick.
@@ -2700,6 +2747,16 @@ async function handleApi(request, env, url, ctx) {
     return json(result, result.ok ? 200 : 502);
   }
 
+  // Admin: printable share cards (QR codes) for the boxes on a delivery run
+  if (url.pathname === "/api/admin/ref-cards" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => null);
+    const ids = (Array.isArray(body?.ids) ? body.ids : []).map(String).filter((id) => id.startsWith("order:")).slice(0, 60);
+    if (!ids.length) return json({ error: "No orders" }, 400);
+    const [cards, settings] = await Promise.all([refCardsFor(env, ids), getSettings(env)]);
+    return json({ ok: true, cards, trayPrice: Number(settings.prices?.tray1) || null });
+  }
+
   // Admin: every paid order's confirmation email and whether it went out
   if (url.pathname === "/api/admin/emails" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
@@ -3789,7 +3846,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "117",
+          "X-Yolko-Admin": "118",
         },
       });
     }
@@ -3850,7 +3907,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "198",
+      "X-Yolko-Build": "199",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

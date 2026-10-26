@@ -437,6 +437,8 @@ button.kpi:active { transform:scale(.99); }
 .load .ln b { font-weight:600; }
 .load .due { color:var(--amber); }
 .run-acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+.run-acts .run-cards { grid-column:1 / -1; }
+.run-hint { margin-top:8px; }
 .run-sec { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:22px 2px 10px; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
 .run-sec:first-child { margin-top:0; }
 .stops { display:flex; flex-direction:column; gap:10px; }
@@ -782,6 +784,30 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
 }
+/* Box cards print as four A6 cards on each A4 sheet, cut along the dashed lines. Black on
+   white whatever the screen appearance; only the logo dot is yellow. */
+#print-cards { display:none; }
+@media print {
+  @page { size:A4 portrait; margin:0; }
+  html, body { background:#fff !important; margin:0 !important; padding:0 !important; }
+  body > *:not(#print-cards) { display:none !important; }
+  #print-cards { display:block; color:#000; font-family:var(--font); -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .pc-sheet { width:210mm; height:297mm; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; overflow:hidden; break-after:page; }
+  .pc-sheet:last-child { break-after:auto; }
+  .pc { box-sizing:border-box; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10mm 10mm 8mm; border-right:.3mm dashed #aaa; border-bottom:.3mm dashed #aaa; }
+  .pc:nth-child(2n) { border-right:0; }
+  .pc:nth-child(n+3) { border-bottom:0; }
+  .pc p { margin:0; }
+  .pc-brand { align-self:flex-start; display:flex; align-items:center; gap:2mm; font-size:13pt; font-weight:800; letter-spacing:-.01em; }
+  .pc-brand i { width:3.4mm; height:3.4mm; border-radius:50%; background:#ffd32a; }
+  .pc h2 { margin:8mm 0 0; font-size:18pt; line-height:1.15; font-weight:800; letter-spacing:-.02em; }
+  .pc .pc-lede { margin-top:3mm; max-width:74mm; font-size:10.5pt; line-height:1.4; color:#333; }
+  .pc-qr { width:50mm; height:50mm; margin-top:6mm; }
+  .pc-qr svg { display:block; width:100%; height:100%; }
+  .pc .pc-scan { margin-top:4mm; font-size:11pt; font-weight:700; }
+  .pc .pc-url { margin-top:1mm; font-size:9.5pt; color:#444; }
+  .pc .pc-foot { margin-top:auto; width:100%; padding-top:3mm; border-top:.3mm solid #ddd; font-size:8.5pt; line-height:1.35; color:#444; }
+}
 </style>
 </head>
 <body>
@@ -911,6 +937,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 <div id="modal-slot"></div>
 <div id="lightbox-slot"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="print-cards" aria-hidden="true"></div>
 
 <script>
 "use strict";
@@ -1866,7 +1893,9 @@ function renderRun() {
   const side = '<div class="card run-prog' + (left.length ? "" : " complete") + '"><div class="top"><span class="big num">' + doneN + " of " + stops.length + '</span><span class="minor" style="margin:0">delivered</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
     '<div class="load"><h3>' + (left.length ? "In the car" : "Delivered today") + "</h3>" + loadList(left.length ? left : stops).map(function (l) { return '<div class="ln"><b>' + esc(l[0]) + "</b></div>"; }).join("") +
       (collect.length ? '<div class="ln due">' + esc("Collect " + money(owed) + " from " + plural(collect.length, "stop")) + "</div>" : "") + "</div>" +
-    (left.length ? '<div class="run-acts">' + (route ? '<a class="btn dark" href="' + esc(route) + '" target="_blank" rel="noopener">' + ic("route", 16) + "Full route</a>" : "") + '<button type="button" class="btn ghost" data-action="copy-run">' + ic("copy", 16) + "Copy list</button></div>" : "") +
+    (left.length ? '<div class="run-acts">' + (route ? '<a class="btn dark" href="' + esc(route) + '" target="_blank" rel="noopener">' + ic("route", 16) + "Full route</a>" : "") + '<button type="button" class="btn ghost" data-action="copy-run">' + ic("copy", 16) + "Copy list</button>" +
+      '<button type="button" class="btn ghost run-cards" data-action="print-cards">' + ic("qr", 16) + "Print box cards</button></div>" +
+      '<p class="minor run-hint">A card for each box with the customer\'s own QR code. A neighbour who scans it gets free delivery.</p>' : "") +
     (custom && left.length ? '<button type="button" class="btn sm ghost" style="margin-top:10px;width:100%" data-action="run-reset">Nearest first again</button>' : "") +
     "</div>";
   let list = "";
@@ -1900,6 +1929,37 @@ function copyRun() {
     lines.push((i + 1) + ". " + o.name + ", " + addressLine(o) + (o.phone ? ", " + fmtPhone(o.phone) : "") + " (" + shortItem(o) + (isPaid(o) ? "" : ", collect " + money(amountOf(o))) + ")");
   });
   copyText(lines.join("\n"), "Stops copied");
+}
+/* Box cards: one per customer still to deliver, carrying their share link as a QR code. */
+function cardHtml(c, price) {
+  return '<div class="pc"><div class="pc-brand"><i></i>YOLKO</div>' +
+    "<h2>" + esc(c.first ? "Free delivery from " + c.first : "Free delivery on your first order") + "</h2>" +
+    '<p class="pc-lede">Fresh eggs at your door on Saturday morning.' + (price ? " A tray of 30 for " + esc(money(price)) + "." : "") + "</p>" +
+    '<div class="pc-qr">' + c.svg + "</div>" +
+    '<p class="pc-scan">Scan to order. Your first delivery is free.</p>' +
+    '<p class="pc-url">' + esc(c.link) + "</p>" +
+    '<p class="pc-foot">' + esc((c.first ? c.first + ", give" : "Give") + " this card to a neighbour. When they order, your next delivery is free too.") + "</p></div>";
+}
+async function printCards(btn) {
+  const g = runGroup();
+  if (!g) return;
+  const stops = runStops(g).filter(function (o) { return o.status !== "done"; });
+  if (!stops.length) return;
+  btn.classList.add("busy");
+  const r = await api("/api/admin/ref-cards", { method: "POST", body: { ids: stops.map(function (o) { return o.id; }) } });
+  btn.classList.remove("busy");
+  const cards = (r.ok && r.data.cards) || [];
+  if (!cards.length) { toast(r.ok ? "No cards to print. These orders have no mobile number" : r.data.error || "Couldn't make the cards"); return; }
+  let html = "";
+  for (let i = 0; i < cards.length; i += 4) html += '<div class="pc-sheet">' + cards.slice(i, i + 4).map(function (c) { return cardHtml(c, r.data.trayPrice); }).join("") + "</div>";
+  $("print-cards").innerHTML = html;
+  const missing = new Set(stops.map(function (o) { return o.phone; })).size - cards.length;
+  if (missing > 0) toast(plural(missing, "box", "boxes") + " without a mobile number got no card");
+  // The title names the PDF when the owner saves instead of printing.
+  const title = document.title;
+  document.title = "YOLKO box cards " + g.label;
+  window.addEventListener("afterprint", function restore() { window.removeEventListener("afterprint", restore); document.title = title; });
+  window.print();
 }
 /* Keep the phone screen awake while the run is open. */
 let WAKE = null;
@@ -3272,6 +3332,7 @@ const ACTIONS = {
   "run-move": function (t) { moveStop(t.getAttribute("data-id"), Number(t.getAttribute("data-d"))); },
   "run-reset": resetRunOrder,
   "copy-run": copyRun,
+  "print-cards": function (t) { printCards(t); },
   "open-order-from-run": function (t) { ACTIONS["goto-order"](t); },
   "alerts": alertsSheet,
   "kpi-stock": function () { go("stock"); },
