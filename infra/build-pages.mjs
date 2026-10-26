@@ -17,6 +17,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://getyolko.com";
@@ -37,64 +38,93 @@ const HERO_IMG = `${SITE}/assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}`;
 const HERO_ALT = `Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $${PRICE.tray1} a tray`;
 const LOGO = `${SITE}/assets/yolko-app-icon-1024.png`;
 
-// Suburb landing pages. `nearby` and `faq` keep each page specific to its area.
+// Suburb landing pages. `local`, `nearby` and `faq` keep each page specific to its area.
 const SUBURB_PAGES = [
   {
     slug: "strathfield", name: "Strathfield", postcode: "2135", region: "Inner west",
     nearby: ["Homebush", "North Strathfield", "Strathfield South", "Enfield", "Burwood"],
     faq: ["Is North Strathfield covered?", "Yes. North Strathfield, Strathfield South and Enfield are all inside the Saturday delivery area."],
+    local: `Strathfield has apartment blocks around the station and family homes on the quieter streets further out. The Korean restaurants and grocers near the station can order 180-egg boxes for the week. In the blocks, neighbours who order for the same Saturday share one trip, so every order after the first ships free.`,
   },
   {
     slug: "homebush", name: "Homebush", postcode: "2140", region: "Inner west",
     nearby: ["Homebush West", "North Strathfield", "Strathfield", "Sydney Olympic Park", "Liberty Grove"],
     faq: ["Can Olympic Park or Homebush West order?", "Yes. Both are inside the Saturday delivery area. For an apartment, put your unit number in the street address."],
+    local: `Many homes around Homebush station and in Sydney Olympic Park are apartments, often several towers to one address. Put your unit and building in the street address. When two or more people in the same building order for the same Saturday, every order after the first ships free, so it is worth sharing in your building chat.`,
   },
   {
     slug: "lidcombe", name: "Lidcombe", postcode: "2141", region: "Cumberland",
     nearby: ["Berala", "Rookwood", "Lidcombe North", "Regents Park", "Auburn"],
     faq: ["Is Berala or Regents Park covered?", "Yes. Both are next to Lidcombe and inside the Saturday delivery area."],
+    local: `Lidcombe has apartments close to the station and houses towards Berala and Regents Park. The restaurants around the station can order 180-egg boxes, up to 10 at a time, and families who bake or cook in bulk often take two trays for $${PRICE.tray2}.`,
   },
   {
     slug: "burwood", name: "Burwood", postcode: "2134", region: "Inner west",
     nearby: ["Burwood Heights", "Croydon", "Enfield", "Strathfield", "Ashfield"],
     faq: ["Can bakers in Burwood order extra trays?", `Yes. Two trays are $${PRICE.tray2} and a 180-egg box is $${PRICE.box}. You can order up to 10 boxes at once.`],
+    local: `Burwood's apartment towers sit around the station and Westfield, with houses on the streets further out. Burwood Chinatown on Deane Street and the restaurants along Burwood Road go through a lot of eggs: a 180-egg box is $${PRICE.box}, and you can order up to 10 at once.`,
   },
   {
     slug: "concord", name: "Concord", postcode: "2137", region: "Canada Bay",
     nearby: ["Mortlake", "Breakfast Point", "Cabarita", "Concord West", "North Strathfield"],
     faq: ["Can a café on Majors Bay Road get a weekly box?", `Yes. Order the $${PRICE.box} box (180 eggs) online, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a> to set up a weekly standing order.`],
+    local: `Concord is mostly houses, with a strip of cafés along Majors Bay Road. A café can order a 180-egg box online each week, or message us on WhatsApp to set up a standing order. Homes in Breakfast Point and Cabarita get the same Saturday delivery and the same $${PRICE.delivery} fee.`,
   },
   {
     slug: "auburn", name: "Auburn", postcode: "2144", region: "Cumberland",
     nearby: ["Lidcombe", "Silverwater", "Berala", "Clyde", "Newington"],
     faq: ["Can I order from Lidcombe or Silverwater?", "Yes. Both are next to Auburn and inside the Saturday delivery area."],
+    local: `Auburn has apartment blocks near the station and houses on the streets around them. The Turkish and Lebanese bakeries and sweet shops along Auburn Road can order 180-egg boxes for $${PRICE.box} each. Apartments in Newington and Silverwater are covered too: put your unit number in the street address.`,
   },
   {
     slug: "rhodes", name: "Rhodes", postcode: "2138", region: "Canada Bay",
     nearby: ["Liberty Grove", "Concord West", "Wentworth Point", "Meadowbank", "Putney"],
     faq: ["Can you deliver to my apartment building?", "Yes. Put your unit number in the street address. If we need access on the day, we message you on WhatsApp."],
+    local: `Rhodes is almost all apartment towers, and so is Wentworth Point across the Bennelong Bridge. Put your unit number in the street address, and we message you on WhatsApp if we need access on the day. When neighbours in the same building order for the same Saturday, every order after the first ships free.`,
   },
   {
     slug: "ashfield", name: "Ashfield", postcode: "2131", region: "Inner west",
     nearby: ["Summer Hill", "Croydon", "Haberfield", "Ashbury", "Dulwich Hill"],
     faq: ["Do restaurants in Ashfield order boxes?", `Yes. A box is 180 eggs for $${PRICE.box}, up to 10 boxes an order. <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a> for a weekly standing order.`],
+    local: `Ashfield mixes apartment blocks near the station with older houses on the side streets. The Shanghainese and other Chinese restaurants along Liverpool Road can order 180-egg boxes, up to 10 at a time, or message us on WhatsApp for a weekly standing order.`,
   },
   {
     slug: "ryde", name: "Ryde", postcode: "2112", region: "Northern Sydney",
     nearby: ["West Ryde", "Putney", "Meadowbank", "Denistone", "Tennyson Point"],
     faq: ["Do you charge more to cross the river?", `No. Delivery is a flat $${PRICE.delivery} anywhere in the delivery area, Ryde included.`],
+    local: `Ryde is mostly houses, with apartments around Top Ryde and the stations at West Ryde and Meadowbank. Ryde is across the Parramatta River from most of our area, and delivery is still a flat $${PRICE.delivery}. In an apartment, put your unit number in the street address.`,
   },
   {
     slug: "bankstown", name: "Bankstown", postcode: "2200", region: "South-west",
     nearby: ["Yagoona", "Punchbowl", "Condell Park", "Bass Hill", "Greenacre"],
     faq: ["Can bakeries and sweet shops order in bulk?", `Yes. Order up to 10 boxes of 180 eggs ($${PRICE.box} each), or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a> for a weekly standing order.`],
+    local: `Bankstown has apartments around the station and plenty of family homes in Yagoona, Condell Park and Greenacre. The Vietnamese bakeries and Lebanese sweet shops in Bankstown can order 180-egg boxes for $${PRICE.box} each, up to 10 at a time.`,
   },
   {
     slug: "parramatta", name: "Parramatta", postcode: "2150", region: "Western Sydney",
     nearby: ["Harris Park", "Westmead", "North Parramatta", "Rosehill", "Granville"],
     faq: ["Is Harris Park or Westmead covered?", "Yes. Both are inside the Saturday delivery area, and there is no extra charge for Parramatta."],
+    local: `Central Parramatta is mostly apartment towers, and North Parramatta and Rosehill have more houses. In a tower, add your unit number, and we message you on WhatsApp if the building needs letting in. Harris Park, Sydney's Little India, is next door, and its sweet shops and restaurants can order 180-egg boxes.`,
   },
 ];
+
+// Covered suburbs closest to a suburb page, with postcodes, from the same zone data checkout uses.
+// 2129 (Sydney Markets) is never shown, and neither is Flemington.
+const HIDDEN_POSTCODES = new Set(["2129"]);
+const NOT_A_SUBURB = /\b(dc|bc|mc|milpo|lpo|centre|university|westfield|square|plaza|mall|aerodrome|metro)\b/i;
+const NEARBY_SKIP = new Set(["Flemington", "Wentworth Port", "Sydney South"]);
+
+function nearestCovered(s, count = 12) {
+  const home = SUBURBS.find((x) => x.name === s.name);
+  if (!home) throw new Error(`No zone data for ${s.name}`);
+  return SUBURBS
+    .filter((x) => x.name !== s.name && !NEARBY_SKIP.has(x.name) && !NOT_A_SUBURB.test(x.name))
+    .map((x) => ({ ...x, postcodes: (x.postcodes || []).filter((p) => !HIDDEN_POSTCODES.has(p)) }))
+    .filter((x) => x.postcodes.length && quoteDelivery({ lat: x.lat, lng: x.lng, name: x.name, crossing: x.crossing }).deliver)
+    .map((x) => ({ ...x, km: haversineKm(home.lat, home.lng, x.lat, x.lng) }))
+    .sort((a, b) => a.km - b.km)
+    .slice(0, count);
+}
 
 // Matches the Google Business Profile service areas (Google allows 20).
 const SERVICE_AREAS = [
@@ -593,6 +623,7 @@ function suburbPage(s) {
   const title = `Egg Delivery ${s.name} ${s.postcode} | 30 Eggs $${PRICE.tray1} | YOLKO`;
   const description = `Cheap, fresh Pace Farm eggs delivered to ${s.name} ${s.postcode} every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery. Order by Friday night.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], [s.name, path]];
+  const near = nearestCovered(s);
   const faqs = [
     [`Do you deliver eggs to ${s.name}?`, `Yes. ${s.name} ${s.postcode} is inside our Saturday delivery area, and so are ${s.nearby[0]} and ${s.nearby[1]}. Checkout confirms your address.`],
     ["When will my eggs arrive?", "Saturday, 6am to 12pm. Order by Friday night."],
@@ -634,11 +665,27 @@ ${stepsSection(["Saturday morning delivery", `To your door in ${s.name}, flat $$
     <section class="local-band">
       <div class="wrap">
         <header class="section-head left">
-          <h2>${s.name} and nearby</h2>
-          <p>Same Saturday delivery and the same $${PRICE.delivery} fee.</p>
+          <h2>Delivering in ${s.name}</h2>
+        </header>
+        <div class="local-prose">
+          <p>${s.local}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="local-band">
+      <div class="wrap">
+        <header class="section-head left">
+          <h2>Suburbs near ${s.name}</h2>
+          <p>The ${near.length} closest suburbs we cover, with postcodes. Same Saturday delivery and the same $${PRICE.delivery} fee.</p>
         </header>
         <ul class="areas-list">
-${chips([...s.nearby.map((n) => [n]), ["All suburbs", "/egg-delivery-areas"]])}
+${near.map((x) => {
+    const own = SUBURB_PAGES.find((o) => o.name === x.name);
+    const label = `${x.name} <small>${x.postcodes.join(", ")}</small>`;
+    return `          <li>${own ? `<a href="${suburbPath(own)}">${label}</a>` : label}</li>`;
+  }).join("\n")}
+${chips([["All suburbs", "/egg-delivery-areas"]])}
         </ul>
         <p class="local-nearby-label">More delivery pages</p>
         <ul class="local-siblings">
