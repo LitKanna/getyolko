@@ -715,6 +715,7 @@ async function markOrderPaid(env, order, session) {
     await syncStock(env, order, order.status);
     await env.DATA.put(order.id, JSON.stringify(order));
     if (order.phone) await clearOpenOrder(env, order.phone, order.id);
+    await noteReminderOrder(env, order).catch((err) => console.log("reminder signup failed", order.id, String(err?.message || err)));
     return { order, newlyPaid: true };
   }
   if (!order.stripe?.amountTotal) {
@@ -1150,6 +1151,279 @@ function mailHtml(text, quote) {
   return `<div style="font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#171714">${body}<br><br><span style="color:#6d6b64">YOLKO · getyolko.com</span>${q}</div>`;
 }
 
+/* ---------- Thursday reorder reminders ----------
+ * Customers who tick "Remind me" at checkout get one email each Thursday before
+ * Saturday delivery, with a link that fills in their last order. These go from the
+ * orders@getyolko.com mailbox (Zoho Mail), never through the CPaaS order sender,
+ * whose terms forbid marketing. Every email carries an unsubscribe link.
+ */
+const REMIND_INDEX = "remind:index";
+const REMIND_OFF = "remind:off";
+const REMIND_LAST_RUN = "remind:lastrun";
+const remindSubKey = (h) => `remind:sub:${h}`;
+const remindTokKey = (t) => `remind:tok:${t}`;
+const remindRunKey = (sat) => `remind:run:${sat}`;
+const REMIND_TOKEN_RE = /^[a-f0-9]{32}$/;
+// Thursday 10am Sydney until Friday 10am, a few per cron tick so one run stays well
+// inside the Worker's per-invocation subrequest limit.
+const REMIND_START_HOUR = 10;
+const REMIND_BATCH = 4;
+const REMIND_MAX = 2000;
+const DELIVERY_HOURS = "6am to 12pm";
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function randomHex(bytes) {
+  return [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Sydney's calendar date, weekday and hour (daylight saving included). */
+function sydneyClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Australia/Sydney",
+    year: "numeric", month: "numeric", day: "numeric", weekday: "short", hour: "numeric", hourCycle: "h23",
+  }).formatToParts(now);
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return { year: Number(get("year")), month: Number(get("month")), day: Number(get("day")), weekday: get("weekday"), hour: Number(get("hour")) % 24 };
+}
+
+/** The Saturday `ahead` days from Sydney's date, as an ISO date and the site's "31 Oct" label. */
+function saturdayFrom(clock, ahead) {
+  const d = new Date(Date.UTC(clock.year, clock.month - 1, clock.day + ahead));
+  return { iso: d.toISOString().slice(0, 10), label: `${d.getUTCDate()} ${SHORT_MONTHS[d.getUTCMonth()]}` };
+}
+
+/** The Saturday this week's reminders are for, or null outside Thursday 10am to Friday 10am. */
+function reminderWindow(now = new Date()) {
+  const c = sydneyClock(now);
+  if (c.weekday === "Thu" && c.hour >= REMIND_START_HOUR) return saturdayFrom(c, 2);
+  if (c.weekday === "Fri" && c.hour < REMIND_START_HOUR) return saturdayFrom(c, 1);
+  return null;
+}
+
+/** The next Thursday reminders go out (today while today's window is still open). */
+function nextReminderDay(now = new Date()) {
+  const c = sydneyClock(now);
+  const idx = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 }[c.weekday];
+  let ahead = (4 - idx + 7) % 7;
+  if (ahead === 0 && c.hour >= REMIND_START_HOUR) ahead = 7;
+  const d = new Date(Date.UTC(c.year, c.month - 1, c.day + ahead));
+  return `Thu ${d.getUTCDate()} ${SHORT_MONTHS[d.getUTCMonth()]}`;
+}
+
+async function getRemindIndex(env) {
+  const list = await env.DATA.get(REMIND_INDEX, "json").catch(() => null);
+  return Array.isArray(list) ? list : [];
+}
+
+async function setRemindIndex(env, list) {
+  await env.DATA.put(REMIND_INDEX, JSON.stringify(list.slice(0, REMIND_MAX)));
+}
+
+/** What a reminder offers: their last order, or one tray when dozen packs are off this week. */
+function reminderItem(rec, settings) {
+  let bundle = BUNDLE_KEYS.includes(rec.bundle) ? rec.bundle : "tray1";
+  let quantity = Math.min(10, Math.max(1, Math.floor(Number(rec.quantity)) || 1));
+  const dozenItem = DOZEN_KEYS.includes(bundle) || CASE_KEYS.includes(bundle);
+  if (dozenItem && !(Number(settings.dozensAvailable) > 0)) {
+    bundle = "tray1";
+    quantity = 1;
+  }
+  const subtotal = (Number(settings.prices?.[bundle]) || 0) * quantity;
+  return { bundle, quantity, subtotal, deliveryFee: SITE_DELIVERY_FEE, total: subtotal + SITE_DELIVERY_FEE };
+}
+
+/**
+ * After a paid order: sign the customer up when they ticked the box, and keep an
+ * existing reminder's "last order" current so the reorder link matches it.
+ */
+async function noteReminderOrder(env, order) {
+  const email = String(order.stripe?.email || order.email || "").trim().toLowerCase();
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) return;
+  const h = (await sha256Hex(email)).slice(0, 24);
+  const rec = await env.DATA.get(remindSubKey(h), "json");
+  if (!rec && !order.remindOptIn) return;
+  const now = new Date().toISOString();
+  const next = {
+    ...(rec || {}),
+    email,
+    name: order.name || rec?.name || "",
+    phone: order.phone || rec?.phone || "",
+    bundle: order.bundle,
+    quantity: order.quantity,
+    deliveryStreet: order.deliveryStreet || "",
+    deliverySuburb: order.deliverySuburb || "",
+    deliveryCity: order.deliveryCity || "",
+    deliveryPostcode: order.deliveryPostcode || "",
+    lastOrderId: order.id,
+    lastPaidAt: order.stripe?.paidAt || now,
+    lastPickupDate: order.pickupDate || "",
+  };
+  const joining = order.remindOptIn && (!rec || rec.unsubscribedAt);
+  if (joining) {
+    next.optedInAt = now;
+    delete next.unsubscribedAt;
+  }
+  if (!next.token) {
+    next.token = randomHex(16);
+    await env.DATA.put(remindTokKey(next.token), h);
+  }
+  await env.DATA.put(remindSubKey(h), JSON.stringify(next));
+  if (joining) {
+    const list = await getRemindIndex(env);
+    if (!list.includes(h)) await setRemindIndex(env, [h, ...list]);
+  }
+}
+
+async function reminderByToken(env, token) {
+  if (!REMIND_TOKEN_RE.test(String(token || ""))) return null;
+  const h = await env.DATA.get(remindTokKey(token));
+  if (!h) return null;
+  const rec = await env.DATA.get(remindSubKey(h), "json");
+  return rec && rec.token === token ? { h, rec } : null;
+}
+
+function reminderLinks(token) {
+  return {
+    reorder: `https://getyolko.com/?utm_source=reminder&utm_medium=email&utm_campaign=thursday#reorder=${token}`,
+    stop: `https://getyolko.com/api/reminders/stop?t=${token}`,
+  };
+}
+
+function buildReminderEmail(rec, settings, sat) {
+  const first = String(rec.name || "").split(/\s+/)[0] || "there";
+  const item = reminderItem(rec, settings);
+  const label = BUNDLE_CHECKOUT_LABELS[item.bundle] || "Eggs";
+  const links = reminderLinks(rec.token);
+  const subject = `Eggs this Saturday, ${sat.label}?`;
+  const C = { canvas: "#faf7f0", paper: "#fffefb", ink: "#171714", ink2: "#3d3b36", muted: "#6d6b64", line: "#e5e0d5", subtle: "#f3efe6", yellow: "#ffd32a" };
+  const FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
+  const preheader = `We deliver Saturday ${sat.label}, ${DELIVERY_HOURS}. Your last order is ready to go again.`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
+<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
+<body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.canvas}">${htmlEscape(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}"><tr><td align="center" style="padding:28px 12px 32px;font-family:${FONT}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;font-family:${FONT}">
+<tr><td style="padding:0 4px 16px"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:${C.yellow};vertical-align:middle"></span><span style="font-size:18px;line-height:22px;font-weight:800;color:${C.ink};letter-spacing:-0.3px;vertical-align:middle;padding-left:8px">YOLKO</span></td></tr>
+<tr><td style="background:${C.paper};border:1px solid ${C.line};border-radius:16px;padding:28px 24px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">Hi ${htmlEscape(first)}, eggs this Saturday?</td></tr>
+<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We deliver on Saturday ${htmlEscape(sat.label)}, ${DELIVERY_HOURS}. Want the same again?</td></tr>
+<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Your order</span><strong style="font-weight:600">${htmlEscape(item.quantity > 1 ? `${item.quantity} x ${label}` : label)}</strong><br>${htmlEscape(`${money(item.subtotal)} + ${money(item.deliveryFee)} delivery = ${money(item.total)}`)}</td></tr></table></td></tr>
+<tr><td style="padding-top:24px"><a href="${htmlEscape(links.reorder)}" style="display:inline-block;background:${C.yellow};color:${C.ink};text-decoration:none;font-weight:700;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">Order again</a></td></tr>
+<tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">It opens your order filled in, ready to pay. Not this week? Just ignore this email.</td></tr>
+</table>
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a> · ${SHOP_EMAIL}<br>You asked for a Thursday reminder when you ordered. <a href="${htmlEscape(links.stop)}" style="color:${C.muted};text-decoration:underline">Unsubscribe</a></td></tr>
+</table>
+</td></tr></table></body></html>`;
+  return { subject, html };
+}
+
+/** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect? }. */
+async function sendReminderEmail(env, auth, rec, settings, sat, { test = false } = {}) {
+  const { subject, html } = buildReminderEmail(rec, settings, sat);
+  try {
+    const acct = await zohoMailAccount(env, auth);
+    await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+      method: "POST",
+      body: { fromAddress: acct.address || SHOP_EMAIL, toAddress: rec.email, subject: test ? `[Test] ${subject}` : subject, content: html, mailFormat: "html" },
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) };
+  }
+}
+
+/** Cron: work through this week's reminders a few at a time. */
+async function runReminders(env, now = new Date()) {
+  const sat = reminderWindow(now);
+  if (!sat) return { skipped: "window" };
+  const runKey = remindRunKey(sat.iso);
+  let run = await env.DATA.get(runKey, "json");
+  if (run?.done) return { skipped: "done" };
+  if (await env.DATA.get(REMIND_OFF)) return { skipped: "paused" };
+  const settings = await getSettings(env);
+  // Sold out: nothing to offer, and the reminder would only disappoint.
+  if (!(Number(settings.traysAvailable) > 0)) return { skipped: "sold out" };
+  const auth = await zohoAuth(env);
+  if (!auth) return { skipped: "mailbox not connected" };
+  if (!run) run = { sat: sat.iso, label: sat.label, startedAt: now.toISOString(), pending: await getRemindIndex(env), sent: 0, skipped: 0, failed: 0 };
+  const batch = run.pending.splice(0, REMIND_BATCH);
+  for (let i = 0; i < batch.length; i++) {
+    const h = batch[i];
+    const rec = await env.DATA.get(remindSubKey(h), "json");
+    if (!rec || rec.unsubscribedAt || rec.lastSentFor === sat.iso) {
+      run.skipped++;
+      continue;
+    }
+    // Already ordered for this Saturday.
+    const recent = Date.now() - Date.parse(rec.lastPaidAt || 0) < 14 * 86400 * 1000;
+    if (rec.lastPickupDate === sat.label && recent) {
+      run.skipped++;
+      continue;
+    }
+    const result = await sendReminderEmail(env, auth, rec, settings, sat);
+    if (result.reconnect) {
+      // The mailbox login expired: keep the rest for after it's reconnected.
+      run.pending.unshift(...batch.slice(i));
+      run.lastError = result.error;
+      break;
+    }
+    if (result.ok) {
+      run.sent++;
+      await env.DATA.put(remindSubKey(h), JSON.stringify({ ...rec, lastSentFor: sat.iso, lastSentAt: new Date().toISOString(), sends: (rec.sends || 0) + 1, lastError: undefined }));
+    } else {
+      run.failed++;
+      run.lastError = result.error;
+      await env.DATA.put(remindSubKey(h), JSON.stringify({ ...rec, lastError: result.error }));
+    }
+  }
+  if (!run.pending.length) {
+    run.done = true;
+    run.finishedAt = new Date().toISOString();
+  }
+  await env.DATA.put(runKey, JSON.stringify(run), { expirationTtl: 60 * 86400 });
+  const { pending, ...summary } = run;
+  await env.DATA.put(REMIND_LAST_RUN, JSON.stringify({ ...summary, left: pending.length }));
+  return summary;
+}
+
+/** The admin's one-line view of reminders. */
+async function reminderStatus(env) {
+  const [list, off, lastRun] = await Promise.all([
+    getRemindIndex(env),
+    env.DATA.get(REMIND_OFF).catch(() => null),
+    env.DATA.get(REMIND_LAST_RUN, "json").catch(() => null),
+  ]);
+  return { on: !off, subscribers: list.length, next: nextReminderDay(), lastRun: lastRun || null };
+}
+
+/** "maruthi@gmail.com" as "ma•••@gmail.com". */
+function maskEmail(email) {
+  const [user, domain] = String(email || "").split("@");
+  return domain ? `${user.slice(0, 2)}•••@${domain}` : "";
+}
+
+/** A small page in the shop's style, for the unsubscribe link. */
+function reminderPage(title, body, status = 200) {
+  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${htmlEscape(title)} · YOLKO</title>
+<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}
+body{margin:0;background:#faf7f0;color:#171714;font:16px/1.5 "Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:440px;margin:0 auto;padding:48px 16px}
+.logo{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:18px;color:#171714;text-decoration:none}
+.logo i{width:10px;height:10px;border-radius:5px;background:#ffd32a}
+.card{margin-top:20px;background:#fffefb;border:1px solid #e5e0d5;border-radius:16px;padding:28px 24px}
+h1{margin:0;font-size:22px;line-height:28px;font-weight:700;letter-spacing:-.2px}
+p{margin:10px 0 0;color:#3d3b36}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:20px;padding:0 22px;border:0;border-radius:12px;background:#171714;color:#fffefb;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+</style></head><body><main><a class="logo" href="/"><i></i>YOLKO</a><div class="card"><h1>${htmlEscape(title)}</h1>${body}</div></main></body></html>`;
+  return new Response(html, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" },
+  });
+}
+
 /** Delivery events for order emails, from Zoho's webhooks, keyed by the send's request id. */
 const emailReqKey = (requestId) => `email:req:${requestId}`;
 const emailEventsKey = (orderId) => `email:events:${orderId}`;
@@ -1208,6 +1482,7 @@ async function emailStatus(env) {
     sending: { connected: emailConfigured(env), from: String(env.ORDER_EMAIL_FROM || "").trim() || null, host, replyTo: SHOP_EMAIL },
     inbox,
     deliveryLogs: { connected: Boolean(lastEventAt), lastEventAt: lastEventAt || null },
+    reminders: await reminderStatus(env).catch(() => null),
   };
 }
 
@@ -1657,6 +1932,55 @@ async function handleApi(request, env, url, ctx) {
   }
 
   // Public: check delivery suburb / postcode is within 45 km of Sydney Markets
+  // "Order again" in a reminder email: the customer's last order, to fill in the form.
+  if (url.pathname === "/api/reorder" && request.method === "GET") {
+    if (!(await allowRate(env, `reorder:${clientIp(request) || "unknown"}`, 30, 3600))) return json({ error: "rate" }, 429);
+    const found = await reminderByToken(env, url.searchParams.get("t"));
+    if (!found) return json({ error: "This link has expired" }, 404);
+    const { h, rec } = found;
+    const item = reminderItem(rec, await getSettings(env));
+    runLater(ctx, env.DATA.put(remindSubKey(h), JSON.stringify({ ...rec, clicks: (rec.clicks || 0) + 1, lastClickAt: new Date().toISOString() })));
+    return json(
+      {
+        ok: true,
+        name: rec.name || "",
+        phone: rec.phone || "",
+        bundle: item.bundle,
+        quantity: item.quantity,
+        deliveryStreet: rec.deliveryStreet || "",
+        deliverySuburb: rec.deliverySuburb || "",
+        deliveryCity: rec.deliveryCity || "Sydney",
+        deliveryPostcode: rec.deliveryPostcode || "",
+        subscribed: !rec.unsubscribedAt,
+      },
+      200,
+      { "Cache-Control": "no-store" }
+    );
+  }
+
+  // Unsubscribe link in reminder emails. GET asks and POST stops, because mail
+  // scanners open links (GET) before the customer does.
+  if (url.pathname === "/api/reminders/stop" && (request.method === "GET" || request.method === "POST")) {
+    const token = String(url.searchParams.get("t") || "");
+    const found = await reminderByToken(env, token);
+    if (!found) return reminderPage("This link has expired", "<p>Still getting reminders? Reply to one and we will stop them.</p>", 404);
+    const { h, rec } = found;
+    const done = reminderPage("You're unsubscribed", "<p>You won't get Thursday reminders any more. Changed your mind? Tick the reminder box next time you order.</p><a class=\"btn\" href=\"/\">Back to YOLKO</a>");
+    if (request.method === "GET") {
+      if (rec.unsubscribedAt) return done;
+      return reminderPage(
+        "Stop Thursday reminders?",
+        `<p>We'll stop emailing ${htmlEscape(maskEmail(rec.email))} before Saturday delivery.</p><form method="post" action="/api/reminders/stop?t=${token}"><button type="submit">Unsubscribe</button></form>`
+      );
+    }
+    if (!rec.unsubscribedAt) {
+      await env.DATA.put(remindSubKey(h), JSON.stringify({ ...rec, unsubscribedAt: new Date().toISOString() }));
+      const list = await getRemindIndex(env);
+      if (list.includes(h)) await setRemindIndex(env, list.filter((x) => x !== h));
+    }
+    return done;
+  }
+
   if (url.pathname === "/api/delivery-check" && request.method === "POST") {
     if (!isAllowedOrigin(request)) {
       return json({ error: "forbidden", code: "origin" }, 403);
@@ -1802,6 +2126,8 @@ async function handleApi(request, env, url, ctx) {
       existingOpen.subtotal = subtotal;
       existingOpen.price = subtotal + deliveryFee;
       existingOpen.updatedAt = new Date().toISOString();
+      if (body?.remind === true) existingOpen.remindOptIn = true;
+      else delete existingOpen.remindOptIn;
       // Keep pending so checkout can mint a fresh session after cancel.
       if (existingOpen.paymentStatus !== "paid") existingOpen.paymentStatus = existingOpen.paymentStatus || "new";
       if (existingOpen.status === "cancelled") existingOpen.status = "new";
@@ -1849,6 +2175,7 @@ async function handleApi(request, env, url, ctx) {
       colo: meta.colo,
       ua: meta.ua,
       visitorId: cleanVisitId(body?.visitorId),
+      ...(body?.remind === true ? { remindOptIn: true } : {}),
     };
     await env.DATA.put(id, JSON.stringify(order));
     await pushOrderIndex(env, id);
@@ -2063,6 +2390,10 @@ async function handleApi(request, env, url, ctx) {
       }
     }
 
+    // "Email me a reminder each Thursday" at checkout; signed up once the order is paid.
+    if (body?.remind === true) order.remindOptIn = true;
+    else delete order.remindOptIn;
+
     let result = await createCheckoutForOrder(env, order, settings, ctx);
     if (result.alreadyPaid) {
       // The reused order was paid in the meantime, so this is a new purchase.
@@ -2208,6 +2539,66 @@ async function handleApi(request, env, url, ctx) {
       stripe: { email: to },
     };
     const result = await sendOrderConfirmationEmail(env, sample, { test: true });
+    return json(result, result.ok ? 200 : 502);
+  }
+
+  // Admin: Thursday reminders, who is signed up and how the last run went
+  if (url.pathname === "/api/admin/reminders" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const list = await getRemindIndex(env);
+    const recs = (await Promise.all(list.slice(0, 300).map((h) => env.DATA.get(remindSubKey(h), "json").catch(() => null)))).filter(Boolean);
+    const people = recs.map((r) => ({
+      name: r.name || "",
+      email: r.email,
+      suburb: r.deliverySuburb || "",
+      since: r.optedInAt || null,
+      lastSentAt: r.lastSentAt || null,
+      clicks: r.clicks || 0,
+      lastError: r.lastError || null,
+    }));
+    return json({ ok: true, ...(await reminderStatus(env)), people });
+  }
+
+  // Admin: pause or resume Thursday reminders
+  if (url.pathname === "/api/admin/reminders" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => null);
+    if (typeof body?.on !== "boolean") return json({ error: "bad request" }, 400);
+    if (body.on) await env.DATA.delete(REMIND_OFF);
+    else await env.DATA.put(REMIND_OFF, new Date().toISOString());
+    return json({ ok: true, ...(await reminderStatus(env)) });
+  }
+
+  // Admin: send a sample reminder whose links work, for a made-up customer who is
+  // never in the Thursday list (one a minute)
+  if (url.pathname === "/api/admin/reminders/test" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const auth = await zohoAuth(env);
+    if (!auth) return json({ ok: false, error: "Connect Zoho Mail first" }, 503);
+    const body = await request.json().catch(() => null);
+    const to = String(body?.to || "").trim();
+    if (to.length > 254 || !EMAIL_RE.test(to)) return json({ ok: false, error: "Enter a valid email address" }, 400);
+    if (await env.DATA.get("remind:test:recent")) return json({ ok: false, error: "One test a minute. Try again shortly" }, 429);
+    await env.DATA.put("remind:test:recent", "1", { expirationTtl: 60 });
+    const prev = await env.DATA.get(remindSubKey("test"), "json").catch(() => null);
+    const token = prev?.token || randomHex(16);
+    const rec = {
+      name: "Test",
+      email: to,
+      phone: "0400000000",
+      bundle: "tray2",
+      quantity: 1,
+      deliveryStreet: "1 Example St",
+      deliverySuburb: "Strathfield",
+      deliveryCity: "Sydney",
+      deliveryPostcode: "2135",
+      token,
+    };
+    await env.DATA.put(remindSubKey("test"), JSON.stringify(rec));
+    if (!prev?.token) await env.DATA.put(remindTokKey(token), "test");
+    const c = sydneyClock();
+    const sat = saturdayFrom(c, ((6 - { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[c.weekday] + 7) % 7) || 7);
+    const result = await sendReminderEmail(env, auth, rec, await getSettings(env), sat, { test: true });
     return json(result, result.ok ? 200 : 502);
   }
 
@@ -3094,7 +3485,8 @@ async function handleApi(request, env, url, ctx) {
 }
 
 export default {
-  // Every cron tick: Meta stock sync + competitor price poll (diff → events/webhook).
+  // Every cron tick: Meta stock sync, competitor price poll (diff → events/webhook),
+  // the missed-payment safety net and, on Thursdays, reorder reminders.
   async scheduled(_event, env, ctx) {
     const settings = await getSettings(env);
     ctx.waitUntil(syncMetaAdsForStock(env, settings.traysAvailable));
@@ -3106,6 +3498,11 @@ export default {
     ctx.waitUntil(
       reconcileOrders(env).catch((err) => {
         console.log("order reconcile failed", String(err?.message || err));
+      })
+    );
+    ctx.waitUntil(
+      runReminders(env).catch((err) => {
+        console.log("reminders failed", String(err?.message || err));
       })
     );
   },
@@ -3138,7 +3535,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "115",
+          "X-Yolko-Admin": "116",
         },
       });
     }

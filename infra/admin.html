@@ -355,7 +355,7 @@ button.kpi:active { transform:scale(.99); }
 .scrim.on { opacity:1; pointer-events:auto; }
 
 /* ---------- emails ---------- */
-.zstrip { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); margin-bottom:16px; overflow:hidden; }
+.zstrip { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); margin-bottom:16px; overflow:hidden; }
 .zcell { display:flex; gap:12px; padding:16px 18px; border-left:1px solid var(--line); min-width:0; }
 .zcell:first-child { border-left:0; }
 .zic { width:32px; height:32px; border-radius:50%; flex:none; display:grid; place-items:center; background:var(--subtle); color:var(--muted); }
@@ -416,6 +416,12 @@ button.kpi:active { transform:scale(.99); }
 .zline > .i { color:var(--muted); }
 .zstack .zcell { border-left:0; border-top:1px solid var(--line); padding:14px 0; }
 .zstack .zcell:first-child { border-top:0; padding-top:4px; }
+.rlist { margin-top:12px; border-top:1px solid var(--line); }
+.rrow { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+.rrow .min0 { flex:1; }
+.rrow b { display:block; font-weight:600; }
+.rrow p { margin:2px 0 0; color:var(--muted); font-size:13px; line-height:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rrow .minor { flex:none; margin:0; }
 
 /* ---------- delivery run ---------- */
 .run { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:16px; align-items:start; }
@@ -2465,7 +2471,74 @@ function zohoCells() {
       : m.clientReady
         ? zcell("inbox", "", "Mailbox", "Not connected", "Read and answer orders@getyolko.com here", '<button type="button" class="more" data-action="zoho-connect">Connect Zoho Mail ' + ic("chevron", 12) + "</button>")
         : zcell("inbox", "", "Mailbox", "Not set up", "Needs the Zoho client on the Worker", more("inbox")),
+    reminderCell(),
   ];
+}
+/* Thursday reorder reminders: customers who ticked the box at checkout. */
+function reminderRunLine(last) {
+  if (!last) return "";
+  const bits = [plural(last.sent || 0, "email") + " sent"];
+  if (last.skipped) bits.push(last.skipped + " skipped");
+  if (last.failed) bits.push(last.failed + " failed");
+  if (last.left) bits.push(last.left + " to go");
+  return "Sat " + last.label + ": " + bits.join(", ");
+}
+function reminderCell() {
+  const st = EMAIL_STATUS;
+  if (!st) return zcell("bell", "", "Thursday reminders", "Checking", "Reorder emails");
+  const r = st.reminders;
+  if (!r) return zcell("bell", "bad", "Thursday reminders", "Unavailable", "Could not read the list");
+  const who = r.subscribers ? plural(r.subscribers, "customer") + " signed up" : "No one yet";
+  const sub = !r.on ? "Paused" : !(st.inbox && st.inbox.connected) ? "Needs the mailbox connected" : r.lastRun ? reminderRunLine(r.lastRun) : "Next " + r.next + ", 10am";
+  return zcell("bell", r.on && r.subscribers ? "ok" : "", "Thursday reminders", who, sub, '<button type="button" class="more" data-action="reminders">Manage ' + ic("chevron", 12) + "</button>");
+}
+async function openReminders() {
+  closeModal(null);
+  const r = await api("/api/admin/reminders");
+  if (!r.ok) { toast("Could not load reminders: " + (r.data.error || "try again")); return; }
+  const d = r.data;
+  if (EMAIL_STATUS) EMAIL_STATUS.reminders = { on: d.on, subscribers: d.subscribers, next: d.next, lastRun: d.lastRun };
+  const people = d.people || [];
+  const status = !d.on ? "Paused. Nobody gets a reminder until you resume." : "Next send " + d.next + " at 10am." + (d.lastRun ? " Last run " + reminderRunLine(d.lastRun) + "." : "");
+  const list = people.length
+    ? '<div class="rlist">' + people.map(function (p) {
+        const when = p.lastError ? "Last send failed" : p.lastSentAt ? "Sent " + rel(p.lastSentAt) : "Not sent yet";
+        return '<div class="rrow"><div class="min0"><b>' + esc(p.name || p.email) + "</b><p>" + esc([p.suburb, p.email].filter(Boolean).join(" · ")) + '</p></div><span class="minor">' + esc(when) + "</span></div>";
+      }).join("") + "</div>"
+    : '<p class="minor">No one has signed up yet. The box sits just above Buy now.</p>';
+  const v = await openModal({
+    title: "Thursday reminders",
+    html: "<p>Customers who tick “Email me a reminder each Thursday” get one email at 10am every Thursday from orders@getyolko.com. Its Order again button fills in their last order, and every email has an unsubscribe link. Nobody gets one in a sold-out week, or when they have already ordered for that Saturday.</p>" +
+      '<p class="minor">' + esc(status) + "</p>" + list,
+    actions: [{ label: d.on ? "Pause" : "Resume", kind: "ghost", value: "toggle" }, { label: "Send me a sample", kind: "primary", value: "test" }],
+  });
+  if (v === "toggle") setReminders(!d.on, true);
+  if (v === "test") testReminder();
+}
+async function setReminders(on, undoable) {
+  const r = await api("/api/admin/reminders", { method: "POST", body: { on: on } });
+  if (!r.ok) { toast("Not saved: " + (r.data.error || "try again")); return; }
+  if (EMAIL_STATUS) EMAIL_STATUS.reminders = { on: r.data.on, subscribers: r.data.subscribers, next: r.data.next, lastRun: r.data.lastRun };
+  if (S.view === "emails") renderEmailStatus();
+  toast(on ? "Thursday reminders are on" : "Thursday reminders paused", undoable ? { label: "Undo", run: function () { setReminders(!on, false); } } : undefined);
+}
+async function testReminder() {
+  let last = "";
+  try { last = localStorage.getItem("yolko_test_email") || ""; } catch (e) {}
+  return openModal({
+    title: "Send a sample reminder",
+    html: "<p>We’ll send this week’s Thursday reminder from orders@getyolko.com, marked [Test]. Its Order again button fills in a made-up order, so you can try the whole thing.</p><label class=\"field\"><span>Send it to</span><input class=\"inp\" id=\"test-to\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" value=\"" + esc(last) + "\" placeholder=\"you@example.com\"></label>",
+    actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Send sample", kind: "primary", value: true }],
+    validate: function (w) { const v = w.querySelector("#test-to").value.trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Enter an email address"; },
+    collect: function (w) { return w.querySelector("#test-to").value.trim(); },
+    submit: async function (v) {
+      try { localStorage.setItem("yolko_test_email", v); } catch (e) {}
+      const r = await api("/api/admin/reminders/test", { method: "POST", body: { to: v } });
+      if (!r.ok) return "Not sent: " + (r.data.error || "Zoho said no");
+      toast("Sample sent. Check " + v);
+      return "";
+    },
+  });
 }
 function renderEmailStatus() {
   const st = EMAIL_STATUS;
@@ -3240,6 +3313,7 @@ const ACTIONS = {
   "zoho-sheet": zohoSheet,
   "zoho-help": function (t) { zohoHelp(t.getAttribute("data-which")); },
   "test-email": testEmail,
+  reminders: openReminders,
   "logout": function () { try { localStorage.removeItem("yolko_admin_key"); } catch (e) {} location.replace("/admin"); },
   "save": saveSettings,
   "discard": discardSettings,

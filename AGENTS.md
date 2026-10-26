@@ -85,6 +85,16 @@ Delivery status (delivered, opened, clicked, bounced, spam) comes from the Zoho 
 credentials, so there is no token: an event only counts when its request id matches an
 `email:req:<requestId>` key written when the Worker sent that email.
 
+Thursday reorder reminders: the order form's "Email me a reminder each Thursday" box sends
+`remind: true`; the order carries `remindOptIn`, and `markOrderPaid` signs the Stripe email up
+(`remind:sub:<sha256(email) prefix>`, list in `remind:index`, link token in `remind:tok:<token>`).
+The cron sends from Thursday 10am to Friday 10am Sydney time, 4 per tick, through the Zoho Mail
+mailbox (never the CPaaS order sender, which forbids marketing). It skips sold-out weeks, people
+who already ordered for that Saturday, and everything while `remind:off` is set (admin Pause).
+"Order again" links to `/#reorder=<token>`: `index.html` lifts the token out of the URL before the
+visit log or Meta pixel can read it, and `app.js` fills the form from `GET /api/reorder?t=`.
+Unsubscribe is `/api/reminders/stop?t=` (GET asks, POST stops, so mail scanners can't unsubscribe).
+
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
 under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system, 16px inputs on

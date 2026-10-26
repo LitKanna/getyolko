@@ -4,6 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="format-detection" content="telephone=no">
+  <!-- "Order again" in a reminder email carries a private token in the hash. Take it out
+       of the address bar before the visit log or the pixel can read the URL. -->
+  <script>
+  (function () {
+    var m = /^#reorder=([a-f0-9]{32})$/.exec(location.hash);
+    if (!m) return;
+    window.YOLKO_REORDER = m[1];
+    history.replaceState(null, "", location.pathname + location.search);
+  })();
+  </script>
   <!-- Live browser chrome size (iOS Safari URL bar, Chrome mobile, desktop). Runs before CSS paint. -->
   <script>
   (function () {
@@ -79,7 +89,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=146">
+  <link rel="stylesheet" href="styles-modern.css?v=147">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -795,6 +805,11 @@
             <p class="field-error" id="phone-error" hidden>Enter a valid Australian mobile, e.g. 0412 345 678</p>
           </div>
 
+          <label class="remind-opt">
+            <input type="checkbox" id="remind" name="remind" value="1">
+            <span>Email me a reminder each Thursday</span>
+          </label>
+
           <div class="cta-row">
             <button type="submit" class="btn btn-solid" id="buynow-btn">
               <span id="buynow-label">Buy now</span>
@@ -979,6 +994,6 @@
   </footer>
 
   <script src="config.js?v=89"></script>
-  <script src="app.js?v=146"></script>
+  <script src="app.js?v=147"></script>
 </body>
 </html>

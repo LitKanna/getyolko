@@ -53,6 +53,7 @@ function bookingFingerprint(b) {
     b.deliveryPostcode || "",
     b.deliverySuburb || "",
     b.pickupDay,
+    b.remind ? "remind" : "",
   ].join("|");
 }
 
@@ -947,7 +948,7 @@ function applyPickup(pickup) {
 }
 
 syncFulfillmentUI();
-fetch(`${API_BASE}/api/settings`)
+const settingsReady = fetch(`${API_BASE}/api/settings`)
   .then((r) => (r.ok ? r.json() : null))
   .then((s) => { if (s) applySettings(s); })
   .catch(() => { syncFulfillmentUI(); });
@@ -1073,6 +1074,7 @@ function collectBooking() {
     quantity,
     total: bundle.price * quantity + deliveryFee,
     orderLabel: describeOrder(bundleKey, quantity),
+    remind: data.get("remind") === "1",
     company: String(data.get("yolko_hp") || data.get("company") || "").trim(),
   };
 }
@@ -1098,6 +1100,7 @@ function createOrder(b) {
           deliveryAddress: b.deliveryAddress || "",
           yolko_hp: b.company || "",
           company: b.company || "",
+          remind: !!b.remind,
           token: token || "",
           visitorId: window.YOLKO_VISITOR_ID || "",
         }),
@@ -1250,6 +1253,7 @@ async function buyNowCheckout(b) {
       deliveryPostcode: b.deliveryPostcode || "",
       deliveryAddress: b.deliveryAddress || "",
       yolko_hp: b.company || "",
+      remind: !!b.remind,
       token,
     }),
   });
@@ -1413,6 +1417,44 @@ againButton.addEventListener("click", () => {
   orderSection.hidden = false;
   orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
 });
+
+/* ---------- "Order again" from a Thursday reminder email ---------- */
+// <head> lifted the token out of the URL. Fill the form once live settings are in,
+// so the stock and dozen-pack rules don't undo the customer's last order.
+function applyReorder(d) {
+  const bundleInput = form.querySelector(`input[name="bundle"][value="${d.bundle}"]`);
+  if (bundleInput && !bundleInput.closest("[hidden]")) {
+    bundleInput.checked = true;
+    bundleInput.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  setQuantity(Number(d.quantity) || 1);
+  const fill = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+  };
+  fill("delivery-street", d.deliveryStreet);
+  fill("delivery-suburb", d.deliverySuburb);
+  fill("delivery-city", d.deliveryCity);
+  fill("delivery-postcode", d.deliveryPostcode);
+  fill("name", d.name);
+  fill("phone", isValidAuMobile(d.phone) ? formatAuMobile(d.phone) : "");
+  const remind = document.getElementById("remind");
+  if (remind && d.subscribed) remind.checked = true;
+  refreshDeliveryZoneHint();
+  refreshSubmitPrice();
+  orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  showToast("Your last order is filled in. Check it, then tap Buy now.");
+}
+
+if (window.YOLKO_REORDER) {
+  const reorder = fetch(`${API_BASE}/api/reorder?t=${window.YOLKO_REORDER}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+  Promise.all([reorder, settingsReady]).then(([d]) => {
+    if (d && d.ok) applyReorder(d);
+    else showToast("That reorder link has expired. Pick your eggs below.");
+  });
+}
 
 /* Re-measure after fonts/layout settle (iOS Safari chrome can shift post-load). */
 if (typeof window.__yolkoFitViewport === "function") {
