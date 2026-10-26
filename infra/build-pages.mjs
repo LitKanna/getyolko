@@ -217,7 +217,7 @@ const BUSINESS = {
     availableLanguage: ["en"],
   },
   openingHoursSpecification: [
-    { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "07:00", closes: "12:00" },
+    { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "06:00", closes: "12:00" },
   ],
   hasMerchantReturnPolicy: { "@id": `${SITE}/#returns` },
   hasOfferCatalog: {
@@ -595,7 +595,7 @@ function suburbPage(s) {
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], [s.name, path]];
   const faqs = [
     [`Do you deliver eggs to ${s.name}?`, `Yes. ${s.name} ${s.postcode} is inside our Saturday delivery area, and so are ${s.nearby[0]} and ${s.nearby[1]}. Checkout confirms your address.`],
-    ["When will my eggs arrive?", "Saturday morning. Order by Friday night."],
+    ["When will my eggs arrive?", "Saturday, 6am to 12pm. Order by Friday night."],
     ["How much does it cost?", PRICE_FAQ],
     s.faq,
     ["What eggs are they?", EGGS_FAQ],
@@ -660,7 +660,7 @@ function sydneyPage() {
   const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery within 45 km. Order online with YOLKO.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", path]];
   const faqs = [
-    ["When is egg delivery in Sydney?", "Saturday morning. Order by Friday night."],
+    ["When is egg delivery in Sydney?", "Saturday, 6am to 12pm. Order by Friday night."],
     ["How far do you deliver?", `About 45&nbsp;km by road. That covers most of Sydney: the inner west, Parramatta, Ryde, Bankstown, Liverpool, Hornsby, Chatswood and Hurstville. Search <a href="/egg-delivery-areas">every suburb we cover</a>, and checkout confirms your address.`],
     ["How much are the eggs and delivery?", PRICE_FAQ],
     ["How do I order?", `Use the <a href="/#order">order form</a> and pay by card. We deliver the next Saturday morning.`],
@@ -722,7 +722,7 @@ function bulkPage() {
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>.`],
     ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers order full boxes for Saturday delivery, and many set up a weekly standing order."],
     ["Which eggs are in the box?", "Pace Farm XL cage eggs, 30 to a 1.75&nbsp;kg tray, six trays to a box."],
-    ["When is bulk delivery?", "Saturday morning, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big quantities."],
+    ["When is bulk delivery?", "Saturday, 6am to 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big quantities."],
     ["How should I store 180 eggs?", "In the fridge, in their trays, stacked flat. Use them by the best-before date on the pack."],
   ];
   const graph = [webPage(path, "Bulk eggs in Sydney", description), breadcrumbs(path, trail), PRODUCT_BOX, RETURNS, faqPage(path, faqs), BUSINESS_REF];
@@ -786,7 +786,7 @@ function areasPage(existingHtml) {
     ["Is my suburb covered?", "If it is on this page, yes. Checkout confirms your exact street and postcode before you pay."],
     ["My suburb is not on the list. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
     ["Does delivery cost more further out?", `No. It is a flat <strong>$${PRICE.delivery}</strong> anywhere in the delivery area.`],
-    ["When do you deliver?", "Saturday morning. Order by Friday night."],
+    ["When do you deliver?", "Saturday, 6am to 12pm. Order by Friday night."],
   ];
   const service = {
     "@type": "Service",
@@ -902,7 +902,7 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES, ["Bulk eggs", "/
 /* ---------- Homepage: structured data and FAQ only ---------- */
 
 const HOME_FAQ = [
-  ["When do you deliver?", `Saturday morning. Order by Friday night. Delivery is a flat $${PRICE.delivery} within 45&nbsp;km.`],
+  ["When do you deliver?", `Saturday, 6am to 12pm. Order by Friday night. Delivery is a flat $${PRICE.delivery} within 45&nbsp;km.`],
   ["Which suburbs do you cover?", `Most of Sydney within 45&nbsp;km of Flemington, from Parramatta and Liverpool to Hornsby, Chatswood and Hurstville. <a href="/egg-delivery-areas">Search every suburb</a>. Checkout confirms your address.`],
   ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a 30-egg tray (about 43¢ an egg), <strong>$${PRICE.tray2}</strong> for two, <strong>$${PRICE.box}</strong> for a 180-egg box. Delivery is a flat $${PRICE.delivery}.`],
   ["How do I pay?", "By card when you order. Checkout is handled by Stripe."],
