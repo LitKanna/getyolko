@@ -993,26 +993,23 @@ if (paidSession && paidSession.startsWith("cs_")) {
     .then((d) => {
       if (d && d.paid) {
         clearReferral();
-        if (d.share && d.share.link) showShareSheet(d.share.link);
-        else showToast("Payment received. Your eggs are booked for Saturday delivery.");
+        showShareSheet(d.share && d.share.link);
         trackMetaPurchase(d.purchase);
       }
     })
     .catch(() => {});
 }
 
-function showToast(text) {
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  toast.setAttribute("role", "status");
-  toast.textContent = text;
-  document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add("show"));
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 400);
-  }, 6000);
+/** Form problems and reorder notes go in a line above Buy now: the shop has no pop-ups. */
+const formMsg = document.getElementById("form-msg");
+function showFormMessage(text, isError = true) {
+  formMsg.textContent = text;
+  formMsg.classList.toggle("info", !isError);
+  formMsg.hidden = false;
 }
+form.addEventListener("input", () => {
+  formMsg.hidden = true;
+});
 
 // Validate the form and collect the booking; returns null after flagging errors
 function collectBooking() {
@@ -1042,17 +1039,17 @@ function collectBooking() {
   if (fulfillment === "delivery") {
     if (deliveryStreet.length < 3) {
       flagInvalid(document.getElementById("delivery-street"));
-      showToast("Add a street address for delivery.");
+      showFormMessage("Add a street address for delivery.");
       return null;
     }
     if (!deliverySuburb) {
       flagInvalid(document.getElementById("delivery-suburb"));
-      showToast("Add your suburb for delivery.");
+      showFormMessage("Add your suburb for delivery.");
       return null;
     }
     if (!/^2\d{3}$/.test(deliveryPostcode)) {
       flagInvalid(document.getElementById("delivery-postcode"));
-      showToast("Enter a valid NSW postcode.");
+      showFormMessage("Enter a valid NSW postcode.");
       return null;
     }
   }
@@ -1338,7 +1335,6 @@ function showConfirmation(b) {
     const result = await openCheckout(lastOrderId);
     if (!result.ok) {
       stripeLink.textContent = isDelivery ? "Payment unavailable, pay on delivery" : "Payment unavailable, pay on pickup";
-      showToast(result.error || "Couldn’t open payment. Try Buy now again.");
     }
   };
 
@@ -1365,7 +1361,8 @@ async function startBuyNow() {
     buynowBtn.disabled = false;
     buynowBtn.removeAttribute("aria-busy");
     buynowLabel.textContent = "Buy now";
-    showToast(msg || "Couldn’t open payment. Try again.");
+    showFormMessage(msg || "Couldn’t open payment. Try again.");
+    formMsg.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
   };
 
   try {
@@ -1451,7 +1448,7 @@ function applyReorder(d) {
   refreshDeliveryZoneHint();
   refreshSubmitPrice();
   orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-  showToast("Your last order is filled in. Check it, then tap Buy now.");
+  showFormMessage("Your last order is filled in. Check it, then tap Buy now.", false);
 }
 
 if (window.YOLKO_REORDER) {
@@ -1460,7 +1457,7 @@ if (window.YOLKO_REORDER) {
     .catch(() => null);
   Promise.all([reorder, settingsReady]).then(([d]) => {
     if (d && d.ok) applyReorder(d);
-    else showToast("That reorder link has expired. Pick your eggs below.");
+    else showFormMessage("That reorder link has expired. Pick your eggs below.", false);
   });
 }
 
@@ -1521,14 +1518,13 @@ function clearReferral() {
         /* private mode: still good for this visit */
       }
       showReferral(r);
-      showToast(`${r.name || "A friend"} sent you free delivery on your first order.`);
     })
     .catch(() => saved && showReferral(saved));
 })();
 
-/** After paying: the customer's own link, to pass the free delivery on. */
+/** After paying: the customer's own link, to pass the free delivery on (when they have one). */
 function showShareSheet(link) {
-  const short = link.replace(/^https:\/\//, "");
+  const short = link ? link.replace(/^https:\/\//, "") : "";
   const text = "Fresh eggs delivered on Saturday. Your first delivery is free with my link:";
   const sheet = document.createElement("div");
   sheet.className = "share-sheet";
@@ -1536,15 +1532,18 @@ function showShareSheet(link) {
     <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" tabindex="-1">
       <button type="button" class="share-close" aria-label="Close">&times;</button>
       <p class="share-kicker">Payment received</p>
-      <h2 id="share-title">Your eggs are booked for Saturday</h2>
+      <h2 id="share-title">Your eggs are booked for Saturday</h2>${
+        link
+          ? `
       <p>Know someone nearby who buys eggs? Send them your link. Their first delivery is free, and so is your next one.</p>
       <p class="share-link"></p>
       <div class="share-actions">
         <button type="button" class="btn btn-ink" data-share>Share link</button>
         <button type="button" class="btn btn-ghost" data-copy>Copy</button>
-      </div>
+      </div>`
+          : ""
+      }
     </div>`;
-  sheet.querySelector(".share-link").textContent = short;
   const close = () => {
     sheet.remove();
     document.removeEventListener("keydown", onKey);
@@ -1552,22 +1551,33 @@ function showShareSheet(link) {
   const onKey = (e) => {
     if (e.key === "Escape") close();
   };
-  const copy = () =>
-    navigator.clipboard.writeText(link).then(
-      () => showToast("Link copied. Paste it in a message to a neighbour."),
-      () => showToast(`Your link: ${short}`)
-    );
   sheet.addEventListener("click", (e) => {
     if (e.target === sheet || e.target.closest(".share-close")) close();
   });
-  sheet.querySelector("[data-copy]").addEventListener("click", copy);
-  const shareBtn = sheet.querySelector("[data-share]");
-  if (navigator.share) {
-    shareBtn.addEventListener("click", () => navigator.share({ title: "YOLKO eggs", text, url: link }).catch(() => {}));
-  } else {
-    shareBtn.textContent = "Copy link";
-    sheet.querySelector("[data-copy]").remove();
-    shareBtn.addEventListener("click", copy);
+  if (link) {
+    const linkEl = sheet.querySelector(".share-link");
+    linkEl.textContent = short;
+    // "Copied" shows on the button itself; if copying is blocked, the link is selected instead.
+    const copy = (e) => {
+      const btn = e.currentTarget;
+      const label = btn.textContent;
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+        () => {
+          btn.textContent = "Copied";
+          setTimeout(() => (btn.textContent = label), 2000);
+        },
+        () => getSelection().selectAllChildren(linkEl)
+      );
+    };
+    sheet.querySelector("[data-copy]").addEventListener("click", copy);
+    const shareBtn = sheet.querySelector("[data-share]");
+    if (navigator.share) {
+      shareBtn.addEventListener("click", () => navigator.share({ title: "YOLKO eggs", text, url: link }).catch(() => {}));
+    } else {
+      shareBtn.textContent = "Copy link";
+      sheet.querySelector("[data-copy]").remove();
+      shareBtn.addEventListener("click", copy);
+    }
   }
   document.addEventListener("keydown", onKey);
   document.body.appendChild(sheet);

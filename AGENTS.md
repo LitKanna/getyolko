@@ -104,6 +104,10 @@ made on the paid screen (`/api/confirm-payment` returns `share`) and in reminder
 a first order, or an earned credit (`ref:cust:<phone>`). `noteReferralOrder` (on paid) counts the
 order, uses a credit, and gives one credit to the friend and to everyone who paid for delivery to a
 shared building. A cron backfill (`ref:backfill`) counts orders paid before this existed.
+Box cards: Admin > Delivery run > "Print box cards" calls `POST /api/admin/ref-cards {ids}`, which
+makes a share code for each customer still to deliver and returns a QR code as SVG (built in the
+Worker with the `qrcode-generator` package) for `/r/<CODE>?m=card`. The admin prints four A6 cards
+per A4 sheet with print CSS; the `?m=card` tag shows card scans as `utm_medium=card`.
 
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
