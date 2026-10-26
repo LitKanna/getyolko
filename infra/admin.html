@@ -1522,6 +1522,8 @@ function statusFooter(o) {
   if (o.status === "done") return b("confirmed", "Undo delivered", "ghost", "undo");
   return b("new", "Reopen order", "ghost", "undo");
 }
+// Why an order's delivery was free (see the referral rules in the Worker).
+const FREE_DELIVERY_WHY = { friend: "Free, friend's link", building: "Free, same building", credit: "Free, earned" };
 function detailHtml(o) {
   const sig = orderSignals(o);
   const isDelivery = o.fulfillment === "delivery";
@@ -1533,6 +1535,7 @@ function detailHtml(o) {
   else chips.push(chip("plain", "Not paid"));
   chips.push({ new: chip("waiting dot", "Waiting"), confirmed: chip("confirmed dot", "Confirmed"), done: chip("delivered", "Delivered"), cancelled: chip("cancelled", "Cancelled") }[o.status] || "");
   if (sig.suspicious) chips.push(chip("warn", "Check this order"));
+  if (o.refFrom) chips.push(chip("plain", o.refBy ? "Sent by " + o.refBy : "Friend's link"));
   const addr = isDelivery ? addressLine(o) : "";
   const phone = fmtPhone(o.phone);
   const email = orderEmail(o);
@@ -1543,7 +1546,7 @@ function detailHtml(o) {
       (sig.suspicious ? '<div class="alert">' + ic("alert", 16) + "<div><b>Worth a second look.</b> " + esc(sig.tags.join(". ")) + ".</div></div>" : "") +
       '<section class="sec"><h3>Order</h3>' +
         '<div class="ln"><span>' + esc(itemLine(o)) + '</span><span class="num">' + esc(money(subtotal)) + "</span></div>" +
-        (isDelivery ? '<div class="ln"><span>Delivery' + (o.deliveryKm ? " · " + esc(o.deliveryKm) + " km" : "") + '</span><span class="num">' + (Number(o.deliveryFee) > 0 ? esc(money(o.deliveryFee)) : "Free") + "</span></div>" : "") +
+        (isDelivery ? '<div class="ln"><span>Delivery' + (o.deliveryKm ? " · " + esc(o.deliveryKm) + " km" : "") + '</span><span class="num">' + (Number(o.deliveryFee) > 0 ? esc(money(o.deliveryFee)) : esc(FREE_DELIVERY_WHY[o.deliveryPerk] || "Free")) + "</span></div>" : "") +
         '<div class="ln total"><span>' + (o.paymentStatus === "paid" || isRefunded(o) ? "Total paid" : "Total to pay") + '</span><span class="num">' + esc(money(amountOf(o))) + "</span></div>" +
         (isRefunded(o) ? '<div class="ln red"><span>Refunded</span><span class="num">-' + esc(money(o.stripe && o.stripe.refundAmount != null ? o.stripe.refundAmount : amountOf(o))) + "</span></div>" : "") +
       "</section>" +

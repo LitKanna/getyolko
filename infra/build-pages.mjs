@@ -23,7 +23,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "147";
+const CSS_V = "148";
 const FONTS_V = "77";
 const IMG_V = "112";
 
@@ -906,6 +906,7 @@ const HOME_FAQ = [
   ["Which suburbs do you cover?", `Most of Sydney within 45&nbsp;km of Flemington, from Parramatta and Liverpool to Hornsby, Chatswood and Hurstville. <a href="/egg-delivery-areas">Search every suburb</a>. Checkout confirms your address.`],
   ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a 30-egg tray (about 43¢ an egg), <strong>$${PRICE.tray2}</strong> for two, <strong>$${PRICE.box}</strong> for a 180-egg box. Delivery is a flat $${PRICE.delivery}.`],
   ["How do I pay?", "By card when you order. Checkout is handled by Stripe."],
+  ["Can delivery be free?", "Yes. After you pay you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, the later orders ship free and the first gets free delivery next time."],
   ["What eggs are they?", EGGS_FAQ],
   ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés can <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us</a> for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk eggs</a>.`],
 ];

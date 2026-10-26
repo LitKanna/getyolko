@@ -89,7 +89,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=147">
+  <link rel="stylesheet" href="styles-modern.css?v=148">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -526,6 +526,14 @@
           },
           {
             "@type": "Question",
+            "name": "Can delivery be free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. After you pay you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, the later orders ship free and the first gets free delivery next time."
+            }
+          },
+          {
+            "@type": "Question",
             "name": "What eggs are they?",
             "acceptedAnswer": {
               "@type": "Answer",
@@ -805,6 +813,8 @@
             <p class="field-error" id="phone-error" hidden>Enter a valid Australian mobile, e.g. 0412 345 678</p>
           </div>
 
+          <p class="ref-note" id="ref-note" role="status" hidden></p>
+
           <label class="remind-opt">
             <input type="checkbox" id="remind" name="remind" value="1">
             <span>Email me a reminder each Thursday</span>
@@ -926,6 +936,10 @@
             <p>By card when you order. Checkout is handled by Stripe.</p>
           </details>
           <details>
+            <summary>Can delivery be free?</summary>
+            <p>Yes. After you pay you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, the later orders ship free and the first gets free delivery next time.</p>
+          </details>
+          <details>
             <summary>What eggs are they?</summary>
             <p id="faq-eggs">Pace Farm extra-large cage eggs, 30 to a 1.75&nbsp;kg tray. The same supermarket brand, for less.</p>
           </details>
@@ -994,6 +1008,6 @@
   </footer>
 
   <script src="config.js?v=89"></script>
-  <script src="app.js?v=147"></script>
+  <script src="app.js?v=148"></script>
 </body>
 </html>

@@ -534,6 +534,18 @@ body.local .hero > .hero-grid {
   font-weight: 700;
 }
 
+/* "A friend sent you free delivery" from a share link */
+.ref-note {
+  width: fit-content;
+  margin: -8px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ink);
+  background: var(--canvas);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 /* Delivery areas (SEO + clarity) */
 .areas {
   padding: var(--section-pad) 0;
@@ -1929,4 +1941,159 @@ body.local .hero-grid {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
+}
+
+/* Short messages ("Link copied", form hints), above the phone's bottom bar */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 1000;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: var(--paper);
+  background: var(--ink);
+  box-shadow: 0 8px 24px rgba(23, 23, 20, 0.18);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 200ms ease, transform 200ms var(--ease);
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+body:has(.mobile-cta.show) .toast {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 84px);
+}
+
+/* After paying: pass free delivery on with your share link */
+.share-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: end center;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  background: rgba(23, 23, 20, 0.42);
+  animation: share-fade 200ms ease;
+}
+
+.share-card {
+  position: relative;
+  width: min(440px, 100%);
+  padding: 28px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 16px 40px rgba(23, 23, 20, 0.2);
+  animation: share-up 260ms var(--ease);
+}
+
+.share-card:focus {
+  outline: none;
+}
+
+.share-card h2 {
+  margin: 4px 48px 0 0;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.share-card p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.share-card .share-kicker {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.share-card .share-link {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--canvas);
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.share-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.share-actions .btn {
+  flex: 1;
+}
+
+.btn-ink {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.btn-ink:hover {
+  background: #000;
+}
+
+.share-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.share-close:hover {
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+@media (min-width: 640px) {
+  .share-sheet {
+    place-items: center;
+  }
+}
+
+@keyframes share-fade {
+  from { opacity: 0; }
+}
+
+@keyframes share-up {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .share-sheet,
+  .share-card {
+    transition: none;
+    animation: none;
+  }
 }
