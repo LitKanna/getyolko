@@ -4,7 +4,7 @@ import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-
 import ADMIN_HTML from "./admin.html";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "e2bceff5239a7c421f68e8864522a3eda91a4ebd";
+const DEPLOY_SHA = "1350b07afeacc16b6efa6bc3e422d4c567d86713";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -3850,7 +3850,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "197",
+      "X-Yolko-Build": "198",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
