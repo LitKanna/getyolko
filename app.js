@@ -495,7 +495,7 @@ function syncFulfillmentUI() {
     daySeg.innerHTML = `<label class="seg-opt">
       <input type="radio" name="pickupDayDisplay" value="Saturday" checked disabled>
       <span class="seg-day">Saturday ${satDate}</span>
-      <span class="seg-hours">Morning</span>
+      <span class="seg-hours">6am to 12pm</span>
     </label>`;
   }
 
