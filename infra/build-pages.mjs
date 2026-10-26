@@ -142,6 +142,8 @@ function product({ id, sku, name, description, price, maxQty }) {
     availability: "https://schema.org/InStock",
     itemCondition: "https://schema.org/NewCondition",
     url: `${SITE}/#order`,
+    // Google's merchant listings report asks for both ends of the price window.
+    validFrom: "2026-07-01",
     priceValidUntil: "2027-06-30",
     seller: { "@id": `${SITE}/#business` },
     shippingDetails: SHIPPING,
