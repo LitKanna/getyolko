@@ -269,6 +269,8 @@ button.kpi:active { transform:scale(.99); }
 /* ---------- list + detail split ---------- */
 .view.fill { display:flex; flex-direction:column; height:calc(100vh - 52px); height:calc(100dvh - 52px); min-height:560px; }
 .view.fill .split { flex:1; min-height:0; }
+/* Fill views fit the window exactly, so the page itself never scrolls under the panes. */
+@media (min-width:900px) { .main:has(> .view.fill:not([hidden])) { padding-bottom:24px; } }
 .split { display:grid; gap:16px; align-items:stretch; }
 .split.orders { grid-template-columns:minmax(0,1fr) 430px; }
 .split.emails { grid-template-columns:400px minmax(0,1fr); }
@@ -355,9 +357,8 @@ button.kpi:active { transform:scale(.99); }
 .scrim.on { opacity:1; pointer-events:auto; }
 
 /* ---------- emails ---------- */
-.zstrip { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); margin-bottom:16px; overflow:hidden; }
-.zcell { display:flex; gap:12px; padding:16px 18px; border-left:1px solid var(--line); min-width:0; }
-.zcell:first-child { border-left:0; }
+/* The Zoho status lives in the Settings sheet, so the list and the open email get the whole screen. */
+.zcell { display:flex; gap:12px; min-width:0; }
 .zic { width:32px; height:32px; border-radius:50%; flex:none; display:grid; place-items:center; background:var(--subtle); color:var(--muted); }
 .zic.ok { background:var(--green-soft); color:var(--green); }
 .zic.bad { background:var(--red-soft); color:var(--red); }
@@ -367,14 +368,20 @@ button.kpi:active { transform:scale(.99); }
 .zcell p { margin:2px 0 0; color:var(--muted); font-size:13px; line-height:18px; overflow:hidden; text-overflow:ellipsis; }
 .zcell .more { display:inline-flex; align-items:center; gap:4px; margin-top:2px; font-size:12px; font-weight:600; color:var(--ink); }
 .zcell .more:hover { text-decoration:underline; text-underline-offset:3px; }
-.ep-head { padding:16px 20px; border-bottom:1px solid var(--line); }
+.sub-issue { display:inline-flex; align-items:center; gap:6px; font-weight:600; color:var(--amber); text-align:left; }
+.sub-issue.bad { color:var(--red); }
+.sub-issue .i { width:14px; height:14px; }
+.sub-issue:hover { text-decoration:underline; text-underline-offset:3px; }
+/* One scroll for the open email: its header scrolls away with the message, like Mail. */
+.ep-scroll { flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto; scrollbar-gutter:stable; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--line2) transparent; }
+.ep-head { flex:none; padding:16px 20px; border-bottom:1px solid var(--line); }
 .ep-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .ep-title h2 { margin:0; font-size:16px; line-height:22px; font-weight:600; }
 .ep-tools { margin-left:auto; display:flex; gap:8px; }
 .ep-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; line-height:16px; color:var(--muted); }
 .ep-meta span b { font-weight:500; color:var(--ink2); margin-left:6px; }
-.ep-body { flex:1; min-height:0; overflow-y:auto; background:var(--subtle); padding:16px; scrollbar-width:thin; }
-.ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf7f0; min-height:420px; }
+.ep-body { flex:1 0 auto; background:var(--subtle); padding:16px; }
+.ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf7f0; min-height:300px; }
 .ep-note { max-width:640px; margin:10px auto 0; font-size:12px; line-height:16px; color:var(--muted); text-align:center; }
 
 /* mailbox rows, message extras, compose */
@@ -409,13 +416,9 @@ button.kpi:active { transform:scale(.99); }
 .cquote pre { margin:6px 0 0; padding:10px 12px; max-height:180px; overflow:auto; white-space:pre-wrap; font:inherit; color:var(--ink2); background:var(--subtle); border-radius:10px; }
 .mlist .badge { margin-left:0; }
 
-.zline { display:none; align-items:center; gap:12px; width:100%; padding:12px 14px; text-align:left; }
-.zline .min0 { flex:1; }
-.zline b { display:block; font-weight:600; }
-.zline span.s { display:block; color:var(--muted); font-size:13px; line-height:18px; }
-.zline > .i { color:var(--muted); }
-.zstack .zcell { border-left:0; border-top:1px solid var(--line); padding:14px 0; }
+.zstack .zcell { border-top:1px solid var(--line); padding:14px 0; }
 .zstack .zcell:first-child { border-top:0; padding-top:4px; }
+.zstack .zcell:last-child { padding-bottom:4px; }
 .rlist { margin-top:12px; border-top:1px solid var(--line); }
 .rrow { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
 .rrow .min0 { flex:1; }
@@ -719,9 +722,6 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .dp-foot .btn { flex:1; height:48px; font-size:15px; border-radius:12px; }
   .dp-head, .ep-head { padding:16px; }
   .dp-body { padding:0 16px 8px; }
-  .zstrip { display:block; }
-  .zstrip > .zcell { display:none; }
-  .zline { display:flex; }
   .ep-tools { margin-left:0; width:100%; }
   .ep-body { padding:12px; }
   .pgrid { grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
@@ -770,7 +770,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .acard .pick { width:24px; height:24px; }
   .check input { width:22px; height:22px; }
   .days button { height:44px; }
-  .dayh a, .zcell .more { padding:10px 0; margin:-10px 0; }
+  .dayh a, .zcell .more, .sub-issue { padding:10px 0; margin:-10px 0; }
   .inp, .dd, .inp.sm, .dd.sm, .search input { font-size:16px; }
   .inp.sm, .dd.sm { height:44px; }
   .dz .inp { height:44px; font-size:16px; }
@@ -880,9 +880,8 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
     <section class="view fill" data-view="emails" id="v-emails" hidden>
       <div class="vhead">
         <div class="min0"><h1>Emails</h1><p class="sub" id="e-sub">Customer mail and order emails for orders@getyolko.com</p></div>
-        <div class="vact"><button class="btn ghost sm" type="button" data-action="test-email" title="Send me a test order email"><span data-icon="eye"></span><span class="lbl">Test order email</span></button><button class="btn dark sm" type="button" data-action="compose"><span data-icon="pencil"></span><span class="lbl">Write email</span></button></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="email-settings" aria-label="Email settings" title="Sending, mailbox, delivery status and Thursday reminders"><span data-icon="gear"></span><span class="lbl">Settings</span></button><button class="btn dark sm" type="button" data-action="compose"><span data-icon="pencil"></span><span class="lbl">Write email</span></button></div>
       </div>
-      <div class="panel zstrip" id="e-status"></div>
       <div class="split emails">
         <div class="panel lp">
           <div class="lp-bar"><div class="seg" id="e-filters" role="tablist" aria-label="Filter emails"></div></div>
@@ -992,6 +991,7 @@ const ICONS = {
   clip: '<path d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L11.5 6.8"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/>',
   navigate: '<path d="M12 3 4.5 20 12 16l7.5 4L12 3z"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   unread: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 6 8.5-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
 };
 function ic(name, size) {
@@ -2522,7 +2522,7 @@ function zcell(icon, cls, k, title, sub, extra) {
 function zohoCells() {
   const st = EMAIL_STATUS;
   const more = function (which, label) { return '<button type="button" class="more" data-action="zoho-help" data-which="' + which + '">' + esc(label || "What’s needed") + " " + ic("chevron", 12) + "</button>"; };
-  if (!st) return [zcell("check", "", "Sending", "Checking", "Zoho CPaaS"), zcell("eye", "", "Delivery status", "Checking", "Zoho webhooks"), zcell("inbox", "", "Mailbox", "Checking", "Zoho Mail")];
+  if (!st) return [zcell("check", "", "Sending", "Checking", "Zoho CPaaS"), zcell("eye", "", "Delivery status", "Checking", "Zoho webhooks"), zcell("inbox", "", "Mailbox", "Checking", "Zoho Mail"), reminderCell()];
   const s = st.sending, d = st.deliveryLogs || {}, m = st.inbox || {};
   return [
     s.connected ? zcell("check", "ok", "Sending", "Connected", "Zoho CPaaS · " + (s.from || "orders@getyolko.com")) : zcell("alert", "bad", "Sending", "Not set up", "The Worker is missing the Zoho send key", more("sending")),
@@ -2603,18 +2603,25 @@ async function testReminder() {
     },
   });
 }
-function renderEmailStatus() {
+/** The one thing that needs a look, shown under the Emails heading in place of the status row. */
+function emailIssue() {
   const st = EMAIL_STATUS;
-  const cells = zohoCells();
-  let line = "Checking Zoho";
-  if (st) {
-    const okCount = [st.sending.connected, st.deliveryLogs && st.deliveryLogs.connected, st.inbox && st.inbox.connected].filter(Boolean).length;
-    line = okCount === 3 ? "Sending, tracking and mailbox connected" : !st.sending.connected ? "Sending isn’t set up" : !(st.inbox && st.inbox.connected) ? "Mailbox not connected" : "Delivery status not set up";
-  }
-  const ok = st && st.sending.connected && st.inbox && st.inbox.connected && st.deliveryLogs && st.deliveryLogs.connected;
-  // Phones get one line that opens the full status as a sheet.
-  $("e-status").innerHTML = cells.join("") +
-    '<button type="button" class="zline" data-action="zoho-sheet"><span class="zic ' + (ok ? "ok" : st && !st.sending.connected ? "bad" : "") + '">' + ic(ok ? "check" : "mail", 16) + '</span><span class="min0"><b>Zoho email</b><span class="s">' + esc(line) + "</span></span>" + ic("chevron", 16) + "</button>";
+  if (!st) return null;
+  if (!st.sending.connected) return { bad: true, text: "Order emails can’t send. Sending isn’t set up" };
+  if (!(st.inbox && st.inbox.connected)) return { text: "Mailbox not connected" };
+  if (!(st.deliveryLogs && st.deliveryLogs.connected)) return { text: "Delivery status not set up" };
+  if (!st.reminders) return { text: "Could not read the Thursday reminders" };
+  if (!st.reminders.on) return { text: "Thursday reminders paused" };
+  return null;
+}
+function renderEmailStatus() {
+  const issue = emailIssue();
+  $("e-sub").innerHTML = issue
+    ? '<button type="button" class="sub-issue' + (issue.bad ? " bad" : "") + '" data-action="email-settings">' + ic("alert", 14) + esc(issue.text) + "</button>"
+    : "Customer mail and order emails for orders@getyolko.com";
+  // An open Settings sheet stays current while the status loads or changes.
+  const z = document.querySelector("#modal .zstack");
+  if (z) z.innerHTML = zohoCells().join("");
 }
 function renderEmails() {
   renderEmailStatus();
@@ -2695,12 +2702,33 @@ function emailFrameDoc(html) {
   const base = '<base target="_blank">';
   return /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i, "<head$1>" + base) : base + html;
 }
+/** The email frame is as tall as the email, so the pane has one scroll and no box inside a box. */
+function fitEmailFrame() {
+  const fr = $("ep-frame");
+  let doc = null;
+  try { doc = fr && fr.contentDocument; } catch (e) {}
+  if (!doc || !doc.documentElement || !fr.offsetWidth) return;
+  const sc = fr.closest(".ep-scroll");
+  const keep = sc ? sc.scrollTop : 0;
+  fr.style.height = "0px";
+  fr.style.height = Math.max(300, doc.documentElement.scrollHeight + 2) + "px";
+  if (sc) sc.scrollTop = keep;
+}
+let FRAME_W = 0;
+const FRAME_RO = window.ResizeObserver ? new ResizeObserver(function () {
+  const fr = $("ep-frame");
+  const w = fr ? fr.offsetWidth : 0;
+  if (w && w !== FRAME_W) { FRAME_W = w; fitEmailFrame(); }
+}) : null;
 function mountEmailFrame(html) {
   const fr = $("ep-frame");
   if (!fr) return;
   fr.onload = function () {
-    try { fr.style.height = Math.max(300, fr.contentDocument.documentElement.scrollHeight + 4) + "px"; } catch (e) {}
+    FRAME_W = fr.offsetWidth;
+    fitEmailFrame();
+    try { fr.contentDocument.fonts.ready.then(fitEmailFrame); } catch (e) {}
   };
+  if (FRAME_RO) { FRAME_RO.disconnect(); FRAME_RO.observe(fr); }
   fr.srcdoc = emailFrameDoc(html);
 }
 async function renderEmailDetail() {
@@ -2717,7 +2745,7 @@ async function renderEmailDetail() {
   if (d.deliveredAt) track.push("<span>Delivered<b>" + esc(fmtDateTime(d.deliveredAt)) + "</b></span>");
   if (d.openedAt) track.push("<span>Opened<b>" + esc(fmtDateTime(d.openedAt) + (d.opens > 1 ? " · " + d.opens + " times" : "")) + "</b></span>");
   if (d.clickedAt) track.push("<span>Clicked<b>" + esc(fmtDateTime(d.clickedAt)) + "</b></span>");
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + '</b><span style="width:44px"></span></div>' +
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + '</b><span style="width:44px"></span></div><div class="ep-scroll">' +
     '<div class="ep-head"><div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + emailChip(e) + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
       (e.to && mailConnected() ? '<button type="button" class="btn sm ghost" data-action="compose-order" data-id="' + esc(e.orderId) + '">' + ic("pencil", 16) + "Write</button>" : "") +
       (e.to ? '<button type="button" class="btn sm ghost" data-action="send-email" data-id="' + esc(e.orderId) + '">' + ic("send", 16) + sendLabel + "</button>" : "") + "</div></div>" +
@@ -2725,7 +2753,7 @@ async function renderEmailDetail() {
       (e.status === "failed" ? '<div class="alert">' + ic("alert", 16) + "<div>" + esc("Zoho said: " + e.reason) + "</div></div>" : "") +
       (ds && ds.bad ? '<div class="alert">' + ic("alert", 16) + "<div><b>" + esc(ds.line) + ".</b> Check the address with the customer, then use Write to reach them, or call.</div></div>" : "") +
     "</div>" +
-    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:420px;margin:0 auto;border-radius:12px"></span></div>';
+    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:420px;margin:0 auto;border-radius:12px"></span></div></div>';
   const id = e.orderId;
   let p = PREVIEWS[id];
   if (!p) {
@@ -2757,16 +2785,16 @@ async function renderMailDetail(pane, folder) {
   const fromAddr = folder === "sent" ? firstAddress(m.to) : m.from;
   const cust = customerByEmail(fromAddr);
   const meta = full || m;
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + '</b><span style="width:44px"></span></div>' +
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + '</b><span style="width:44px"></span></div><div class="ep-scroll">' +
     '<div class="ep-head"><div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + '</h2><div class="ep-tools">' +
       '<button type="button" class="btn sm dark" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '">' + ic("reply", 16) + (folder === "sent" ? "Write again" : "Reply") + "</button>" +
       (folder === "inbox" ? '<button type="button" class="btn sm ghost" data-action="mail-unread" data-id="' + esc(id) + '" title="Mark as unread">' + ic("unread", 16) + '<span class="lbl">Mark unread</span></button>' : "") +
     "</div></div>" +
-    '<div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
+    '<div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc && !/^not provided$/i.test(full.cc) ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
     (cust ? '<div class="cust-strip">' + ic("users", 16) + '<span class="min0"><b>' + esc(cust.latest.name || "Customer") + "</b> · " + esc(plural(cust.count, "order")) + " · latest #" + esc(orderRef(cust.latest)) + ", " + esc(dayLabel(cust.latest)) + '</span><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(cust.latest.id) + '">Open order</button></div>' : "") +
     (full && full.attachments && full.attachments.length ? '<div class="atts">' + full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") + "</div>" : "") +
     "</div>" +
-    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div>';
+    '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div></div>';
   if (!full) {
     const r = await api("/api/admin/mail/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + (m.unread ? "&markRead=1" : ""));
     if (!r.ok) { const b = $("ep-body"); if (b && S.mailSel[folder] === id) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not open this message</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
@@ -2921,8 +2949,14 @@ async function zohoDisconnect() {
   toast("Zoho Mail disconnected");
   loadEmails(true);
 }
-function zohoSheet() {
-  openModal({ title: "Zoho email", html: '<div class="zstack">' + zohoCells().join("") + "</div>", actions: [{ label: "Done", kind: "primary", value: true }] });
+/** Sending, delivery status, mailbox and Thursday reminders, in one sheet off the Emails page. */
+async function emailSettings() {
+  const v = await openModal({
+    title: "Email settings",
+    html: '<p class="minor" style="margin:0 0 6px">All shop email goes through Zoho as orders@getyolko.com.</p><div class="zstack">' + zohoCells().join("") + "</div>",
+    actions: [{ label: "Send a test email", kind: "ghost", value: "test" }, { label: "Done", kind: "primary", value: true }],
+  });
+  if (v === "test") testEmail();
 }
 function zohoHelp(which) {
   const content = {
@@ -3374,7 +3408,7 @@ const ACTIONS = {
   },
   "zoho-connect": zohoConnect,
   "zoho-disconnect": zohoDisconnect,
-  "zoho-sheet": zohoSheet,
+  "email-settings": emailSettings,
   "zoho-help": function (t) { zohoHelp(t.getAttribute("data-which")); },
   "test-email": testEmail,
   reminders: openReminders,

@@ -115,7 +115,10 @@ under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system
 phones (no iOS zoom), safe-area padding. Prefer an Undo toast over a confirm dialog; dialogs say
 Cancel, and a destructive button is never the default. Sheets have a grabber and swipe down to
 close. The phone tab bar (Orders, Run, Stock, Emails, More) is navigation only, so everything else
-lives on the More page. Buttons show a spinner while working. The stock page hides pickup days
+lives on the More page. Buttons show a spinner while working. On the Emails page the Zoho status (sending, delivery status,
+mailbox, Thursday reminders) lives in the Settings sheet, never as a row on the page; only a
+problem shows, as one line under the heading. The open email is a single scroll (header and
+message together) with the email frame sized to its content, so there is no box inside a box. The stock page hides pickup days
 while the shop is delivery only. Before calling an admin change live, look at full-page
 screenshots at desktop and phone sizes in light and dark.
 
