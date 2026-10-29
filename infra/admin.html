@@ -133,9 +133,10 @@ a { color:inherit; text-decoration:none; }
 /* Switching sections is frequent, so it only gets a short fade (Apple: keep motion purposeful). */
 .view { animation:viewIn .14s ease-out; }
 @keyframes viewIn { from { opacity:0; } to { opacity:1; } }
-.vhead { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; }
+.vhead { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
 .vhead h1 { margin:0; font-size:22px; line-height:28px; font-weight:700; letter-spacing:-.01em; }
 .vhead .sub { margin:2px 0 0; color:var(--muted); font-size:13px; line-height:18px; }
+.vhead .sub:empty { display:none; }
 .vact { display:flex; align-items:center; gap:8px; flex:none; }
 .search {
   display:flex; align-items:center; gap:10px; width:300px; height:40px; padding:0 8px 0 12px;
@@ -885,7 +886,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view" data-view="run" id="v-run" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Delivery run</h1><p class="sub" id="r-sub">Your stops in order</p></div>
+        <div class="min0"><h1>Delivery run</h1><p class="sub" id="r-sub">Loading</p></div>
         <div class="vact" id="r-act"></div>
       </div>
       <div id="r-body"></div>
@@ -893,7 +894,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view" data-view="stock" id="v-stock" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Stock &amp; prices</h1><p class="sub">Saved changes show on the website within seconds</p></div>
+        <div class="min0"><h1>Stock &amp; prices</h1></div>
         <div class="vact"><a class="btn ghost sm" href="/" target="_blank" rel="noopener"><span data-icon="external"></span><span class="lbl">View the shop</span></a></div>
       </div>
       <div id="stock-body"></div>
@@ -901,8 +902,8 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view fill" data-view="emails" id="v-emails" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Emails</h1><p class="sub" id="e-sub">Customer mail and order emails for orders@getyolko.com</p></div>
-        <div class="vact"><button class="btn ghost sm" type="button" data-action="email-settings" aria-label="Email settings" title="Sending, mailbox, delivery status and Thursday reminders"><span data-icon="gear"></span><span class="lbl">Settings</span></button><button class="btn dark sm" type="button" data-action="compose"><span data-icon="pencil"></span><span class="lbl">Write email</span></button></div>
+        <div class="min0"><h1>Emails</h1><p class="sub" id="e-sub"></p></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="email-settings" aria-label="Email settings" title="Email settings"><span data-icon="gear"></span><span class="lbl">Settings</span></button><button class="btn dark sm" type="button" data-action="compose"><span data-icon="pencil"></span><span class="lbl">Write email</span></button></div>
       </div>
       <div class="split emails">
         <div class="panel lp">
@@ -915,14 +916,14 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view" data-view="customers" id="v-customers" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Customers</h1><p class="sub" id="c-sub">Everyone who has ordered, best customers first</p></div>
+        <div class="min0"><h1>Customers</h1><p class="sub" id="c-sub">Loading</p></div>
       </div>
       <div id="c-body"></div>
     </section>
 
     <section class="view" data-view="competitors" id="v-competitors" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Competitors</h1><p class="sub">Caged egg prices at other shops, checked every 15 minutes</p></div>
+        <div class="min0"><h1>Competitors</h1></div>
         <div class="vact"><button class="btn ghost sm" type="button" data-action="pw-poll" id="pw-poll"><span data-icon="refresh"></span><span class="lbl">Check prices now</span></button></div>
       </div>
       <div id="pw-body"></div>
@@ -930,7 +931,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view" data-view="visits" id="v-visits" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Flyer visits</h1><p class="sub" id="vi-note">People who scanned the flyer QR or opened getyolko.com/f</p></div>
+        <div class="min0"><h1>Flyer visits</h1></div>
         <div class="vact"><button class="ib" type="button" data-action="visits-refresh" aria-label="Refresh"><span data-icon="refresh"></span></button></div>
       </div>
       <div id="vi-body"></div>
@@ -938,7 +939,7 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
 
     <section class="view" data-view="images" id="v-images" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Images</h1><p class="sub">Pick which photos rotate on the homepage, then publish</p></div>
+        <div class="min0"><h1>Images</h1></div>
         <div class="vact"><button class="ib" type="button" data-action="assets-refresh" aria-label="Refresh"><span data-icon="refresh"></span></button></div>
       </div>
       <div id="im-body"></div>
@@ -2299,7 +2300,7 @@ function renderStock() {
   const dzOn = d.dozensAvailable > 0;
   body.innerHTML =
     '<div class="stock-grid"><div class="stack">' +
-      '<div class="card"><div class="chead"><div><h2>This week</h2><p class="csub">What customers can buy right now</p></div></div>' +
+      '<div class="card"><div class="chead"><div><h2>This week</h2></div></div>' +
         '<div class="srow"><div class="t"><b>Trays left</b><span id="st-trays-note">' + esc(websiteStockText(d.traysAvailable)) + "</span></div>" + stepperHtml("st-trays", d.traysAvailable, "trays") + "</div>" +
         '<div class="srow"><div class="t"><b>Sell dozen packs</b><span>Shows the 600 g, 700 g and 800 g dozens on the website</span></div><label class="toggle"><input type="checkbox" id="st-dz-on"' + (dzOn ? " checked" : "") + ' aria-label="Sell dozen packs"><span></span></label></div>' +
         '<div class="srow' + (dzOn ? "" : " off") + '" id="st-dz-row"><div class="t"><b>Dozen packs left</b><span>Dozens hide again when this reaches 0</span></div>' + stepperHtml("st-dozens", d.dozensAvailable, "packs", !dzOn) + "</div>" +
@@ -2662,7 +2663,7 @@ function renderEmailStatus() {
   const top = list[0];
   const html = top
     ? '<button type="button" class="sub-issue' + (top.bad ? " bad" : "") + '" data-action="email-settings">' + ic("alert", 14) + esc(top.text + (list.length > 1 ? " · " + (list.length - 1) + " more" : "")) + "</button>"
-    : "Customer mail and order emails for orders@getyolko.com";
+    : "";
   if (html !== SUB_HTML) { SUB_HTML = html; $("e-sub").innerHTML = html; }
   // An open Settings sheet stays current while the status loads or changes, and keeps keyboard focus.
   const z = document.querySelector("#modal .zstack");
@@ -3127,7 +3128,7 @@ function renderCustomers() {
   });
   const buyers = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.spend - a.spend; });
   const repeat = buyers.filter(function (b) { return b.orders > 1; }).length;
-  $("c-sub").textContent = buyers.length ? plural(buyers.length, "customer") + " · " + repeat + " came back" : "Everyone who has ordered, best customers first";
+  $("c-sub").textContent = buyers.length ? plural(buyers.length, "customer") + " · " + repeat + " came back" : "";
   if (!buyers.length) { body.innerHTML = '<div class="card"><div class="empty-state">' + ic("users", 28) + "<b>No customers yet</b><p>They show up here with their first order.</p></div></div>"; return; }
   const WORD = { tray1: "1 tray", tray2: "2 trays", box: "Box" };
   body.innerHTML = '<div class="cgrid">' + buyers.map(function (b, i) {
