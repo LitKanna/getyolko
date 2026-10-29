@@ -489,7 +489,7 @@ button.kpi:active { scale:.97; transition:background-color .15s, scale .12s var(
 .split.orders .lp { container-type:inline-size; container-name:olist; }
 .row .c2, .row .c3, .row .mt.ref { display:none; }
 @container olist (min-width: 720px) {
-  .row:not(.erow) { grid-template-columns:40px minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 92px; gap:16px; }
+  .row:not(.erow) { grid-template-columns:40px minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 116px; gap:16px; }
   .row:not(.erow) .mt.combo { display:none; }
   .row .mt.ref { display:block; }
   .row .c2, .row .c3 { display:block; min-width:0; }
@@ -497,6 +497,8 @@ button.kpi:active { scale:.97; transition:background-color .15s, scale .12s var(
   .row .c2 span, .row .c3 span { display:block; margin-top:1px; color:var(--muted); font-size:15px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .row .c2 span.due { color:var(--amber); font-weight:600; }
 }
+/* Narrow order lists (small laptops) pull the tabs in a little so they all still show. */
+@media (min-width:900px) { @container olist (max-width: 600px) { .lp-bar .seg button { padding:0 10px; } } }
 .row .unread { width:10px; height:10px; border-radius:50%; background:var(--ink); flex:none; }
 /* After a filter change the rows arrive one after another. */
 .cascade > * { animation:rise .5s var(--spring) both; }
@@ -1832,6 +1834,12 @@ function shortItem(o) {
 }
 function itemLine(o) { return shortItem(o) + " · " + eggsFor(o).toLocaleString() + " eggs"; }
 function isPaid(o) { return o.paymentStatus === "paid" && o.status !== "cancelled"; }
+/** Someone opened the Stripe payment page and has not paid. That is not an order yet, so it stays
+ *  out of the lists, counts, alerts, the run and Customers. It shows under "Not paid" for a week in
+ *  case a nudge helps; paying later turns it into a normal confirmed order. */
+function isOpenCheckout(o) { return o.status === "new" && !!o.sessionId && o.paymentStatus !== "paid"; }
+function checkoutAge(o) { return Date.now() - (Date.parse(o.updatedAt || o.createdAt || "") || 0); }
+function checkoutChip(o) { return chip("checkout", checkoutAge(o) < 864e5 ? "Checkout open" : "Didn't pay"); }
 function isRefunded(o) { return o.paymentStatus === "refunded"; }
 function orderRef(o) { return String(o.id || "").slice(-6).toUpperCase(); }
 function orderEmail(o) { return (o.stripe && o.stripe.email) ? String(o.stripe.email) : (o.email ? String(o.email) : ""); }
@@ -1863,7 +1871,7 @@ function primaryChip(o) {
   if (o.status === "cancelled") return chip("cancelled", "Cancelled");
   if (o.status === "done") return chip("delivered", "Delivered");
   if (isPaid(o)) return chip("paid", "Paid");
-  if (o.status === "new" && o.sessionId) return chip("checkout", "Checkout open");
+  if (isOpenCheckout(o)) return checkoutChip(o);
   if (o.status === "new") return chip("waiting dot", "Waiting");
   return chip("confirmed dot", "Confirmed");
 }
@@ -1912,7 +1920,9 @@ async function loadOrders(force) {
     const data = JSON.parse(text);
     ORDERS = Array.isArray(data.orders) ? data.orders : [];
     S.ordersLoaded = true;
+    const fresh = freshOrders();
     onOrdersChanged();
+    if (fresh.length) onNewOrders(fresh);
   } catch (e) {
     if (force) toast("Could not load orders. Check the connection");
   } finally {
@@ -1931,8 +1941,12 @@ function onOrdersChanged() {
 }
 
 /* ============================== orders: list ============================== */
-const FILTERS = [["upcoming", "Upcoming"], ["waiting", "Waiting"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
+const FILTERS = [["upcoming", "Upcoming"], ["waiting", "Waiting"], ["unpaid", "Not paid"], ["delivered", "Delivered"], ["cancelled", "Cancelled"], ["all", "All"]];
+// Only the tabs that need you carry a count; the history tabs just open.
+const COUNTED = { upcoming: 1, waiting: 1, unpaid: 1 };
 function inFilter(o, f) {
+  if (isOpenCheckout(o)) return f === "unpaid" && checkoutAge(o) < 7 * 864e5;
+  if (f === "unpaid") return false;
   if (f === "upcoming") return o.status === "new" || o.status === "confirmed";
   if (f === "waiting") return o.status === "new";
   if (f === "delivered") return o.status === "done";
@@ -1988,12 +2002,15 @@ function renderOrderList() {
   }
   const list = visibleOrders();
   const asc = S.filter === "upcoming" || S.filter === "waiting";
-  const groups = groupOrders(list, asc);
+  const groups = S.filter === "unpaid"
+    ? [{ label: "Didn't finish paying", who: list.length === 1 ? "1 person" : list.length + " people", pickup: true, orders: list.sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); }) }]
+    : groupOrders(list, asc);
   VISIBLE_IDS = [];
   if (!list.length) {
     const msg = S.q ? ["No orders match", "Try a name, phone number, suburb or order number."]
       : S.filter === "upcoming" ? ["No upcoming orders", "New orders show up here by themselves."]
       : S.filter === "waiting" ? ["Nothing waiting", "Every order has been confirmed."]
+      : S.filter === "unpaid" ? ["Nobody left at checkout", "People who open the payment page and don't pay show here for a week."]
       : ["Nothing here yet", "Orders move here as you work through them."];
     el.innerHTML = '<div class="empty-state">' + ic("orders", 28) + "<b>" + esc(msg[0]) + "</b><p>" + esc(msg[1]) + "</p></div>";
     return;
@@ -2001,7 +2018,7 @@ function renderOrderList() {
   const keep = el.scrollTop;
   el.innerHTML = groups.map(function (g) {
     const route = asc && !g.pickup ? mapsRoute(g.orders) : "";
-    return '<div class="dayh">' + ic(g.pickup ? "pin" : "truck", 16) + "<b>" + esc(g.label) + '</b><span class="m">' + esc(plural(g.orders.length, "order")) + '<span class="lg-only"> · ' + esc(plural(g.trays, "tray")) + "</span></span>" +
+    return '<div class="dayh">' + ic(g.pickup ? "pin" : "truck", 16) + "<b>" + esc(g.label) + '</b><span class="m">' + (g.who ? esc(g.who) + "</span>" : esc(plural(g.orders.length, "order")) + '<span class="lg-only"> · ' + esc(plural(g.trays, "tray")) + "</span></span>") +
       (route ? '<span class="dl"><a href="#run">' + ic("navigate", 16) + '<span>Start run</span></a><a href="' + esc(route) + '" target="_blank" rel="noopener" class="lg-only">' + ic("route", 16) + "<span>Route in Maps</span></a></span>" : "") +
       "</div>" + g.orders.map(function (o) { VISIBLE_IDS.push(o.id); return rowHtml(o); }).join("");
   }).join("");
@@ -2017,7 +2034,7 @@ function rowHtml(o) {
     '<span class="mt combo">' + esc(shortItem(o) + " · " + place(o) + unpaid) + '</span><span class="mt ref">#' + esc(orderRef(o)) + " · " + esc(fmtPhone(o.phone) || "no phone") + "</span></span>" +
     // Wide lists show these as their own columns (see the olist container query).
     '<span class="c2"><b>' + esc(o.fulfillment === "delivery" ? (o.deliverySuburb || "Delivery") : "Pickup") + "</b><span>" + esc(dayLabel(o)) + "</span></span>" +
-    '<span class="c3"><b>' + esc(shortItem(o)) + "</b><span>Ordered " + esc(rel(o.createdAt)) + "</span></span>" +
+    '<span class="c3"><b>' + esc(shortItem(o)) + "</b><span>" + (isOpenCheckout(o) ? "Opened " : "Ordered ") + esc(rel(o.createdAt)) + "</span></span>" +
     '<span class="rt"><span class="pr num">' + esc(money(amountOf(o))) + "</span>" + primaryChip(o) + "</span></button>";
 }
 function markSelectedRow() {
@@ -2029,7 +2046,7 @@ function markSelectedRow() {
 
 /* ============================== orders: header, KPIs ============================== */
 function nextDelivery() {
-  const up = ORDERS.filter(function (o) { return o.status === "new" || o.status === "confirmed"; });
+  const up = ORDERS.filter(function (o) { return (o.status === "new" || o.status === "confirmed") && !isOpenCheckout(o); });
   const groups = groupOrders(up, true);
   return groups.length ? groups[0] : null;
 }
@@ -2060,7 +2077,7 @@ function renderOrdersMeta() {
   if (!S.ordersLoaded) {
     kp.innerHTML = Array.from({ length: 4 }).map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("");
   } else {
-    const waiting = ORDERS.filter(function (o) { return o.status === "new"; }).length;
+    const waiting = ORDERS.filter(function (o) { return o.status === "new" && !isOpenCheckout(o); }).length;
     const next = nextDelivery();
     const active = ORDERS.filter(function (o) { return o.status !== "cancelled"; });
     const confirmed = active.filter(function (o) { return o.status !== "new"; }).reduce(function (s, o) { return s + (Number(o.price) || 0); }, 0);
@@ -2081,7 +2098,9 @@ function renderOrdersMeta() {
   const base = ORDERS.filter(matchesQuery);
   $("o-filters").innerHTML = FILTERS.map(function (f) {
     const n = base.filter(function (o) { return inFilter(o, f[0]); }).length;
-    return '<button type="button" role="tab" aria-selected="' + (S.filter === f[0]) + '" class="' + (S.filter === f[0] ? "on" : "") + '" data-action="filter" data-f="' + f[0] + '">' + f[1] + (S.ordersLoaded ? ' <span class="c num">' + n + "</span>" : "") + "</button>";
+    // "Not paid" only shows while there is something in it.
+    if (f[0] === "unpaid" && !n && S.filter !== "unpaid") return "";
+    return '<button type="button" role="tab" aria-selected="' + (S.filter === f[0]) + '" class="' + (S.filter === f[0] ? "on" : "") + '" data-action="filter" data-f="' + f[0] + '">' + f[1] + (S.ordersLoaded && COUNTED[f[0]] ? ' <span class="c num">' + n + "</span>" : "") + "</button>";
   }).join("");
   renderNav();
 }
@@ -2174,7 +2193,7 @@ function statusFooter(o) {
   const b = function (status, label, kind, icon) {
     return '<button type="button" class="btn ' + kind + '" data-action="status" data-id="' + id + '" data-status="' + status + '">' + (icon ? ic(icon, 16) : "") + esc(label) + "</button>";
   };
-  if (o.status === "new") return b("cancelled", "Cancel order", "ghost") + b("confirmed", "Confirm order", "primary", "check");
+  if (o.status === "new") return b("cancelled", "Cancel order", "ghost") + b("confirmed", "Confirm order", isOpenCheckout(o) ? "ghost" : "primary", "check");
   if (o.status === "confirmed") return b("cancelled", "Cancel order", "ghost") + b("done", "Mark delivered", "primary", "check");
   if (o.status === "done") return b("confirmed", "Undo delivered", "ghost", "undo");
   return b("new", "Reopen order", "ghost", "undo");
@@ -2190,9 +2209,9 @@ function detailHtml(o) {
   const chips = [];
   if (isRefunded(o)) chips.push(chip("refunded", "Refunded"));
   else if (o.paymentStatus === "paid") { if (!track) chips.push(chip("paid", "Paid")); }
-  else if (o.sessionId) chips.push(chip("checkout", "Checkout open"));
+  else if (o.sessionId) chips.push(isOpenCheckout(o) ? checkoutChip(o) : chip("checkout", "Checkout open"));
   else chips.push(chip("plain", "Not paid"));
-  if (o.status === "new") chips.push(chip("waiting dot", "Waiting"));
+  if (o.status === "new" && !isOpenCheckout(o)) chips.push(chip("waiting dot", "Waiting"));
   else if (!track) chips.push({ confirmed: chip("confirmed dot", "Confirmed"), done: chip("delivered", "Delivered"), cancelled: chip("cancelled", "Cancelled") }[o.status] || "");
   if (sig.suspicious) chips.push(chip("warn", "Check this order"));
   if (o.refFrom) chips.push(chip("plain", o.refBy ? "Sent by " + o.refBy : "Friend's link"));
@@ -2341,6 +2360,7 @@ async function setStatus(id, status, opts) {
   }
   const prev = o.status;
   o.status = status;
+  if (KNOWN) KNOWN.add(o.id);
   onOrdersChanged();
   const r = await api("/api/order-status", { method: "POST", body: { id: id, status: status } });
   if (!r.ok) {
@@ -2446,11 +2466,11 @@ async function sendOrderEmail(id) {
 /* Saturday mode: the next delivery day as a list of stops in driving order, one tap to
    navigate, call or text, and a big Mark delivered button. Built for a phone in the car. */
 function runGroup() {
-  const live = ORDERS.filter(function (o) { return o.fulfillment === "delivery" && (o.status === "new" || o.status === "confirmed"); });
+  const live = ORDERS.filter(function (o) { return o.fulfillment === "delivery" && (o.status === "new" || o.status === "confirmed") && !isOpenCheckout(o); });
   const groups = groupOrders(live, true);
   if (groups.length) {
     const g = groups[0];
-    return { key: g.key, label: g.label, orders: ORDERS.filter(function (o) { return dayKey(o) === g.key && o.status !== "cancelled"; }) };
+    return { key: g.key, label: g.label, orders: ORDERS.filter(function (o) { return dayKey(o) === g.key && o.status !== "cancelled" && !isOpenCheckout(o); }) };
   }
   // Nothing left to deliver: show today's finished run, if there was one.
   const today = sydDate(Date.now());
@@ -2693,17 +2713,25 @@ async function pollHead() {
   const r = await api("/api/admin/orders-head");
   if (!r.ok) return;
   const h = r.data;
-  const changed = HEAD && h.latest && h.latest !== HEAD.latest;
-  const n = changed ? Math.max(1, h.count - HEAD.count) : 0;
+  // A new order row, or a payment (the Worker notes the latest one), means a fresh look.
+  const changed = HEAD && ((h.latest && h.latest !== HEAD.latest) || (h.lastPaid && h.lastPaid !== HEAD.lastPaid));
   HEAD = h;
-  if (changed) onNewOrders(n);
+  if (changed) loadOrders(true);
 }
-async function onNewOrders(n) {
+/** Orders already seen, so only new real ones ring. An unpaid checkout rings once it's paid. */
+let KNOWN = null;
+function freshOrders() {
+  const real = ORDERS.filter(function (o) { return o.status !== "cancelled" && !isOpenCheckout(o); });
+  if (!KNOWN) { KNOWN = new Set(real.map(function (o) { return o.id; })); return []; }
+  const fresh = real.filter(function (o) { return !KNOWN.has(o.id); });
+  fresh.forEach(function (o) { KNOWN.add(o.id); });
+  return fresh;
+}
+function onNewOrders(fresh) {
+  const n = fresh.length;
   if (document.hidden || S.view !== "orders") { UNSEEN += n; setTitle(); }
   if (ALERTS.sound) chime();
-  await loadOrders(true);
-  const newest = ORDERS.slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); })[0];
-  if (!newest) return;
+  const newest = fresh.slice().sort(function (a, b) { return String(b.createdAt || "").localeCompare(String(a.createdAt || "")); })[0];
   const line = (newest.name || "New customer") + " · " + shortItem(newest) + " · " + money(amountOf(newest));
   if (ALERTS.notify && window.Notification && Notification.permission === "granted" && (document.hidden || !document.hasFocus())) {
     try {
@@ -2756,7 +2784,7 @@ const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock
 // The phone tab bar is for moving between sections only; everything else lives on the More page.
 const TAB_IDS = ["orders", "run", "stock", "emails"];
 function navBadge(id) {
-  if (id === "orders") { const n = ORDERS.filter(function (o) { return o.status === "new"; }).length; return n ? String(n) : ""; }
+  if (id === "orders") { const n = ORDERS.filter(function (o) { return o.status === "new" && !isOpenCheckout(o); }).length; return n ? String(n) : ""; }
   if (id === "emails") { const n = emailAttention(); return n ? String(n) : ""; }
   return "";
 }
@@ -3776,7 +3804,7 @@ function renderCustomers() {
   const body = $("c-body");
   if (!S.ordersLoaded) { body.innerHTML = '<div class="cgrid">' + Array.from({ length: 6 }).map(function () { return '<div class="card cc"><span class="sk" style="width:60%;height:14px"></span><span class="sk" style="height:36px;margin-top:16px"></span><span class="sk" style="height:40px;margin-top:12px"></span></div>'; }).join("") + "</div>"; return; }
   const map = {};
-  ORDERS.filter(function (o) { return o.status !== "cancelled"; }).forEach(function (o) {
+  ORDERS.filter(function (o) { return o.status !== "cancelled" && !isOpenCheckout(o); }).forEach(function (o) {
     const key = o.phone || o.name;
     const b = map[key] || (map[key] = { name: o.name, phone: o.phone, email: "", orders: 0, trays: 0, spend: 0, paid: 0, history: [], bundles: {}, days: {} });
     b.orders++;
