@@ -132,10 +132,17 @@ The look is iOS 27 (Figma file "YOLKO Admin", page "iOS 27 admin") in black, whi
 only. Kanna's rule (Oct 2026): no colour at all, so never add hues, tinted glows or coloured icon
 tiles; status shows by fill, weight and words (what needs you is solid black, white in dark mode).
 Kanna also asked for it to be modern and creative, not plain kit defaults. All colours, radii, glass
-and spring curves are tokens in `:root`. A soft white light sits behind the page (`body::before`,
-paused on the delivery run); the sidebar, tab bar, toolbar buttons and save bar are Liquid Glass;
-cards are crisp white with a hairline shadow (`--card-shadow`); the chosen sidebar item and tab are a
-solid capsule that glides (`glide()`); toasts are black capsules in both appearances. An order reads
+and spring curves are tokens in `:root` (dark ones in `:root.dk`). The page is a flat grey; the
+sidebar, tab bar, toolbar buttons and save bar are Liquid Glass; cards are crisp white with a
+hairline shadow (`--card-shadow`); the chosen sidebar item and tab are a solid capsule that glides
+(`glide()`); toasts are black capsules in both appearances. Emphasis uses `--sel`/`--on-sel` (black
+in light, a mid grey in dark) so dark mode never shows big white blocks; the main action button is
+the only white solid in dark. Kanna's polish rules (29 Oct 2026): every panel and the last card of a
+page end on the sidebar's bottom line, 16px (`--edge`) from the screen edges; one type scale (page
+titles 30, stat numbers 28, order total 40, card titles 17, body 15, labels 13, all sentence case);
+check iPad sizes too (Kanna mostly uses an iPad Pro in dark). Appearance is Light, Dark or Auto from
+the switch in the sidebar (More on phones), kept in `localStorage` (`yolko_theme`); the script in the
+head puts `.dk` on `<html>` before the first paint. Plain customer emails read light on dark in Dark. An order reads
 like a Wallet pass: big name and total, a progress track whose truck drives to the order's step, round
 contact buttons, then the delivery as a ticket with a perforated tear line. Motion uses the spring
 tokens (`--spring`, `--spring-bouncy`, `--spring-snappy` with `--t-*` durations): orders and emails
