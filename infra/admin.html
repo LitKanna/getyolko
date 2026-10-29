@@ -267,7 +267,7 @@ button.kpi:active { transform:scale(.99); }
 .kpi .s { display:block; margin-top:2px; font-size:13px; line-height:18px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 /* ---------- list + detail split ---------- */
-.view.fill { display:flex; flex-direction:column; height:calc(100vh - 52px); height:calc(100dvh - 52px); min-height:560px; }
+.view.fill { display:flex; flex-direction:column; height:calc(100vh - 52px); height:calc(100dvh - 52px); min-height:420px; }
 .view.fill .split { flex:1; min-height:0; }
 /* Fill views fit the window exactly, so the page itself never scrolls under the panes. */
 @media (min-width:900px) { .main:has(> .view.fill:not([hidden])) { padding-bottom:24px; } }
@@ -372,13 +372,18 @@ button.kpi:active { transform:scale(.99); }
 .sub-issue.bad { color:var(--red); }
 .sub-issue .i { width:14px; height:14px; }
 .sub-issue:hover { text-decoration:underline; text-underline-offset:3px; }
-/* One scroll for the open email: its header scrolls away with the message, like Mail. */
+/* One scroll for the open email: the details scroll away with the message, while the subject and
+   Reply stay pinned on wide screens (the top bar holds Reply on phones and in the drawer). */
 .ep-scroll { flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto; scrollbar-gutter:stable; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--line2) transparent; }
-.ep-head { flex:none; padding:16px 20px; border-bottom:1px solid var(--line); }
-.ep-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.ep-title { flex:none; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:16px 20px 8px; background:var(--paper); }
 .ep-title h2 { margin:0; font-size:16px; line-height:22px; font-weight:600; }
 .ep-tools { margin-left:auto; display:flex; gap:8px; }
-.ep-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; line-height:16px; color:var(--muted); }
+.ep-head { flex:none; padding:0 20px 16px; border-bottom:1px solid var(--line); }
+@media (min-width:1180px) {
+  .ep-title { position:sticky; top:0; z-index:2; transition:box-shadow .15s; }
+  .ep-title.stuck { box-shadow:0 1px 0 var(--line), 0 6px 12px -8px rgba(23,23,20,.18); }
+}
+.ep-meta { display:flex; flex-wrap:wrap; gap:4px 20px; font-size:12px; line-height:16px; color:var(--muted); }
 .ep-meta span b { font-weight:500; color:var(--ink2); margin-left:6px; }
 .ep-body { flex:1 0 auto; background:var(--subtle); padding:16px; }
 .ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf7f0; min-height:300px; }
@@ -720,7 +725,9 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .dp.pane { width:100vw; border-left:0; padding-top:var(--safe-t); }
   .dp-foot { padding:12px 16px calc(12px + var(--safe-b)); }
   .dp-foot .btn { flex:1; height:48px; font-size:15px; border-radius:12px; }
-  .dp-head, .ep-head { padding:16px; }
+  .dp-head { padding:16px; }
+  .ep-title { padding:16px 16px 8px; }
+  .ep-head { padding:0 16px 16px; }
   .dp-body { padding:0 16px 8px; }
   .ep-tools { margin-left:0; width:100%; }
   .ep-body { padding:12px; }
@@ -770,7 +777,9 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .acard .pick { width:24px; height:24px; }
   .check input { width:22px; height:22px; }
   .days button { height:44px; }
-  .dayh a, .zcell .more, .sub-issue { padding:10px 0; margin:-10px 0; }
+  .dayh a { padding:10px 0; margin:-10px 0; }
+  .zcell .more { padding:12px 0; margin:-12px 0; }
+  .sub-issue { padding:13px 0; margin:-13px 0; }
   .inp, .dd, .inp.sm, .dd.sm, .search input { font-size:16px; }
   .inp.sm, .dd.sm { height:44px; }
   .dz .inp { height:44px; font-size:16px; }
@@ -1142,7 +1151,7 @@ function openModal(opts) {
     });
     const first = wrap.querySelector("[autofocus]") || wrap.querySelector("input:not([type=hidden]), textarea") ||
       wrap.querySelector(".mact .btn.primary, .mact .btn.dark") || wrap.querySelector(".mact .btn.ghost");
-    if (first) setTimeout(function () { first.focus(); }, 30);
+    if (first) setTimeout(function () { first.focus({ preventScroll: true }); }, 30);
     wrap.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && e.target.tagName === "INPUT") {
         e.preventDefault();
@@ -2553,7 +2562,8 @@ function reminderCell() {
   if (!r) return zcell("bell", "bad", "Thursday reminders", "Unavailable", "Could not read the list");
   const who = r.subscribers ? plural(r.subscribers, "customer") + " signed up" : "No one yet";
   const sub = !r.on ? "Paused" : !(st.inbox && st.inbox.connected) ? "Needs the mailbox connected" : r.lastRun ? reminderRunLine(r.lastRun) : "Next " + r.next + ", 10am";
-  return zcell("bell", r.on && r.subscribers ? "ok" : "", "Thursday reminders", who, sub, '<button type="button" class="more" data-action="reminders">Manage ' + ic("chevron", 12) + "</button>");
+  const cls = r.lastRun && r.lastRun.failed ? "bad" : r.on && r.subscribers ? "ok" : "";
+  return zcell("bell", cls, "Thursday reminders", who, sub, '<button type="button" class="more" data-action="reminders">Manage ' + ic("chevron", 12) + "</button>");
 }
 async function openReminders() {
   closeModal(null);
@@ -2603,25 +2613,37 @@ async function testReminder() {
     },
   });
 }
-/** The one thing that needs a look, shown under the Emails heading in place of the status row. */
-function emailIssue() {
+/** What needs a look, most urgent first. The first one shows under the Emails heading. */
+function emailIssues() {
   const st = EMAIL_STATUS;
-  if (!st) return null;
-  if (!st.sending.connected) return { bad: true, text: "Order emails can’t send. Sending isn’t set up" };
-  if (!(st.inbox && st.inbox.connected)) return { text: "Mailbox not connected" };
-  if (!(st.deliveryLogs && st.deliveryLogs.connected)) return { text: "Delivery status not set up" };
-  if (!st.reminders) return { text: "Could not read the Thursday reminders" };
-  if (!st.reminders.on) return { text: "Thursday reminders paused" };
-  return null;
+  if (!st) return [];
+  const out = [];
+  const r = st.reminders;
+  if (!st.sending.connected) out.push({ bad: true, text: "Order emails can’t send. Sending isn’t set up" });
+  if (!(st.inbox && st.inbox.connected)) out.push({ text: "Mailbox not connected" });
+  if (r && r.lastRun && r.lastRun.failed) out.push({ bad: true, text: plural(r.lastRun.failed, "Thursday reminder") + " failed to send" });
+  if (!(st.deliveryLogs && st.deliveryLogs.connected)) out.push({ text: "Delivery status not set up" });
+  if (!r) out.push({ text: "Could not read the Thursday reminders" });
+  else if (!r.on) out.push({ text: "Thursday reminders paused" });
+  return out;
 }
+let SUB_HTML = "", SHEET_HTML = "";
 function renderEmailStatus() {
-  const issue = emailIssue();
-  $("e-sub").innerHTML = issue
-    ? '<button type="button" class="sub-issue' + (issue.bad ? " bad" : "") + '" data-action="email-settings">' + ic("alert", 14) + esc(issue.text) + "</button>"
+  const list = emailIssues();
+  const top = list[0];
+  const html = top
+    ? '<button type="button" class="sub-issue' + (top.bad ? " bad" : "") + '" data-action="email-settings">' + ic("alert", 14) + esc(top.text + (list.length > 1 ? " · " + (list.length - 1) + " more" : "")) + "</button>"
     : "Customer mail and order emails for orders@getyolko.com";
-  // An open Settings sheet stays current while the status loads or changes.
+  if (html !== SUB_HTML) { SUB_HTML = html; $("e-sub").innerHTML = html; }
+  // An open Settings sheet stays current while the status loads or changes, and keeps keyboard focus.
   const z = document.querySelector("#modal .zstack");
-  if (z) z.innerHTML = zohoCells().join("");
+  const cells = zohoCells().join("");
+  if (!z || cells === SHEET_HTML) return;
+  SHEET_HTML = cells;
+  const f = document.activeElement && z.contains(document.activeElement) ? document.activeElement.getAttribute("data-action") : null;
+  z.innerHTML = cells;
+  const again = f && z.querySelector('[data-action="' + f + '"]');
+  if (again) again.focus({ preventScroll: true });
 }
 function renderEmails() {
   renderEmailStatus();
@@ -2708,11 +2730,34 @@ function fitEmailFrame() {
   let doc = null;
   try { doc = fr && fr.contentDocument; } catch (e) {}
   if (!doc || !doc.documentElement || !fr.offsetWidth) return;
+  const de = doc.documentElement;
+  // Page-height CSS in an email (height:100%, min-height:100vh) would only add a scroll inside the frame.
+  [de, doc.body].forEach(function (el) {
+    if (el) { el.style.setProperty("height", "auto", "important"); el.style.setProperty("min-height", "0", "important"); }
+  });
   const sc = fr.closest(".ep-scroll");
   const keep = sc ? sc.scrollTop : 0;
+  // Measure at the width the email is shown at: no vertical scrollbar while measuring.
+  const ov = de.style.overflowY;
+  de.style.overflowY = "hidden";
   fr.style.height = "0px";
-  fr.style.height = Math.max(300, doc.documentElement.scrollHeight + 2) + "px";
+  shrinkWideEmail(de);
+  let h = Math.max(300, de.scrollHeight + 2);
+  fr.style.height = h + "px";
+  // Anything still wider than the pane scrolls sideways; leave room for that scrollbar under the email.
+  const hbar = doc.defaultView ? doc.defaultView.innerHeight - de.clientHeight : 0;
+  if (hbar > 0) fr.style.height = (h += hbar) + "px";
+  de.style.overflowY = ov;
   if (sc) sc.scrollTop = keep;
+}
+/** A fixed-width newsletter (600 to 700px) shrinks to fit a narrow pane, as phone mail apps do. */
+function shrinkWideEmail(de) {
+  if (!("zoom" in de.style)) return;
+  de.style.zoom = "";
+  const over = de.scrollWidth / de.clientWidth;
+  const z = Math.floor(100 / over) / 100;
+  // Past that the text gets too small to read, so very wide content scrolls sideways instead.
+  if (over > 1.01 && z >= 0.45) de.style.zoom = String(z);
 }
 let FRAME_W = 0;
 const FRAME_RO = window.ResizeObserver ? new ResizeObserver(function () {
@@ -2720,16 +2765,38 @@ const FRAME_RO = window.ResizeObserver ? new ResizeObserver(function () {
   const w = fr ? fr.offsetWidth : 0;
   if (w && w !== FRAME_W) { FRAME_W = w; fitEmailFrame(); }
 }) : null;
+const BODY_RO = window.ResizeObserver ? new ResizeObserver(function () { fitEmailFrame(); }) : null;
 function mountEmailFrame(html) {
   const fr = $("ep-frame");
   if (!fr) return;
+  const fit = function () { if ($("ep-frame") === fr) fitEmailFrame(); };
   fr.onload = function () {
     FRAME_W = fr.offsetWidth;
-    fitEmailFrame();
-    try { fr.contentDocument.fonts.ready.then(fitEmailFrame); } catch (e) {}
+    fit();
+    try { fr.contentDocument.fonts.ready.then(fit); } catch (e) {}
   };
   if (FRAME_RO) { FRAME_RO.disconnect(); FRAME_RO.observe(fr); }
+  if (BODY_RO) BODY_RO.disconnect();
   fr.srcdoc = emailFrameDoc(html);
+  // Fit as soon as the email is parsed, not when its last image or tracking pixel arrives, then
+  // again whenever an image lands or fails, a section opens, or the text reflows.
+  (function whenParsed(n) {
+    if ($("ep-frame") !== fr) return;
+    let doc = null;
+    try { doc = fr.contentDocument; } catch (e) {}
+    if (!doc || doc.URL !== "about:srcdoc" || doc.readyState === "loading" || !doc.body) {
+      if (n < 600) requestAnimationFrame(function () { whenParsed(n + 1); });
+      return;
+    }
+    fit();
+    ["load", "error", "toggle"].forEach(function (t) { doc.addEventListener(t, fit, true); });
+    if (BODY_RO) BODY_RO.observe(doc.body);
+  })(0);
+}
+/** On wide screens the subject row stays pinned; it gets a hairline once the email scrolls under it. */
+function watchEmailScroll(pane) {
+  const sc = pane.querySelector(".ep-scroll"), t = pane.querySelector(".ep-title");
+  if (sc && t) sc.addEventListener("scroll", function () { t.classList.toggle("stuck", sc.scrollTop > 0); }, { passive: true });
 }
 async function renderEmailDetail() {
   const pane = $("e-detail");
@@ -2745,15 +2812,17 @@ async function renderEmailDetail() {
   if (d.deliveredAt) track.push("<span>Delivered<b>" + esc(fmtDateTime(d.deliveredAt)) + "</b></span>");
   if (d.openedAt) track.push("<span>Opened<b>" + esc(fmtDateTime(d.openedAt) + (d.opens > 1 ? " · " + d.opens + " times" : "")) + "</b></span>");
   if (d.clickedAt) track.push("<span>Clicked<b>" + esc(fmtDateTime(d.clickedAt)) + "</b></span>");
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + '</b><span style="width:44px"></span></div><div class="ep-scroll">' +
-    '<div class="ep-head"><div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + emailChip(e) + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + "</b>" +
+    '<button type="button" class="ib" data-action="goto-order" data-id="' + esc(e.orderId) + '" aria-label="Open order" title="Open order">' + ic("orders") + '</button></div><div class="ep-scroll">' +
+    '<div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + emailChip(e) + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
       (e.to && mailConnected() ? '<button type="button" class="btn sm ghost" data-action="compose-order" data-id="' + esc(e.orderId) + '">' + ic("pencil", 16) + "Write</button>" : "") +
       (e.to ? '<button type="button" class="btn sm ghost" data-action="send-email" data-id="' + esc(e.orderId) + '">' + ic("send", 16) + sendLabel + "</button>" : "") + "</div></div>" +
-      '<div class="ep-meta"><span>To<b>' + esc(e.name ? e.name + " <" + (e.to || "no email") + ">" : (e.to || "No email address")) + "</b></span><span>From<b>YOLKO &lt;" + esc(from) + "&gt;</b></span><span>" + esc(when[0]) + "<b>" + esc(when[1]) + "</b></span>" + track.join("") + "</div>" +
+    '<div class="ep-head"><div class="ep-meta"><span>To<b>' + esc(e.name ? e.name + " <" + (e.to || "no email") + ">" : (e.to || "No email address")) + "</b></span><span>From<b>YOLKO &lt;" + esc(from) + "&gt;</b></span><span>" + esc(when[0]) + "<b>" + esc(when[1]) + "</b></span>" + track.join("") + "</div>" +
       (e.status === "failed" ? '<div class="alert">' + ic("alert", 16) + "<div>" + esc("Zoho said: " + e.reason) + "</div></div>" : "") +
       (ds && ds.bad ? '<div class="alert">' + ic("alert", 16) + "<div><b>" + esc(ds.line) + ".</b> Check the address with the customer, then use Write to reach them, or call.</div></div>" : "") +
     "</div>" +
     '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:420px;margin:0 auto;border-radius:12px"></span></div></div>';
+  watchEmailScroll(pane);
   const id = e.orderId;
   let p = PREVIEWS[id];
   if (!p) {
@@ -2785,16 +2854,19 @@ async function renderMailDetail(pane, folder) {
   const fromAddr = folder === "sent" ? firstAddress(m.to) : m.from;
   const cust = customerByEmail(fromAddr);
   const meta = full || m;
-  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + '</b><span style="width:44px"></span></div><div class="ep-scroll">' +
-    '<div class="ep-head"><div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + '</h2><div class="ep-tools">' +
-      '<button type="button" class="btn sm dark" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '">' + ic("reply", 16) + (folder === "sent" ? "Write again" : "Reply") + "</button>" +
+  const replyLabel = folder === "sent" ? "Write again" : "Reply";
+  pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + "</b>" +
+    '<button type="button" class="ib" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '" aria-label="' + replyLabel + '" title="' + replyLabel + '">' + ic("reply") + '</button></div><div class="ep-scroll">' +
+    '<div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + '</h2><div class="ep-tools">' +
+      '<button type="button" class="btn sm dark" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '">' + ic("reply", 16) + replyLabel + "</button>" +
       (folder === "inbox" ? '<button type="button" class="btn sm ghost" data-action="mail-unread" data-id="' + esc(id) + '" title="Mark as unread">' + ic("unread", 16) + '<span class="lbl">Mark unread</span></button>' : "") +
     "</div></div>" +
-    '<div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc && !/^not provided$/i.test(full.cc) ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
+    '<div class="ep-head"><div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc && !/^not provided$/i.test(full.cc) ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
     (cust ? '<div class="cust-strip">' + ic("users", 16) + '<span class="min0"><b>' + esc(cust.latest.name || "Customer") + "</b> · " + esc(plural(cust.count, "order")) + " · latest #" + esc(orderRef(cust.latest)) + ", " + esc(dayLabel(cust.latest)) + '</span><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(cust.latest.id) + '">Open order</button></div>' : "") +
     (full && full.attachments && full.attachments.length ? '<div class="atts">' + full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") + "</div>" : "") +
     "</div>" +
     '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div></div>';
+  watchEmailScroll(pane);
   if (!full) {
     const r = await api("/api/admin/mail/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + (m.unread ? "&markRead=1" : ""));
     if (!r.ok) { const b = $("ep-body"); if (b && S.mailSel[folder] === id) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not open this message</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
@@ -2806,7 +2878,7 @@ async function renderMailDetail(pane, folder) {
   const b = $("ep-body");
   if (!b) return;
   b.innerHTML = '<iframe id="ep-frame" title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>';
-  mountEmailFrame('<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#171714;background:#fff;margin:0;padding:20px;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:0 0 0 4px;padding-left:12px;border-left:3px solid #e5e0d5;color:#3d3b36}</style></head><body>' + (full.html || "") + "</body></html>");
+  mountEmailFrame('<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#171714;background:#fff;margin:0;padding:20px;word-wrap:break-word}img{max-width:100%;height:auto}pre{white-space:pre-wrap}blockquote{margin:0 0 0 4px;padding-left:12px;border-left:3px solid #e5e0d5;color:#3d3b36}</style></head><body>' + (full.html || "") + "</body></html>");
 }
 function openEmail(id) {
   S.emailSel = id;
@@ -2953,7 +3025,7 @@ async function zohoDisconnect() {
 async function emailSettings() {
   const v = await openModal({
     title: "Email settings",
-    html: '<p class="minor" style="margin:0 0 6px">All shop email goes through Zoho as orders@getyolko.com.</p><div class="zstack">' + zohoCells().join("") + "</div>",
+    html: '<p class="minor" style="margin:0 0 6px">All shop email goes through Zoho as orders@getyolko.com.</p><div class="zstack">' + (SHEET_HTML = zohoCells().join("")) + "</div>",
     actions: [{ label: "Send a test email", kind: "ghost", value: "test" }, { label: "Done", kind: "primary", value: true }],
   });
   if (v === "test") testEmail();

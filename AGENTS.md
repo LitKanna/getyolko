@@ -117,8 +117,10 @@ Cancel, and a destructive button is never the default. Sheets have a grabber and
 close. The phone tab bar (Orders, Run, Stock, Emails, More) is navigation only, so everything else
 lives on the More page. Buttons show a spinner while working. On the Emails page the Zoho status (sending, delivery status,
 mailbox, Thursday reminders) lives in the Settings sheet, never as a row on the page; only a
-problem shows, as one line under the heading. The open email is a single scroll (header and
-message together) with the email frame sized to its content, so there is no box inside a box. The stock page hides pickup days
+problem shows, as one line under the heading. The open email is a single scroll with the email
+frame sized to its content (fitted as soon as it is parsed, and wide newsletters shrink to fit), so
+there is no box inside a box. Reply always stays in reach: the subject row is pinned on wide
+screens and the top bar holds it on phones. The stock page hides pickup days
 while the shop is delivery only. Before calling an admin change live, look at full-page
 screenshots at desktop and phone sizes in light and dark.
 
