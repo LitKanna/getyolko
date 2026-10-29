@@ -142,7 +142,9 @@ page end on the sidebar's bottom line, 16px (`--edge`) from the screen edges; on
 titles 30, stat numbers 28, order total 40, card titles 17, body 15, labels 13, all sentence case);
 check iPad sizes too (Kanna mostly uses an iPad Pro in dark). Appearance is Light, Dark or Auto from
 the switch in the sidebar (More on phones), kept in `localStorage` (`yolko_theme`); the script in the
-head puts `.dk` on `<html>` before the first paint. Plain customer emails read light on dark in Dark. An order reads
+head puts `.dk` on `<html>` before the first paint. Plain customer emails read light on dark in Dark.
+On screens under 820px tall the sidebar drops the week card so nothing squashes. Customer cards are
+one quiet line under the name, a row of four facts and the next step, with no chips. An order reads
 like a Wallet pass: big name and total, a progress track whose truck drives to the order's step, round
 contact buttons, then the delivery as a ticket with a perforated tear line. Motion uses the spring
 tokens (`--spring`, `--spring-bouncy`, `--spring-snappy` with `--t-*` durations): orders and emails
