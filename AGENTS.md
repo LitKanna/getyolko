@@ -128,17 +128,20 @@ order as one button: no From/To/Received labels or raw headers. The stock page h
 while the shop is delivery only. Before calling an admin change live, look at full-page
 screenshots at desktop and phone sizes in light and dark.
 
-The look is iOS 27 (Figma file "YOLKO Admin", page "iOS 27 admin"), and Kanna asked for it to be
-creative with iOS motion, not plain kit defaults. All colours, radii, glass and spring curves are
-tokens in `:root`. A soft yolk, sky and lilac light drifts behind the page (`body::before`, paused on
-the delivery run); the sidebar, tab bar, toolbar buttons, toasts and save bar are Liquid Glass with a
-bright top-left rim; cards are frosted (`--card`) while the list and detail panels stay solid. Motion
-uses the spring tokens (`--spring`, `--spring-bouncy`, `--spring-snappy` with `--t-*` durations):
-selection capsules glide in segmented controls, the sidebar and the tab bar (`glide()`), orders and
-emails open out of their row on phones and fold back into it, sheets spring up and follow the finger,
-glass grows under the finger, KPI widgets roll changed numbers, and the phone large title folds into
-a frosted top bar. Everything respects reduced motion. Apple devices get SF Pro (SF Pro Rounded for
-widget numbers); others get the self-hosted Inter.
+The look is iOS 27 (Figma file "YOLKO Admin", page "iOS 27 admin") in black, white and greys
+only. Kanna's rule (Oct 2026): no colour at all, so never add hues, tinted glows or coloured icon
+tiles; status shows by fill, weight and words (what needs you is solid black, white in dark mode).
+Kanna also asked for it to be modern and creative, not plain kit defaults. All colours, radii, glass
+and spring curves are tokens in `:root`. A soft white light sits behind the page (`body::before`,
+paused on the delivery run); the sidebar, tab bar, toolbar buttons and save bar are Liquid Glass;
+cards are crisp white with a hairline shadow (`--card-shadow`); the chosen sidebar item and tab are a
+solid capsule that glides (`glide()`); toasts are black capsules in both appearances. An order reads
+like a Wallet pass: big name and total, a progress track whose truck drives to the order's step, round
+contact buttons, then the delivery as a ticket with a perforated tear line. Motion uses the spring
+tokens (`--spring`, `--spring-bouncy`, `--spring-snappy` with `--t-*` durations): orders and emails
+open out of their row on phones, sheets spring up and follow the finger, widgets roll changed
+numbers, and the phone large title folds into a frosted top bar. Everything respects reduced
+motion. Apple devices get SF Pro; others get the self-hosted Inter.
 
 ### No lint / test / build tooling
 There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder
