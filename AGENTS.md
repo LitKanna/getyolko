@@ -115,7 +115,9 @@ under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system
 phones (no iOS zoom), safe-area padding. Prefer an Undo toast over a confirm dialog; dialogs say
 Cancel, and a destructive button is never the default. Sheets have a grabber and swipe down to
 close. The phone tab bar (Orders, Run, Stock, Emails, More) is navigation only, so everything else
-lives on the More page. Buttons show a spinner while working. On the Emails page the Zoho status (sending, delivery status,
+lives on the More page. Buttons show a spinner while working. Page headings have no description
+line (Kanna: it "sounds like ai"); the line under a heading only shows a live fact such as the next
+delivery or a stop count, or a problem. On the Emails page the Zoho status (sending, delivery status,
 mailbox, Thursday reminders) lives in the Settings sheet, never as a row on the page; only a
 problem shows, as one line under the heading. The open email is a single scroll with the email
 frame sized to its content (fitted as soon as it is parsed, and wide newsletters shrink to fit), so
