@@ -717,6 +717,8 @@ async function markOrderPaid(env, order, session) {
     if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
     await syncStock(env, order, order.status);
     await env.DATA.put(order.id, JSON.stringify(order));
+    // The admin rings for an order once it is paid, not when checkout opens: orders-head carries this.
+    await env.DATA.put("orders:lastpaid", `${order.id}|${Date.now()}`).catch(() => null);
     if (order.phone) await clearOpenOrder(env, order.phone, order.id);
     await noteReminderOrder(env, order).catch((err) => console.log("reminder signup failed", order.id, String(err?.message || err)));
     await noteReferralOrder(env, order).catch((err) => console.log("referral note failed", order.id, String(err?.message || err)));
@@ -2477,8 +2479,8 @@ async function handleApi(request, env, url, ctx) {
   // Admin: one-read check for new orders, so a background tab can poll cheaply.
   if (url.pathname === "/api/admin/orders-head" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    const ids = await getOrderIndex(env);
-    return json({ count: ids.length, latest: ids[0] || null });
+    const [ids, lastPaid] = await Promise.all([getOrderIndex(env), env.DATA.get("orders:lastpaid").catch(() => null)]);
+    return json({ count: ids.length, latest: ids[0] || null, lastPaid: lastPaid || null });
   }
 
   // Admin: list orders, newest first (uses orders:index. avoids KV list())
@@ -3907,7 +3909,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "208",
+      "X-Yolko-Build": "209",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

@@ -69,6 +69,12 @@ The admin Emails page uses `GET /api/admin/emails`, `GET /api/admin/email-previe
 `POST /api/admin/test-email {to}`. All shop email is orders@getyolko.com on Zoho (order emails
 reply to it too); getyolkonow@gmail.com is only for Google sign-ins, never for mail.
 
+An order row is written when the customer opens Stripe Checkout, so a row with status `new`, a
+`sessionId` and no payment is not an order yet. The admin keeps these out of Upcoming, Waiting, the
+widgets, the nav count, alerts, the delivery run and Customers, and lists them under Not paid for a
+week ("Checkout open" for the first 24 hours, then "Didn't pay"). `markOrderPaid` writes
+`orders:lastpaid`, which `GET /api/admin/orders-head` returns, so a checkout paid later still rings.
+
 Zoho Mail (the admin Inbox, Sent, reply and compose) is an OAuth connection, not a pasted token.
 Secrets `ZOHO_CLIENT_ID` and `ZOHO_CLIENT_SECRET` come from a Server-based app in
 api-console.zoho.com (redirect `https://getyolko.com/api/zoho/callback`, scopes
@@ -142,7 +148,10 @@ page end on the sidebar's bottom line, 16px (`--edge`) from the screen edges; on
 titles 30, stat numbers 28, order total 40, card titles 17, body 15, labels 13, all sentence case);
 check iPad sizes too (Kanna mostly uses an iPad Pro in dark). Appearance is Light, Dark or Auto from
 the switch in the sidebar (More on phones), kept in `localStorage` (`yolko_theme`); the script in the
-head puts `.dk` on `<html>` before the first paint. Plain customer emails read light on dark in Dark. An order reads
+head puts `.dk` on `<html>` before the first paint. Plain customer emails read light on dark in Dark.
+On screens under 820px tall the sidebar drops the week card so nothing squashes. Customer cards are
+one quiet line under the name, a row of four facts and the next step, with no chips. Only the order
+tabs that need you (Upcoming, Waiting, Not paid) show a count, so the tabs fit an iPad. An order reads
 like a Wallet pass: big name and total, a progress track whose truck drives to the order's step, round
 contact buttons, then the delivery as a ticket with a perforated tear line. Motion uses the spring
 tokens (`--spring`, `--spring-bouncy`, `--spring-snappy` with `--t-*` durations): orders and emails
