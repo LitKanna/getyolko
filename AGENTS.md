@@ -120,7 +120,9 @@ mailbox, Thursday reminders) lives in the Settings sheet, never as a row on the 
 problem shows, as one line under the heading. The open email is a single scroll with the email
 frame sized to its content (fitted as soon as it is parsed, and wide newsletters shrink to fit), so
 there is no box inside a box. Reply always stays in reach: the subject row is pinned on wide
-screens and the top bar holds it on phones. The stock page hides pickup days
+screens and the top bar holds it on phones. Under the subject, an open email shows one person row
+like Mail (initials, name, address, time; order emails add their status chip) and the customer's
+order as one button: no From/To/Received labels or raw headers. The stock page hides pickup days
 while the shop is delivery only. Before calling an admin change live, look at full-page
 screenshots at desktop and phone sizes in light and dark.
 

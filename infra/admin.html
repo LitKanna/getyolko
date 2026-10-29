@@ -375,16 +375,30 @@ button.kpi:active { transform:scale(.99); }
 /* One scroll for the open email: the details scroll away with the message, while the subject and
    Reply stay pinned on wide screens (the top bar holds Reply on phones and in the drawer). */
 .ep-scroll { flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto; scrollbar-gutter:stable; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--line2) transparent; }
-.ep-title { flex:none; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:16px 20px 8px; background:var(--paper); }
-.ep-title h2 { margin:0; font-size:16px; line-height:22px; font-weight:600; }
+.ep-title { flex:none; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px 16px; padding:16px 20px 12px; background:var(--paper); }
+.ep-title h2 { margin:0; font-size:18px; line-height:24px; font-weight:600; letter-spacing:-.01em; }
 .ep-tools { margin-left:auto; display:flex; gap:8px; }
-.ep-head { flex:none; padding:0 20px 16px; border-bottom:1px solid var(--line); }
+.ep-head { flex:none; padding:4px 20px 16px; border-bottom:1px solid var(--line); }
+/* Who it's from and when, the way Mail shows it: a face, a name, an address, a time. No field labels. */
+.ep-from { display:flex; align-items:flex-start; gap:12px; }
+.ep-from .av { width:40px; height:40px; font-size:14px; }
+.ep-from .who { flex:1; min-width:0; }
+.ep-from .nm { display:flex; align-items:center; gap:8px; min-width:0; }
+.ep-from .nm b { min-width:0; font-size:15px; line-height:20px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ep-from .nm .chip { flex:none; }
+.ep-from .who span { display:block; font-size:13px; line-height:20px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ep-from time { flex:none; font-size:13px; line-height:20px; color:var(--muted); white-space:nowrap; }
+.ep-more { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-left:52px; }
+.ep-more:empty { display:none; }
+.order-pill { display:inline-flex; align-items:center; gap:8px; max-width:100%; height:36px; padding:0 10px 0 12px; border-radius:18px; background:var(--subtle); font-size:13px; font-weight:600; color:var(--ink); }
+.order-pill:hover { background:var(--hover); }
+.order-pill .i { flex:none; color:var(--muted); }
+.order-pill span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.order-pill small { font-size:13px; font-weight:500; color:var(--muted); }
 @media (min-width:1180px) {
   .ep-title { position:sticky; top:0; z-index:2; transition:box-shadow .15s; }
   .ep-title.stuck { box-shadow:0 1px 0 var(--line), 0 6px 12px -8px rgba(23,23,20,.18); }
 }
-.ep-meta { display:flex; flex-wrap:wrap; gap:4px 20px; font-size:12px; line-height:16px; color:var(--muted); }
-.ep-meta span b { font-weight:500; color:var(--ink2); margin-left:6px; }
 .ep-body { flex:1 0 auto; background:var(--subtle); padding:16px; }
 .ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:12px; background:#faf7f0; min-height:300px; }
 .ep-note { max-width:640px; margin:10px auto 0; font-size:12px; line-height:16px; color:var(--muted); text-align:center; }
@@ -394,11 +408,6 @@ button.kpi:active { transform:scale(.99); }
 .mrow.unread-row .nm b, .mrow.unread-row .mt .subj { font-weight:700; color:var(--ink); }
 .mrow .nm .i { width:14px; height:14px; color:var(--muted); flex:none; }
 .more-row { display:flex; justify-content:center; padding:14px; }
-.cust-strip { display:flex; align-items:center; gap:10px; margin-top:12px; padding:8px 8px 8px 12px; border-radius:10px; background:var(--subtle); font-size:13px; line-height:18px; color:var(--ink2); }
-.cust-strip > .i { color:var(--muted); flex:none; }
-.cust-strip .min0 { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cust-strip b { font-weight:600; color:var(--ink); }
-.atts { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .att { display:inline-flex; align-items:center; gap:8px; max-width:100%; height:36px; padding:0 12px; border:1px solid var(--line2); border-radius:10px; background:var(--paper); font-size:13px; font-weight:500; }
 .att:hover { background:var(--hover); }
 .att .min0 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
@@ -726,9 +735,11 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .dp-foot { padding:12px 16px calc(12px + var(--safe-b)); }
   .dp-foot .btn { flex:1; height:48px; font-size:15px; border-radius:12px; }
   .dp-head { padding:16px; }
-  .ep-title { padding:16px 16px 8px; }
-  .ep-head { padding:0 16px 16px; }
+  .ep-title { padding:16px 16px 12px; }
+  .ep-title h2 { font-size:17px; line-height:22px; }
+  .ep-head { padding:4px 16px 16px; }
   .dp-body { padding:0 16px 8px; }
+  .ep-title { grid-template-columns:minmax(0,1fr); }
   .ep-tools { margin-left:0; width:100%; }
   .ep-body { padding:12px; }
   .pgrid { grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
@@ -780,6 +791,8 @@ details.pick[open] > summary .i { transform:rotate(90deg); }
   .dayh a { padding:10px 0; margin:-10px 0; }
   .zcell .more { padding:12px 0; margin:-12px 0; }
   .sub-issue { padding:13px 0; margin:-13px 0; }
+  .order-pill, .att { height:44px; }
+  .order-pill { border-radius:22px; }
   .inp, .dd, .inp.sm, .dd.sm, .search input { font-size:16px; }
   .inp.sm, .dd.sm { height:44px; }
   .dz .inp { height:44px; font-size:16px; }
@@ -1038,6 +1051,15 @@ function fmtClock(iso) {
   return new Date(iso).toLocaleTimeString("en-AU", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
 }
 function sydDate(t) { return new Date(t).toLocaleDateString("en-CA", { timeZone: TZ }); }
+/** "Today, 1:02 am", "Yesterday, 4:36 pm" or "Thu 29 Oct, 1:02 am": when a message came, the way Mail says it. */
+function fmtWhen(iso, mid) {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  const day = sydDate(t);
+  const word = day === sydDate(Date.now()) ? "Today" : day === sydDate(Date.now() - 864e5) ? "Yesterday" : "";
+  if (!word) return fmtDateTime(iso);
+  return (mid ? word.toLowerCase() : word) + ", " + fmtClock(iso);
+}
 function rel(iso) {
   if (!iso) return "";
   const t = new Date(iso).getTime();
@@ -2525,6 +2547,13 @@ function customerByEmail(addr) {
   return { latest: mine[0], count: mine.filter(function (o) { return o.status !== "cancelled"; }).length || mine.length };
 }
 function firstAddress(s) { const m = /<([^>]+)>/.exec(String(s || "")); return (m ? m[1] : String(s || "").split(/[,;]/)[0]).trim(); }
+/** The display name in '"Priya Shah" <priya@x.com>', or "" when there is only an address. */
+function addrName(s) { const m = /^\s*"?([^"<]*?)"?\s*</.exec(String(s || "")); return m ? m[1].trim() : ""; }
+/** The person row at the top of an open email: initials, name, a quiet second line, and the time. */
+function emailFrom(name, line, when, whenTitle, lead, badge) {
+  return '<div class="ep-from"><span class="av">' + esc(initials(name)) + '</span><div class="who"><div class="nm"><b>' + esc((lead || "") + name) + "</b>" + (badge || "") + "</div>" +
+    (line ? "<span>" + esc(line) + "</span>" : "") + '</div><time title="' + esc(whenTitle || "") + '">' + esc(when) + "</time></div>";
+}
 function zcell(icon, cls, k, title, sub, extra) {
   return '<div class="zcell"><span class="zic ' + cls + '">' + ic(icon, 16) + '</span><div class="min0"><span class="k">' + esc(k) + "</span><b>" + esc(title) + "</b><p>" + esc(sub) + "</p>" + (extra || "") + "</div></div>";
 }
@@ -2805,19 +2834,18 @@ async function renderEmailDetail() {
   if (!e) { pane.innerHTML = '<div class="dp-empty">' + ic("mail", 30) + "<b>Pick an email</b><p>You’ll see exactly what the customer got.</p></div>"; return; }
   const ds = deliveryState(e);
   const sendLabel = e.status === "sent" ? "Resend" : e.status === "failed" ? "Try again" : "Send now";
-  const from = (EMAIL_STATUS && EMAIL_STATUS.sending && EMAIL_STATUS.sending.from) || "orders@getyolko.com";
-  const when = e.status === "sent" ? ["Sent", fmtDateTime(e.sentAt)] : e.status === "failed" ? ["Last try", fmtDateTime(e.lastTriedAt)] : ["Paid", fmtDateTime(e.paidAt || e.createdAt)];
+  const when = e.status === "sent" ? ["Sent", e.sentAt] : e.status === "failed" ? ["Last try", e.lastTriedAt] : ["Paid", e.paidAt || e.createdAt];
   const d = e.delivery || {};
   const track = [];
-  if (d.deliveredAt) track.push("<span>Delivered<b>" + esc(fmtDateTime(d.deliveredAt)) + "</b></span>");
-  if (d.openedAt) track.push("<span>Opened<b>" + esc(fmtDateTime(d.openedAt) + (d.opens > 1 ? " · " + d.opens + " times" : "")) + "</b></span>");
-  if (d.clickedAt) track.push("<span>Clicked<b>" + esc(fmtDateTime(d.clickedAt)) + "</b></span>");
+  if (d.openedAt) track.push("Opened " + fmtWhen(d.openedAt, true) + (d.opens > 1 ? " (" + d.opens + " times)" : ""));
+  if (d.clickedAt) track.push("Clicked " + fmtWhen(d.clickedAt, true));
+  const toLine = [e.name ? e.to || "No email address" : ""].concat(track).filter(Boolean).join(" · ");
   pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>Email #" + esc(e.ref) + "</b>" +
     '<button type="button" class="ib" data-action="goto-order" data-id="' + esc(e.orderId) + '" aria-label="Open order" title="Open order">' + ic("orders") + '</button></div><div class="ep-scroll">' +
-    '<div class="ep-title"><h2>' + esc(e.subject) + "</h2>" + emailChip(e) + '<div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
+    '<div class="ep-title"><h2>' + esc(e.subject) + '</h2><div class="ep-tools"><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(e.orderId) + '">' + ic("orders", 16) + "Open order</button>" +
       (e.to && mailConnected() ? '<button type="button" class="btn sm ghost" data-action="compose-order" data-id="' + esc(e.orderId) + '">' + ic("pencil", 16) + "Write</button>" : "") +
       (e.to ? '<button type="button" class="btn sm ghost" data-action="send-email" data-id="' + esc(e.orderId) + '">' + ic("send", 16) + sendLabel + "</button>" : "") + "</div></div>" +
-    '<div class="ep-head"><div class="ep-meta"><span>To<b>' + esc(e.name ? e.name + " <" + (e.to || "no email") + ">" : (e.to || "No email address")) + "</b></span><span>From<b>YOLKO &lt;" + esc(from) + "&gt;</b></span><span>" + esc(when[0]) + "<b>" + esc(when[1]) + "</b></span>" + track.join("") + "</div>" +
+    '<div class="ep-head">' + emailFrom(e.name || e.to || "No email address", toLine, (e.status === "sent" ? "" : when[0] + " ") + fmtWhen(when[1], e.status !== "sent"), when[0] + " " + fmtDateTime(when[1]), "", emailChip(e)) +
       (e.status === "failed" ? '<div class="alert">' + ic("alert", 16) + "<div>" + esc("Zoho said: " + e.reason) + "</div></div>" : "") +
       (ds && ds.bad ? '<div class="alert">' + ic("alert", 16) + "<div><b>" + esc(ds.line) + ".</b> Check the address with the customer, then use Write to reach them, or call.</div></div>" : "") +
     "</div>" +
@@ -2851,20 +2879,26 @@ async function renderMailDetail(pane, folder) {
   }
   const key = "mail:" + id;
   const full = PREVIEWS[key];
-  const fromAddr = folder === "sent" ? firstAddress(m.to) : m.from;
-  const cust = customerByEmail(fromAddr);
+  const sent = folder === "sent";
   const meta = full || m;
-  const replyLabel = folder === "sent" ? "Write again" : "Reply";
+  const addr = sent ? firstAddress(meta.to || m.to) : (meta.from || m.from || "");
+  const cust = customerByEmail(addr);
+  const name = sent ? (cust && cust.latest.name) || addrName(meta.to || m.to) || addr : meta.fromName || m.fromName || addr;
+  const cc = full && full.cc && !/^not provided$/i.test(full.cc) ? full.cc : "";
+  const line = [name !== addr ? addr : "", cc ? "Cc " + cc : ""].filter(Boolean).join(" · ");
+  const custName = cust && cust.latest.name && cust.latest.name.toLowerCase() !== String(name).toLowerCase() ? cust.latest.name + " · " : "";
+  const more = (cust ? '<button type="button" class="order-pill" data-action="goto-order" data-id="' + esc(cust.latest.id) + '" title="Open order">' + ic("orders", 16) +
+      "<span>" + esc(custName + "Order #" + orderRef(cust.latest) + " · " + dayLabel(cust.latest)) + (cust.count > 1 ? " <small>· " + esc(plural(cust.count, "order")) + "</small>" : "") + "</span>" + ic("chevron", 14) + "</button>" : "") +
+    (full && full.attachments ? full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") : "");
+  const replyLabel = sent ? "Write again" : "Reply";
   pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + "</b>" +
     '<button type="button" class="ib" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '" aria-label="' + replyLabel + '" title="' + replyLabel + '">' + ic("reply") + '</button></div><div class="ep-scroll">' +
     '<div class="ep-title"><h2>' + esc(m.subject || "(no subject)") + '</h2><div class="ep-tools">' +
       '<button type="button" class="btn sm dark" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '">' + ic("reply", 16) + replyLabel + "</button>" +
       (folder === "inbox" ? '<button type="button" class="btn sm ghost" data-action="mail-unread" data-id="' + esc(id) + '" title="Mark as unread">' + ic("unread", 16) + '<span class="lbl">Mark unread</span></button>' : "") +
     "</div></div>" +
-    '<div class="ep-head"><div class="ep-meta"><span>From<b>' + esc(folder === "sent" ? "YOLKO <" + (MAIL.sent && MAIL.sent.account || "orders@getyolko.com") + ">" : ((meta.fromName ? meta.fromName + " " : "") + "<" + (meta.from || "") + ">")) + "</b></span><span>To<b>" + esc(meta.to || "") + "</b></span>" + (full && full.cc && !/^not provided$/i.test(full.cc) ? "<span>Cc<b>" + esc(full.cc) + "</b></span>" : "") + "<span>" + (folder === "sent" ? "Sent" : "Received") + "<b>" + esc(fmtDateTime(meta.receivedAt || m.receivedAt)) + "</b></span></div>" +
-    (cust ? '<div class="cust-strip">' + ic("users", 16) + '<span class="min0"><b>' + esc(cust.latest.name || "Customer") + "</b> · " + esc(plural(cust.count, "order")) + " · latest #" + esc(orderRef(cust.latest)) + ", " + esc(dayLabel(cust.latest)) + '</span><button type="button" class="btn sm ghost" data-action="goto-order" data-id="' + esc(cust.latest.id) + '">Open order</button></div>' : "") +
-    (full && full.attachments && full.attachments.length ? '<div class="atts">' + full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") + "</div>" : "") +
-    "</div>" +
+    '<div class="ep-head">' + emailFrom(name, line, fmtWhen(meta.receivedAt || m.receivedAt), (sent ? "Sent " : "Received ") + fmtDateTime(meta.receivedAt || m.receivedAt), sent ? "To " : "") +
+    '<div class="ep-more">' + more + "</div></div>" +
     '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div></div>';
   watchEmailScroll(pane);
   if (!full) {
