@@ -91,6 +91,17 @@ img {
   height: auto;
 }
 
+/* Photos and the map sit in the page like part of the design: no right-click
+   save, dragging, selecting or long-press menu. They stay real <img> tags so
+   Google still reads them and their alt text. */
+img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 button,
 input,
 select,
