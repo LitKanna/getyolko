@@ -5,8 +5,10 @@
  *
  *   egg-delivery-<suburb>.html  (one per entry in SUBURB_PAGES)
  *   egg-delivery-sydney.html, bulk-eggs-sydney.html, egg-delivery-areas.html, 404.html
+ *   assets/coverage-map.svg (the delivery map, from the same zone data checkout uses)
  *   sitemap.xml
- *   index.html: only the JSON-LD block and the FAQ list (between markers)
+ *   index.html: only the JSON-LD block, the FAQ list, the map and the
+ *   next-delivery script (each between markers)
  *
  * Usage: node infra/build-pages.mjs && node infra/build-areas-page.mjs
  * (the areas page keeps its generated suburb list; build-areas-page refills it).
@@ -18,21 +20,29 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
+import { buildCoverageMap } from "./coverage-map.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "149";
+const CSS_V = "150";
 const FONTS_V = "77";
 const IMG_V = "112";
+const MAP_V = "1";
 
 const PHONE = "+61433975055";
-const PHONE_DISPLAY = "+61 433 975 055";
+const PHONE_LOCAL = "0433 975 055";
 const WHATSAPP = "https://wa.me/61433975055";
 const EMAIL = "orders@getyolko.com";
 const PRICE = { tray1: 13, tray2: 25, box: 72, delivery: 5 };
+const PACKS = {
+  tray1: { name: "1 tray", label: "1 tray · 30 eggs", eggs: 30, price: PRICE.tray1 },
+  tray2: { name: "2 trays", label: "2 trays · 60 eggs", eggs: 60, price: PRICE.tray2 },
+  box: { name: "Full box", label: "Full box · 180 eggs", eggs: 180, price: PRICE.box },
+};
+const MAP = buildCoverageMap();
 
 const HERO_IMG = `${SITE}/assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}`;
 const HERO_ALT = `Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $${PRICE.tray1} a tray`;
@@ -334,9 +344,10 @@ function jsonLd(graph, indent = "  ") {
 
 /* ---------- Shared markup ---------- */
 
-const HERO_SIZES = "(max-width: 900px) min(100vw - 32px, 420px), 420px";
+const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), 560px";
 const heroSrcset = (ext) =>
   [640, 928, 1536].map((w) => `assets/chalk-tray/${PRICE.tray1}-${w}.${ext}?v=${IMG_V} ${w}w`).join(", ");
+const perEgg = (price, eggs) => Math.round((price / eggs) * 100);
 
 const META_PIXEL = `  <script>
   !function(f,b,e,v,n,t,s)
@@ -408,11 +419,33 @@ ${META_PIXEL}
 </head>`;
 }
 
+// Fills in the coming Saturday (Sydney time). Without JS the bar still says "Saturday delivery".
+const NEXT_RUN_SCRIPT = `  <script>
+  (function () {
+    var el = document.querySelector("[data-next-run]");
+    if (!el || !window.Intl) return;
+    try {
+      var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
+      var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
+      var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+      var ahead = (6 - dow + 7) % 7 || 7;
+      var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
+      var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+      el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
+    } catch (e) {}
+  })();
+  </script>`;
+
+const ANNOUNCE = `  <div class="announce">
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+  </div>
+${NEXT_RUN_SCRIPT}`;
+
 const NAV = [
   ["Delivery", "/egg-delivery-sydney"],
-  ["Areas", "/egg-delivery-areas"],
+  ["Suburbs", "/egg-delivery-areas"],
   ["Bulk eggs", "/bulk-eggs-sydney"],
-  ["FAQ", "#faq"],
+  ["Questions", "#faq"],
 ];
 
 function header(path) {
@@ -422,7 +455,9 @@ function header(path) {
     const current = href === path ? ' aria-current="page"' : "";
     return `        <a href="${href}"${current}>${label}</a>`;
   }).join("\n");
-  return `  <header class="topbar">
+  return `${ANNOUNCE}
+
+  <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="/" aria-label="YOLKO home">
         <span class="brand-dot" aria-hidden="true"></span>
@@ -431,7 +466,10 @@ function header(path) {
       <nav class="topnav" aria-label="Main navigation">
 ${links}
       </nav>
-      <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      <div class="topbar-actions">
+        <a class="topbar-phone" href="tel:${PHONE}">${PHONE_LOCAL}</a>
+        <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      </div>
     </div>
   </header>`;
 }
@@ -447,17 +485,26 @@ ${parts.join("\n")}
           </nav>`;
 }
 
-function heroSection({ trail, kicker, h1, sub, cta = "Order now", alt = HERO_ALT }) {
+const HERO_FACTS = `          <ul class="hero-facts">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$${PRICE.delivery} flat delivery</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
+          </ul>`;
+
+function heroSection({ trail, kicker, h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT, pack = "tray1" }) {
+  const p = PACKS[pack];
   return `    <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
 ${crumbsNav(trail)}
-          <p class="hero-kicker">${kicker}</p>
+          <p class="hero-pill"><span class="pill-dot" aria-hidden="true"></span>${kicker}</p>
           <h1>${h1}</h1>
           <p class="hero-sub">${sub}</p>
           <div class="hero-cta">
-            <a class="btn btn-solid" href="/#order">${cta}</a>
+            <a class="btn btn-solid btn-lg" href="${ctaHref}">${cta}</a>${secondary ? `
+            <a class="btn btn-ghost btn-lg" href="${secondary[1]}"${secondary[1].startsWith("http") ? ' target="_blank" rel="noopener noreferrer"' : ""}>${secondary[0]}</a>` : ""}
           </div>
+${HERO_FACTS}
         </div>
         <div class="hero-showcase">
           <div class="showcase-card">
@@ -466,39 +513,121 @@ ${crumbsNav(trail)}
               <img src="assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}" srcset="${heroSrcset("jpg")}" sizes="${HERO_SIZES}" width="1536" height="1536" fetchpriority="high" decoding="async" alt="${esc(alt)}">
             </picture>
           </div>
+          <div class="price-card" aria-hidden="true">
+            <span>${p.label}</span>
+            <strong>$${p.price}</strong>
+            <span>About ${perEgg(p.price, p.eggs)}¢ an egg</span>
+          </div>
         </div>
       </div>
     </section>`;
 }
 
-function stepsSection(lastStep) {
-  const steps = [
-    ["Order by Friday night", "Choose a tray, two trays or a 180-egg box."],
-    ["Pay by card", "Secure checkout with Stripe."],
-    lastStep,
-  ];
-  return `    <section class="local-band">
+function sectionHead(title, sub, id) {
+  return `        <header class="section-head">
+          <h2${id ? ` id="${id}"` : ""}>${title}</h2>${sub ? `
+          <p>${sub}</p>` : ""}
+        </header>`;
+}
+
+// Suburb pages leave this out: the hero facts say the same, and less shared text keeps each page its own.
+function timeline(title, steps, sub = "One delivery run a week keeps the price low. Here is how it goes.") {
+  return `    <section id="how" class="how" aria-labelledby="how-title">
       <div class="wrap">
-        <header class="section-head left">
-          <h2>How it works</h2>
-        </header>
-        <ol class="local-model">
-${steps.map(([t, d]) => `          <li><strong>${t}</strong><span>${d}</span></li>`).join("\n")}
+${sectionHead(title, sub, "how-title")}
+        <ol class="timeline">
+${steps.map(([when, t, d]) => `          <li>
+            <span class="tl-when">${when}</span>
+            <h3>${t}</h3>
+            <p>${d}</p>
+          </li>`).join("\n")}
         </ol>
       </div>
     </section>`;
 }
+
+const STEPS = (last) => [
+  ["By Friday night", "Order online", "Choose a tray, two trays or a 180-egg box, and pay by card."],
+  ["Straight away", "Get your receipt", "We email your order and receipt as soon as you pay."],
+  ["Saturday, 6am to 12pm", "Eggs at your door", last],
+];
+
+function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.delivery} flat.`) {
+  const cards = ["tray1", "tray2", "box"].map((k) => {
+    const p = PACKS[k];
+    return `          <li>
+            <h3>${p.name}</h3>
+            <p class="pc-meta">${p.eggs} eggs · ${perEgg(p.price, p.eggs)}¢ an egg</p>
+            <div class="pc-row">
+              <span class="pc-price">$${p.price}</span>
+              <a class="btn btn-solid btn-small" href="/?b=${k}#order" aria-label="Order ${p.name.toLowerCase()}">Order</a>
+            </div>
+          </li>`;
+  }).join("\n");
+  return `    <section class="band" aria-labelledby="prices-title">
+      <div class="wrap">
+${sectionHead(title, sub, "prices-title")}
+        <ul class="price-cards">
+${cards}
+        </ul>
+      </div>
+    </section>`;
+}
+
+function mapFigure() {
+  const labels = MAP.labels
+    .map((l) => `              <span class="map-label" style="left:${l.x}%;top:${l.y}%">${l.name}</span>`)
+    .join("\n");
+  return `          <figure class="coverage-map">
+            <div class="map-frame" aria-hidden="true">
+              <img src="/assets/coverage-map.svg?v=${MAP_V}" width="${MAP.width}" height="${MAP.height}" loading="lazy" decoding="async" alt="">
+${labels}
+            </div>
+            <figcaption><span class="map-key">We deliver</span><span class="map-key off">Too far for now</span></figcaption>
+          </figure>`;
+}
+
+function suburbCheck(id) {
+  return `            <form class="suburb-check" action="/egg-delivery-areas" method="get" role="search">
+              <label class="sr-only" for="${id}">Suburb or postcode</label>
+              <input id="${id}" name="q" type="search" inputmode="search" autocomplete="off" placeholder="Suburb or postcode">
+              <button class="btn btn-ink" type="submit">Check</button>
+            </form>`;
+}
+
+function mapPanel(title, text, extra = "") {
+  return `    <section class="areas" aria-labelledby="map-title">
+      <div class="wrap">
+        <div class="areas-panel">
+          <div class="areas-copy">
+            <h2 id="map-title">${title}</h2>
+            <p>${text}</p>
+${extra}
+          </div>
+${mapFigure()}
+        </div>
+      </div>
+    </section>`;
+}
+
+const CONTACT_ROW = `          <div class="contact-row">
+            <a class="btn btn-ink btn-small" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+            <a class="btn btn-ghost btn-small" href="tel:${PHONE}">Call</a>
+            <a class="btn btn-ghost btn-small" href="mailto:${EMAIL}">Email</a>
+          </div>`;
 
 function faqSection(title, faqs) {
   const items = faqs.map(([q, a], i) => `          <details${i === 0 ? " open" : ""}>
             <summary>${q}</summary>
             <p>${a}</p>
           </details>`);
-  return `    <section id="faq" class="faq">
-      <div class="wrap">
-        <header class="section-head">
-          <h2>${title}</h2>
-        </header>
+  return `    <section id="faq" class="faq" aria-labelledby="faq-title">
+      <div class="wrap faq-layout">
+        <div class="faq-intro">
+          <h2 id="faq-title">${title}</h2>
+          <p>Can't find your answer? Message us and a real person will reply.</p>
+${CONTACT_ROW}
+        </div>
         <div class="faq-grid">
 ${items.join("\n")}
         </div>
@@ -507,13 +636,17 @@ ${items.join("\n")}
 }
 
 function ctaBand(title, text, secondary) {
-  return `    <section class="local-cta-band">
+  return `    <section class="cta-band">
       <div class="wrap">
-        <h2>${title}</h2>
-        <p>${text}</p>
-        <div class="hero-cta">
-          <a class="btn btn-solid" href="/#order">Order now</a>${secondary ? `
-          <a class="btn btn-ghost" href="${secondary[1]}">${secondary[0]}</a>` : ""}
+        <div class="cta-panel">
+          <div>
+            <h2>${title}</h2>
+            <p>${text}</p>
+          </div>
+          <div class="hero-cta">
+            <a class="btn btn-ink btn-lg" href="/#order">Order now</a>${secondary ? `
+            <a class="btn btn-ghost btn-lg" href="${secondary[1]}"${secondary[1].startsWith("http") ? ' target="_blank" rel="noopener noreferrer"' : ""}>${secondary[0]}</a>` : ""}
+          </div>
         </div>
       </div>
     </section>`;
@@ -521,10 +654,11 @@ function ctaBand(title, text, secondary) {
 
 function chips(items, current) {
   return items
-    .map(([label, href]) => {
-      if (!href) return `          <li>${label}</li>`;
+    .map(([label, href, cls]) => {
+      const c = cls ? ` class="${cls}"` : "";
+      if (!href) return `          <li${c}>${label}</li>`;
       const cur = href === current ? ' aria-current="page"' : "";
-      return `          <li><a href="${href}"${cur}>${label}</a></li>`;
+      return `          <li${c}><a href="${href}"${cur}>${label}</a></li>`;
     })
     .join("\n");
 }
@@ -544,26 +678,25 @@ function footer(path) {
             <span class="brand-dot" aria-hidden="true"></span>
             <span>YOLKO</span>
           </a>
-          <p class="foot-tag">Fresh Pace Farm eggs, delivered in Sydney.</p>
-          <address class="foot-nap">
-            Saturday delivery across Sydney<br>
-            Within 45&nbsp;km of Flemington
-          </address>
+          <p class="foot-tag">Fresh Pace Farm eggs, delivered across Sydney every Saturday morning.</p>
         </div>
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
-          <a href="/#order">Order now</a>
+          <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
+          <a href="/#faq">Questions</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
           <a href="/egg-delivery-sydney"${cur("/egg-delivery-sydney")}>Egg delivery Sydney</a>
-          <a href="/egg-delivery-areas"${cur("/egg-delivery-areas")}>Suburbs we cover</a>
-          <a href="/#faq">FAQ</a>
+          <a href="/egg-delivery-areas"${cur("/egg-delivery-areas")}>All suburbs</a>
+          <a href="/egg-delivery-strathfield"${cur("/egg-delivery-strathfield")}>Strathfield</a>
+          <a href="/egg-delivery-homebush"${cur("/egg-delivery-homebush")}>Homebush</a>
+          <a href="/egg-delivery-parramatta"${cur("/egg-delivery-parramatta")}>Parramatta</a>
         </nav>
         <nav class="foot-col" aria-label="Contact">
           <p class="foot-h">Contact</p>
-          <a href="tel:${PHONE}">${PHONE_DISPLAY}</a>
+          <a href="tel:${PHONE}">${PHONE_LOCAL}</a>
           <a href="mailto:${EMAIL}">${EMAIL}</a>
           <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </nav>
@@ -579,33 +712,45 @@ function footer(path) {
   </footer>`;
 }
 
-function mobileCta(line) {
+function mobileCta(line, pack = "tray1") {
+  const p = PACKS[pack];
   return `  <div class="mobile-cta show">
     <div class="mobile-cta-text">
-      <strong>30 eggs · $${PRICE.tray1}</strong>
+      <strong>${p.eggs} eggs · $${p.price}</strong>
       <span>${line}</span>
     </div>
-    <a class="btn btn-small" href="/#order">Order</a>
+    <a class="btn btn-solid btn-small" href="/${pack === "tray1" ? "" : `?b=${pack}`}#order">Order</a>
   </div>`;
 }
 
+// Shades the header once the page scrolls, and slides the phone order bar in
+// after the hero's own Order button has scrolled away (without JS it always shows).
 const TOPBAR_SCRIPT = `  <script>
   (function () {
     var bar = document.querySelector(".topbar");
-    if (!bar) return;
-    function sync() { bar.classList.toggle("scrolled", window.scrollY > 8); }
+    var cta = document.querySelector(".mobile-cta");
+    var heroCta = document.querySelector(".hero .hero-cta");
+    function sync() {
+      if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
+      if (cta && heroCta) {
+        var show = heroCta.getBoundingClientRect().bottom < 0;
+        cta.classList.toggle("show", show);
+        cta.inert = !show;
+      }
+    }
     sync();
     window.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync);
   })();
   </script>`;
 
-function page({ path, title, description, graph, index, hero, body, mobile, scripts = "" }) {
+function page({ path, title, description, graph, index, hero, body, mobile, pack, scripts = "" }) {
   return `${head({ path, title, description, graph, index, hero })}
 <body class="local">
 ${header(path)}
 ${body}
 
-${mobile ? mobileCta(mobile) + "\n\n" : ""}${footer(path)}
+${mobile ? mobileCta(mobile, pack) + "\n\n" : ""}${footer(path)}
 
 ${scripts}${TOPBAR_SCRIPT}
 </body>
@@ -615,8 +760,8 @@ ${scripts}${TOPBAR_SCRIPT}
 
 /* ---------- Pages ---------- */
 
-const PRICE_FAQ = `<strong>$${PRICE.tray1}</strong> for a 30-egg tray, <strong>$${PRICE.tray2}</strong> for two, <strong>$${PRICE.box}</strong> for a 180-egg box. Delivery is a flat <strong>$${PRICE.delivery}</strong>.`;
-const EGGS_FAQ = "Pace Farm extra-large cage eggs, 30 to a 1.75&nbsp;kg tray. The same supermarket brand, for less.";
+const PRICE_FAQ = `<strong>$${PRICE.tray1}</strong> for a tray of 30, <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is <strong>$${PRICE.delivery}</strong> flat.`;
+const EGGS_FAQ = "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray. The same brand as the supermarket, for less.";
 
 function suburbPage(s) {
   const path = suburbPath(s);
@@ -625,8 +770,8 @@ function suburbPage(s) {
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], [s.name, path]];
   const near = nearestCovered(s);
   const faqs = [
-    [`Do you deliver eggs to ${s.name}?`, `Yes. ${s.name} ${s.postcode} is inside our Saturday delivery area, and so are ${s.nearby[0]} and ${s.nearby[1]}. Checkout confirms your address.`],
-    ["When will my eggs arrive?", "Saturday, 6am to 12pm. Order by Friday night."],
+    [`Do you deliver eggs to ${s.name}?`, `Yes. ${s.name} ${s.postcode} is in our Saturday delivery area, and so are ${s.nearby[0]} and ${s.nearby[1]}. We check your address before you pay.`],
+    ["When will my eggs arrive?", "Saturday, between 6am and 12pm. Order by Friday night."],
     ["How much does it cost?", PRICE_FAQ],
     s.faq,
     ["What eggs are they?", EGGS_FAQ],
@@ -651,42 +796,37 @@ function suburbPage(s) {
     faqPage(path, faqs),
     BUSINESS_REF,
   ];
+  const nearList = near.map((x) => {
+    const own = SUBURB_PAGES.find((o) => o.name === x.name);
+    const label = `${x.name} <small>${x.postcodes.join(", ")}</small>`;
+    return `            <li>${own ? `<a href="${suburbPath(own)}">${label}</a>` : label}</li>`;
+  }).join("\n");
   const body = `  <main>
 ${heroSection({
     trail,
     kicker: `${s.name} ${s.postcode} · ${s.region}`,
-    h1: `Egg delivery<br>in ${s.name}`,
-    sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
+    h1: `Egg delivery in ${s.name}`,
+    sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, at your door in ${s.name} on Saturday morning. Delivery is $${PRICE.delivery} flat.`,
+    secondary: [`Suburbs near ${s.name}`, "#nearby"],
     alt: `${HERO_ALT}. Delivered to ${s.name}`,
   })}
 
-${stepsSection(["Saturday morning delivery", `To your door in ${s.name}, flat $${PRICE.delivery}.`])}
-
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head left">
+    <section class="band band-first">
+      <div class="wrap local-row">
+        <div class="panel">
           <h2>Delivering in ${s.name}</h2>
-        </header>
-        <div class="local-prose">
           <p>${s.local}</p>
         </div>
-      </div>
-    </section>
-
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head left">
+        <div class="panel" id="nearby">
           <h2>Suburbs near ${s.name}</h2>
-          <p>The ${near.length} closest suburbs we cover, with postcodes. Same Saturday delivery and the same $${PRICE.delivery} fee.</p>
-        </header>
-        <ul class="areas-list">
-${near.map((x) => {
-    const own = SUBURB_PAGES.find((o) => o.name === x.name);
-    const label = `${x.name} <small>${x.postcodes.join(", ")}</small>`;
-    return `          <li>${own ? `<a href="${suburbPath(own)}">${label}</a>` : label}</li>`;
-  }).join("\n")}
-${chips([["All suburbs", "/egg-delivery-areas"]])}
-        </ul>
+          <p>The ${near.length} closest suburbs we cover. Same Saturday delivery, same $${PRICE.delivery} fee.</p>
+          <ul class="areas-list">
+${nearList}
+            <li class="chip-strong"><a href="/egg-delivery-areas">All suburbs</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="wrap">
         <p class="local-nearby-label">More delivery pages</p>
         <ul class="local-siblings">
 ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES.slice(0, -1).filter(([, h]) => h !== path)])}
@@ -694,9 +834,11 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES.slice(0, -1).filt
       </div>
     </section>
 
+${priceCards(`Egg prices in ${s.name}`, `Same eggs in every pack. Delivery to ${s.name} is $${PRICE.delivery} flat.`)}
+
 ${faqSection(`${s.name} delivery questions`, faqs)}
 
-${ctaBand(`Eggs in ${s.name} this Saturday`, `Order by Friday night. Flat $${PRICE.delivery} delivery.`)}
+${ctaBand(`Eggs in ${s.name} this Saturday`, `Order by Friday night. Delivery is $${PRICE.delivery} flat.`)}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery to ${s.name}` });
 }
@@ -707,8 +849,8 @@ function sydneyPage() {
   const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery within 45 km. Order online with YOLKO.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", path]];
   const faqs = [
-    ["When is egg delivery in Sydney?", "Saturday, 6am to 12pm. Order by Friday night."],
-    ["How far do you deliver?", `About 45&nbsp;km by road. That covers most of Sydney: the inner west, Parramatta, Ryde, Bankstown, Liverpool, Hornsby, Chatswood and Hurstville. Search <a href="/egg-delivery-areas">every suburb we cover</a>, and checkout confirms your address.`],
+    ["When is egg delivery in Sydney?", "Saturday, between 6am and 12pm. Order by Friday night."],
+    ["How far do you deliver?", `Most of Sydney: the inner west, Parramatta, Ryde, Bankstown, Liverpool, Hornsby, Chatswood, Hurstville, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
     ["How much are the eggs and delivery?", PRICE_FAQ],
     ["How do I order?", `Use the <a href="/#order">order form</a> and pay by card. We deliver the next Saturday morning.`],
   ];
@@ -729,32 +871,40 @@ function sydneyPage() {
               <strong>${s.name}</strong>
               <span>${s.postcode} · ${s.region}</span>
             </a>
-          </li>`).join("\n");
+          </li>`).join("\n") + `
+          <li class="all">
+            <a href="/egg-delivery-areas">
+              <strong>All suburbs</strong>
+              <span>Nearly 700, A to Z</span>
+            </a>
+          </li>`;
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: "Sydney-wide",
-    h1: "Egg delivery<br>across Sydney",
-    sub: `30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered Saturday morning anywhere within 45&nbsp;km. Flat <strong>$${PRICE.delivery}</strong> delivery.`,
+    kicker: "Sydney-wide, every Saturday",
+    h1: "Egg delivery across Sydney",
+    sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs. Delivery is $${PRICE.delivery} flat.`,
+    secondary: ["Check your suburb", "#map-title"],
   })}
 
-${stepsSection(["Saturday morning delivery", `To your door, flat $${PRICE.delivery}.`])}
+${timeline("How Saturday delivery works", STEPS(`To your door, $${PRICE.delivery} flat, anywhere in the delivery area.`))}
 
-    <section class="local-band" id="suburbs">
+${mapPanel("We deliver to nearly 700 Sydney suburbs", `From Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. Same Saturday run, same $${PRICE.delivery} delivery.`, suburbCheck("map-q"))}
+
+    <section class="band" id="suburbs" aria-labelledby="suburbs-title">
       <div class="wrap">
-        <header class="section-head">
-          <h2>Suburb pages</h2>
-          <p>Nearly 700 suburbs are covered. <a href="/egg-delivery-areas">Find yours</a>.</p>
-        </header>
+${sectionHead("Popular suburbs", `Local pages for the suburbs we deliver to most. <a href="/egg-delivery-areas">See all suburbs</a>.`, "suburbs-title")}
         <ul class="local-suburbs">
 ${cards}
         </ul>
       </div>
     </section>
 
+${priceCards("Prices")}
+
 ${faqSection("Sydney delivery questions", faqs)}
 
-${ctaBand("Eggs this Saturday", `Order by Friday night. Flat $${PRICE.delivery} delivery.`, ["All suburbs", "/egg-delivery-areas"])}
+${ctaBand("Fresh eggs this Saturday", `Order by Friday night. Delivery is $${PRICE.delivery} flat.`, ["All suburbs", "/egg-delivery-areas"])}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
 }
@@ -765,54 +915,60 @@ function bulkPage() {
   const description = `Buy eggs in bulk in Sydney. A full box of 180 Pace Farm XL cage eggs is $${PRICE.box} (40¢ an egg), up to 10 boxes per order. Saturday delivery for cafés, bakers and big families.`;
   const trail = [["Home", "/"], ["Bulk eggs Sydney", path]];
   const faqs = [
-    ["How much is a bulk box of eggs?", `A full box is 180 Pace Farm XL cage eggs (six 30-egg trays) for <strong>$${PRICE.box}</strong>, about 40¢ an egg. Delivery is a flat <strong>$${PRICE.delivery}</strong>.`],
+    ["How much is a bulk box of eggs?", `A full box is 180 Pace Farm extra-large eggs (six trays of 30) for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivery is <strong>$${PRICE.delivery}</strong> flat.`],
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>.`],
     ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers order full boxes for Saturday delivery, and many set up a weekly standing order."],
-    ["Which eggs are in the box?", "Pace Farm XL cage eggs, 30 to a 1.75&nbsp;kg tray, six trays to a box."],
-    ["When is bulk delivery?", "Saturday, 6am to 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big quantities."],
+    ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
+    ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big amounts."],
     ["How should I store 180 eggs?", "In the fridge, in their trays, stacked flat. Use them by the best-before date on the pack."],
   ];
   const graph = [webPage(path, "Bulk eggs in Sydney", description), breadcrumbs(path, trail), PRODUCT_BOX, RETURNS, faqPage(path, faqs), BUSINESS_REF];
-  const perEgg = (price, eggs) => Math.round((price / eggs) * 100);
   const rows = [
     ["1 tray", 30, PRICE.tray1],
     ["2 trays", 60, PRICE.tray2],
-    ["Full box", 180, PRICE.box],
+    ["Full box", 180, PRICE.box, true],
     ["10 boxes", 1800, PRICE.box * 10],
   ];
   const body = `  <main>
 ${heroSection({
     trail,
     kicker: "Full box · 180 eggs",
-    h1: "Bulk eggs<br>in Sydney",
-    sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about 40¢ an egg. Delivered Saturday morning, flat <strong>$${PRICE.delivery}</strong>.`,
+    h1: "Bulk eggs in Sydney",
+    sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivered on Saturday morning, $${PRICE.delivery} flat.`,
     cta: "Order a box",
+    ctaHref: "/?b=box#order",
+    secondary: ["WhatsApp us", WHATSAPP],
     alt: `${HERO_ALT}. Six trays make a 180-egg box`,
+    pack: "box",
   })}
 
-    <section class="local-band">
+    <section class="band" aria-labelledby="per-egg-title">
       <div class="wrap">
-        <header class="section-head">
-          <h2>Price per egg</h2>
-          <p>Same eggs in every pack, one flat $${PRICE.delivery} delivery.</p>
-        </header>
+${sectionHead("Price per egg", `Same eggs in every pack, and one $${PRICE.delivery} delivery fee.`, "per-egg-title")}
         <table class="price-table">
           <thead><tr><th scope="col">Pack</th><th scope="col">Eggs</th><th scope="col">Price</th><th scope="col">Per egg</th></tr></thead>
           <tbody>
-${rows.map(([name, eggs, price]) => `            <tr><th scope="row">${name}</th><td>${eggs.toLocaleString("en-AU")}</td><td>$${price.toLocaleString("en-AU")}</td><td>${perEgg(price, eggs)}¢</td></tr>`).join("\n")}
+${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best"' : ""}><th scope="row">${name}</th><td>${eggs.toLocaleString("en-AU")}</td><td>$${price.toLocaleString("en-AU")}</td><td>${perEgg(price, eggs)}¢</td></tr>`).join("\n")}
           </tbody>
         </table>
       </div>
     </section>
 
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head">
+    <section class="band">
+      <div class="wrap local-row">
+        <div class="panel">
           <h2>Weekly standing orders</h2>
-          <p>For cafés, bakers, caterers and big families.</p>
-        </header>
-        <div class="local-prose">
-          <p><a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">Send us a WhatsApp</a> with your name, address and how many boxes you need each week. We set them aside for every Saturday delivery.</p>
+          <p>For cafés, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
+          <div class="hero-cta">
+            <a class="btn btn-ink" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Order online</h2>
+          <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
+          <div class="hero-cta">
+            <a class="btn btn-solid" href="/?b=box#order">Order a box</a>
+          </div>
         </div>
       </div>
     </section>
@@ -821,7 +977,7 @@ ${faqSection("Bulk order questions", faqs)}
 
 ${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, ["WhatsApp us", WHATSAPP])}
   </main>`;
-  return page({ path, title, description, graph, body, mobile: `Full box, 180 eggs · $${PRICE.box}` });
+  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
 
 function areasPage(existingHtml) {
@@ -830,10 +986,10 @@ function areasPage(existingHtml) {
   const description = `Every Sydney suburb YOLKO delivers eggs to, with postcodes. Nearly 700 suburbs within about 45 km get Saturday morning delivery for a flat $${PRICE.delivery}.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], ["Delivery areas", path]];
   const faqs = [
-    ["Is my suburb covered?", "If it is on this page, yes. Checkout confirms your exact street and postcode before you pay."],
+    ["Is my suburb covered?", "If it is on this page, yes. We check your exact street and postcode before you pay."],
     ["My suburb is not on the list. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
-    ["Does delivery cost more further out?", `No. It is a flat <strong>$${PRICE.delivery}</strong> anywhere in the delivery area.`],
-    ["When do you deliver?", "Saturday, 6am to 12pm. Order by Friday night."],
+    ["Does delivery cost more further out?", `No. It is <strong>$${PRICE.delivery}</strong> flat anywhere in the delivery area.`],
+    ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Friday night."],
   ];
   const service = {
     "@type": "Service",
@@ -856,29 +1012,34 @@ function areasPage(existingHtml) {
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: "Sydney · 45 km",
-    h1: "Every suburb<br>we deliver to",
-    sub: `Nearly 700 Sydney suburbs get Saturday morning egg delivery for a flat <strong>$${PRICE.delivery}</strong>.`,
+    kicker: "Nearly 700 suburbs",
+    h1: "Every suburb we deliver to",
+    sub: `Saturday morning egg delivery across Sydney, $${PRICE.delivery} flat. Find your suburb below.`,
+    secondary: ["Find your suburb", "#suburbs"],
   })}
 
-    <section id="suburbs" class="faq areas-finder">
+${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`)}
+
+    <section id="suburbs" class="band areas-finder" aria-labelledby="finder-title">
       <div class="wrap">
-        <header class="section-head">
-          <h2>Find your suburb</h2>
-          <p>Type a suburb or postcode. Checkout confirms your exact address.</p>
-        </header>
-        <div class="field area-search">
-          <label for="area-q">Suburb or postcode</label>
-          <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
+        <div class="panel">
+          <h2 id="finder-title">Find your suburb</h2>
+          <p>Type a suburb or postcode. We check your exact address before you pay.</p>
+          <div class="field area-search">
+            <label for="area-q">Suburb or postcode</label>
+            <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
+          </div>
           <p class="area-status" id="area-status" aria-live="polite"></p>
-        </div>
+          <div class="area-bands">
 ${list}
+          </div>
+        </div>
       </div>
     </section>
 
 ${faqSection("Delivery area questions", faqs)}
 
-${ctaBand("Found it?", `Tray $${PRICE.tray1}, two trays $${PRICE.tray2}, or a 180-egg box for $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
+${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.tray2}, and a box of 180 is $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
   </main>`;
   const scripts = `  <script>
   (function () {
@@ -906,10 +1067,18 @@ ${ctaBand("Found it?", `Tray $${PRICE.tray1}, two trays $${PRICE.tray2}, or a 18
       if (!term) { status.textContent = ""; return; }
       status.innerHTML = shown
         ? shown + (shown === 1 ? " match. You're in the delivery area." : " matches. You're in the delivery area.")
-        : 'No match. <a href="/#order">Try checkout</a> or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
+        : 'No match. <a href="/#order">Try the order form</a> or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
     }
     q.addEventListener("input", run);
+    // The suburb check on other pages sends people here with ?q=
+    var start = new URLSearchParams(location.search).get("q");
+    if (start) {
+      q.value = start;
+      run();
+      document.getElementById("suburbs").scrollIntoView();
+    }
   })();
+  </script>
 
 `;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, scripts });
@@ -918,15 +1087,13 @@ ${ctaBand("Found it?", `Tray $${PRICE.tray1}, two trays $${PRICE.tray2}, or a 18
 function notFoundPage() {
   const path = "/404";
   const body = `  <main>
-    <section class="local-band">
+    <section class="notfound">
       <div class="wrap">
-        <header class="section-head left">
-          <h1>Page not found</h1>
-          <p>The link may be old or mistyped.</p>
-        </header>
+        <h1>Page not found</h1>
+        <p>The link may be old or mistyped. Here are some good places to start.</p>
         <div class="hero-cta">
-          <a class="btn btn-solid" href="/#order">Order eggs</a>
-          <a class="btn btn-ghost" href="/">Home</a>
+          <a class="btn btn-solid btn-lg" href="/#order">Order eggs</a>
+          <a class="btn btn-ghost btn-lg" href="/">Home</a>
         </div>
         <p class="local-nearby-label">Delivery pages</p>
         <ul class="local-siblings">
@@ -946,17 +1113,23 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES, ["Bulk eggs", "/
   });
 }
 
-/* ---------- Homepage: structured data and FAQ only ---------- */
+/* ---------- Homepage: structured data, FAQ, map and next delivery date ---------- */
 
 const HOME_FAQ = [
-  ["When do you deliver?", `Saturday, 6am to 12pm. Order by Friday night. Delivery is a flat $${PRICE.delivery} within 45&nbsp;km.`],
-  ["Which suburbs do you cover?", `Most of Sydney within 45&nbsp;km of Flemington, from Parramatta and Liverpool to Hornsby, Chatswood and Hurstville. <a href="/egg-delivery-areas">Search every suburb</a>. Checkout confirms your address.`],
-  ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a 30-egg tray (about 43¢ an egg), <strong>$${PRICE.tray2}</strong> for two, <strong>$${PRICE.box}</strong> for a 180-egg box. Delivery is a flat $${PRICE.delivery}.`],
-  ["How do I pay?", "By card when you order. Checkout is handled by Stripe."],
-  ["Can delivery be free?", "Yes. After you pay you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, the later orders ship free and the first gets free delivery next time."],
+  ["When do you deliver?", `Saturday, between 6am and 12pm. Order by Friday night. Delivery is $${PRICE.delivery} flat.`],
+  ["Which suburbs do you cover?", `Nearly 700 suburbs across Sydney, from Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
+  ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a tray of 30 (about ${perEgg(PRICE.tray1, 30)}¢ an egg), <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is $${PRICE.delivery} flat.`],
+  ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],
+  ["Can delivery be free?", "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
   ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés can <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us</a> for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk eggs</a>.`],
 ];
+
+function fillMarker(html, name, content) {
+  const re = new RegExp(`(<!-- ${name}:start[^>]*-->)[\\s\\S]*?(\\n[ \\t]*<!-- ${name}:end -->)`);
+  if (!re.test(html)) throw new Error(`${name} markers not found in index.html`);
+  return html.replace(re, (_, a, b) => `${a}\n${content}${b}`);
+}
 
 function updateHome() {
   const file = join(ROOT, "index.html");
@@ -981,10 +1154,9 @@ function updateHome() {
             <summary>${q}</summary>
             <p${q === "What eggs are they?" ? ' id="faq-eggs"' : ""}>${a}</p>
           </details>`).join("\n");
-  html = html.replace(
-    /(<!-- faq:start[^>]*-->\n)[\s\S]*?(\n\s*<!-- faq:end -->)/,
-    (_, a, b) => a + faqHtml + b
-  );
+  html = fillMarker(html, "faq", faqHtml);
+  html = fillMarker(html, "map", mapFigure());
+  html = fillMarker(html, "next-run", NEXT_RUN_SCRIPT);
   writeFileSync(file, html);
 }
 
@@ -1022,6 +1194,7 @@ writeFileSync(join(ROOT, "bulk-eggs-sydney.html"), bulkPage());
 const areasFile = join(ROOT, "egg-delivery-areas.html");
 writeFileSync(areasFile, areasPage(readFileSync(areasFile, "utf8")));
 writeFileSync(join(ROOT, "404.html"), notFoundPage());
+writeFileSync(join(ROOT, "assets", "coverage-map.svg"), MAP.svg);
 writeFileSync(join(ROOT, "sitemap.xml"), sitemap());
 updateHome();
-console.log(`Built ${SUBURB_PAGES.length} suburb pages, Sydney, bulk, areas, 404, sitemap and homepage data`);
+console.log(`Built ${SUBURB_PAGES.length} suburb pages, Sydney, bulk, areas, 404, sitemap, map (${MAP.count} suburbs) and homepage data`);

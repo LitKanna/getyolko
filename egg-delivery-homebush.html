@@ -34,9 +34,9 @@
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="apple-touch-icon" href="assets/yolko-app-icon-1024.png">
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
-  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) min(100vw - 32px, 420px), 420px" fetchpriority="high">
+  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=149">
+  <link rel="stylesheet" href="styles-modern.css?v=150">
 
   <script type="application/ld+json">
   {
@@ -124,7 +124,7 @@
             "name": "Do you deliver eggs to Homebush?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. Homebush 2140 is inside our Saturday delivery area, and so are Homebush West and North Strathfield. Checkout confirms your address."
+              "text": "Yes. Homebush 2140 is in our Saturday delivery area, and so are Homebush West and North Strathfield. We check your address before you pay."
             }
           },
           {
@@ -132,7 +132,7 @@
             "name": "When will my eggs arrive?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday, 6am to 12pm. Order by Friday night."
+              "text": "Saturday, between 6am and 12pm. Order by Friday night."
             }
           },
           {
@@ -140,7 +140,7 @@
             "name": "How much does it cost?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "$13 for a 30-egg tray, $25 for two, $72 for a 180-egg box. Delivery is a flat $5."
+              "text": "$13 for a tray of 30, $25 for two trays, $72 for a box of 180. Delivery is $5 flat."
             }
           },
           {
@@ -156,7 +156,7 @@
             "name": "What eggs are they?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Pace Farm extra-large cage eggs, 30 to a 1.75 kg tray. The same supermarket brand, for less."
+              "text": "Pace Farm extra-large eggs (cage), 30 to a 1.75 kg tray. The same brand as the supermarket, for less."
             }
           }
         ]
@@ -208,6 +208,25 @@
   alt="" /></noscript>
 </head>
 <body class="local">
+  <div class="announce">
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+  </div>
+  <script>
+  (function () {
+    var el = document.querySelector("[data-next-run]");
+    if (!el || !window.Intl) return;
+    try {
+      var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
+      var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
+      var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+      var ahead = (6 - dow + 7) % 7 || 7;
+      var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
+      var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+      el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
+    } catch (e) {}
+  })();
+  </script>
+
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="/" aria-label="YOLKO home">
@@ -216,11 +235,14 @@
       </a>
       <nav class="topnav" aria-label="Main navigation">
         <a href="/egg-delivery-sydney">Delivery</a>
-        <a href="/egg-delivery-areas">Areas</a>
+        <a href="/egg-delivery-areas">Suburbs</a>
         <a href="/bulk-eggs-sydney">Bulk eggs</a>
-        <a href="#faq">FAQ</a>
+        <a href="#faq">Questions</a>
       </nav>
-      <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      <div class="topbar-actions">
+        <a class="topbar-phone" href="tel:+61433975055">0433 975 055</a>
+        <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      </div>
     </div>
   </header>
   <main>
@@ -234,69 +256,62 @@
             <span class="crumbs-sep" aria-hidden="true">/</span>
             <span aria-current="page">Homebush</span>
           </nav>
-          <p class="hero-kicker">Homebush 2140 · Inner west</p>
-          <h1>Egg delivery<br>in Homebush</h1>
-          <p class="hero-sub">30 Pace Farm eggs for <strong>$13</strong>, delivered Saturday morning. Flat <strong>$5</strong> delivery.</p>
+          <p class="hero-pill"><span class="pill-dot" aria-hidden="true"></span>Homebush 2140 · Inner west</p>
+          <h1>Egg delivery in Homebush</h1>
+          <p class="hero-sub">A tray of 30 Pace Farm eggs for <strong>$13</strong>, at your door in Homebush on Saturday morning. Delivery is $5 flat.</p>
           <div class="hero-cta">
-            <a class="btn btn-solid" href="/#order">Order now</a>
+            <a class="btn btn-solid btn-lg" href="/#order">Order now</a>
+            <a class="btn btn-ghost btn-lg" href="#nearby">Suburbs near Homebush</a>
           </div>
+          <ul class="hero-facts">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$5 flat delivery</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
+          </ul>
         </div>
         <div class="hero-showcase">
           <div class="showcase-card">
             <picture class="showcase-photo is-active">
-              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) min(100vw - 32px, 420px), 420px">
-              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) min(100vw - 32px, 420px), 420px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray. Delivered to Homebush">
+              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px">
+              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray. Delivered to Homebush">
             </picture>
+          </div>
+          <div class="price-card" aria-hidden="true">
+            <span>1 tray · 30 eggs</span>
+            <strong>$13</strong>
+            <span>About 43¢ an egg</span>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head left">
-          <h2>How it works</h2>
-        </header>
-        <ol class="local-model">
-          <li><strong>Order by Friday night</strong><span>Choose a tray, two trays or a 180-egg box.</span></li>
-          <li><strong>Pay by card</strong><span>Secure checkout with Stripe.</span></li>
-          <li><strong>Saturday morning delivery</strong><span>To your door in Homebush, flat $5.</span></li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head left">
+    <section class="band band-first">
+      <div class="wrap local-row">
+        <div class="panel">
           <h2>Delivering in Homebush</h2>
-        </header>
-        <div class="local-prose">
           <p>Many homes around Homebush station and in Sydney Olympic Park are apartments, often several towers to one address. Put your unit and building in the street address. When two or more people in the same building order for the same Saturday, every order after the first ships free, so it is worth sharing in your building chat.</p>
         </div>
-      </div>
-    </section>
-
-    <section class="local-band">
-      <div class="wrap">
-        <header class="section-head left">
+        <div class="panel" id="nearby">
           <h2>Suburbs near Homebush</h2>
-          <p>The 12 closest suburbs we cover, with postcodes. Same Saturday delivery and the same $5 fee.</p>
-        </header>
-        <ul class="areas-list">
-          <li>Homebush South <small>2140</small></li>
-          <li>Homebush West <small>2140</small></li>
-          <li>North Strathfield <small>2137</small></li>
-          <li><a href="/egg-delivery-strathfield">Strathfield <small>2135</small></a></li>
-          <li><a href="/egg-delivery-burwood">Burwood <small>2134</small></a></li>
-          <li>Burwood North <small>2134</small></li>
-          <li>Liberty Grove <small>2138</small></li>
-          <li><a href="/egg-delivery-concord">Concord <small>2137</small></a></li>
-          <li>Rookwood <small>2141</small></li>
-          <li>Canada Bay <small>2046</small></li>
-          <li>Concord West <small>2138</small></li>
-          <li>Sydney Olympic Park <small>2127</small></li>
-          <li><a href="/egg-delivery-areas">All suburbs</a></li>
-        </ul>
+          <p>The 12 closest suburbs we cover. Same Saturday delivery, same $5 fee.</p>
+          <ul class="areas-list">
+            <li>Homebush South <small>2140</small></li>
+            <li>Homebush West <small>2140</small></li>
+            <li>North Strathfield <small>2137</small></li>
+            <li><a href="/egg-delivery-strathfield">Strathfield <small>2135</small></a></li>
+            <li><a href="/egg-delivery-burwood">Burwood <small>2134</small></a></li>
+            <li>Burwood North <small>2134</small></li>
+            <li>Liberty Grove <small>2138</small></li>
+            <li><a href="/egg-delivery-concord">Concord <small>2137</small></a></li>
+            <li>Rookwood <small>2141</small></li>
+            <li>Canada Bay <small>2046</small></li>
+            <li>Concord West <small>2138</small></li>
+            <li>Sydney Olympic Park <small>2127</small></li>
+            <li class="chip-strong"><a href="/egg-delivery-areas">All suburbs</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="wrap">
         <p class="local-nearby-label">More delivery pages</p>
         <ul class="local-siblings">
           <li><a href="/egg-delivery-sydney">Sydney</a></li>
@@ -314,23 +329,64 @@
       </div>
     </section>
 
-    <section id="faq" class="faq">
+    <section class="band" aria-labelledby="prices-title">
       <div class="wrap">
         <header class="section-head">
-          <h2>Homebush delivery questions</h2>
+          <h2 id="prices-title">Egg prices in Homebush</h2>
+          <p>Same eggs in every pack. Delivery to Homebush is $5 flat.</p>
         </header>
+        <ul class="price-cards">
+          <li>
+            <h3>1 tray</h3>
+            <p class="pc-meta">30 eggs · 43¢ an egg</p>
+            <div class="pc-row">
+              <span class="pc-price">$13</span>
+              <a class="btn btn-solid btn-small" href="/?b=tray1#order" aria-label="Order 1 tray">Order</a>
+            </div>
+          </li>
+          <li>
+            <h3>2 trays</h3>
+            <p class="pc-meta">60 eggs · 42¢ an egg</p>
+            <div class="pc-row">
+              <span class="pc-price">$25</span>
+              <a class="btn btn-solid btn-small" href="/?b=tray2#order" aria-label="Order 2 trays">Order</a>
+            </div>
+          </li>
+          <li>
+            <h3>Full box</h3>
+            <p class="pc-meta">180 eggs · 40¢ an egg</p>
+            <div class="pc-row">
+              <span class="pc-price">$72</span>
+              <a class="btn btn-solid btn-small" href="/?b=box#order" aria-label="Order full box">Order</a>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="faq" class="faq" aria-labelledby="faq-title">
+      <div class="wrap faq-layout">
+        <div class="faq-intro">
+          <h2 id="faq-title">Homebush delivery questions</h2>
+          <p>Can't find your answer? Message us and a real person will reply.</p>
+          <div class="contact-row">
+            <a class="btn btn-ink btn-small" href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+            <a class="btn btn-ghost btn-small" href="tel:+61433975055">Call</a>
+            <a class="btn btn-ghost btn-small" href="mailto:orders@getyolko.com">Email</a>
+          </div>
+        </div>
         <div class="faq-grid">
           <details open>
             <summary>Do you deliver eggs to Homebush?</summary>
-            <p>Yes. Homebush 2140 is inside our Saturday delivery area, and so are Homebush West and North Strathfield. Checkout confirms your address.</p>
+            <p>Yes. Homebush 2140 is in our Saturday delivery area, and so are Homebush West and North Strathfield. We check your address before you pay.</p>
           </details>
           <details>
             <summary>When will my eggs arrive?</summary>
-            <p>Saturday, 6am to 12pm. Order by Friday night.</p>
+            <p>Saturday, between 6am and 12pm. Order by Friday night.</p>
           </details>
           <details>
             <summary>How much does it cost?</summary>
-            <p><strong>$13</strong> for a 30-egg tray, <strong>$25</strong> for two, <strong>$72</strong> for a 180-egg box. Delivery is a flat <strong>$5</strong>.</p>
+            <p><strong>$13</strong> for a tray of 30, <strong>$25</strong> for two trays, <strong>$72</strong> for a box of 180. Delivery is <strong>$5</strong> flat.</p>
           </details>
           <details>
             <summary>Can Olympic Park or Homebush West order?</summary>
@@ -338,18 +394,22 @@
           </details>
           <details>
             <summary>What eggs are they?</summary>
-            <p>Pace Farm extra-large cage eggs, 30 to a 1.75&nbsp;kg tray. The same supermarket brand, for less.</p>
+            <p>Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray. The same brand as the supermarket, for less.</p>
           </details>
         </div>
       </div>
     </section>
 
-    <section class="local-cta-band">
+    <section class="cta-band">
       <div class="wrap">
-        <h2>Eggs in Homebush this Saturday</h2>
-        <p>Order by Friday night. Flat $5 delivery.</p>
-        <div class="hero-cta">
-          <a class="btn btn-solid" href="/#order">Order now</a>
+        <div class="cta-panel">
+          <div>
+            <h2>Eggs in Homebush this Saturday</h2>
+            <p>Order by Friday night. Delivery is $5 flat.</p>
+          </div>
+          <div class="hero-cta">
+            <a class="btn btn-ink btn-lg" href="/#order">Order now</a>
+          </div>
         </div>
       </div>
     </section>
@@ -360,7 +420,7 @@
       <strong>30 eggs · $13</strong>
       <span>Saturday delivery to Homebush</span>
     </div>
-    <a class="btn btn-small" href="/#order">Order</a>
+    <a class="btn btn-solid btn-small" href="/#order">Order</a>
   </div>
 
   <footer class="foot">
@@ -371,26 +431,25 @@
             <span class="brand-dot" aria-hidden="true"></span>
             <span>YOLKO</span>
           </a>
-          <p class="foot-tag">Fresh Pace Farm eggs, delivered in Sydney.</p>
-          <address class="foot-nap">
-            Saturday delivery across Sydney<br>
-            Within 45&nbsp;km of Flemington
-          </address>
+          <p class="foot-tag">Fresh Pace Farm eggs, delivered across Sydney every Saturday morning.</p>
         </div>
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
-          <a href="/#order">Order now</a>
+          <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney">Bulk eggs</a>
+          <a href="/#faq">Questions</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
           <a href="/egg-delivery-sydney">Egg delivery Sydney</a>
-          <a href="/egg-delivery-areas">Suburbs we cover</a>
-          <a href="/#faq">FAQ</a>
+          <a href="/egg-delivery-areas">All suburbs</a>
+          <a href="/egg-delivery-strathfield">Strathfield</a>
+          <a href="/egg-delivery-homebush" aria-current="page">Homebush</a>
+          <a href="/egg-delivery-parramatta">Parramatta</a>
         </nav>
         <nav class="foot-col" aria-label="Contact">
           <p class="foot-h">Contact</p>
-          <a href="tel:+61433975055">+61 433 975 055</a>
+          <a href="tel:+61433975055">0433 975 055</a>
           <a href="mailto:orders@getyolko.com">orders@getyolko.com</a>
           <a href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </nav>
@@ -408,10 +467,19 @@
   <script>
   (function () {
     var bar = document.querySelector(".topbar");
-    if (!bar) return;
-    function sync() { bar.classList.toggle("scrolled", window.scrollY > 8); }
+    var cta = document.querySelector(".mobile-cta");
+    var heroCta = document.querySelector(".hero .hero-cta");
+    function sync() {
+      if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
+      if (cta && heroCta) {
+        var show = heroCta.getBoundingClientRect().bottom < 0;
+        cta.classList.toggle("show", show);
+        cta.inert = !show;
+      }
+    }
     sync();
     window.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync);
   })();
   </script>
 </body>

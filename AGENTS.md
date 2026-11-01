@@ -24,17 +24,23 @@ Then open http://localhost:8080. No install is required just to view/use the sit
 
 ### Generated pages (non-obvious)
 The suburb pages (`egg-delivery-*.html`), `egg-delivery-sydney.html`, `bulk-eggs-sydney.html`,
-`egg-delivery-areas.html`, `404.html`, `sitemap.xml`, and the JSON-LD and FAQ blocks inside
-`index.html` are generated. Edit `infra/build-pages.mjs` (copy, prices, `CSS_V`, structured data)
-or `infra/build-areas-page.mjs` (the A to Z suburb list), then run
+`egg-delivery-areas.html`, `404.html`, `sitemap.xml`, `assets/coverage-map.svg`, and the
+JSON-LD, FAQ, delivery map and next-delivery-date blocks inside `index.html` (between
+`<!-- name:start -->` / `<!-- name:end -->` markers) are generated. Edit `infra/build-pages.mjs`
+(copy, prices, `CSS_V`, structured data), `infra/coverage-map.mjs` (the dot map, drawn from the
+same zone data checkout uses) or `infra/build-areas-page.mjs` (the A to Z suburb list), then run
 `node infra/build-pages.mjs && node infra/build-areas-page.mjs`. Never put the Sydney Markets
 address or its 2129 postcode on any page: YOLKO is a home-based, service-area business.
 
-### Look (Kanna's choice, Oct 2026)
-"Quiet local shop": one font (Plus Jakarta Sans), black text on an ivory page, normal-size
-sentence-case headings with no trailing full stop, no orange. Yolk yellow only on the logo
-dot and the Order / Buy buttons (`.btn-solid`); selected options get a black outline, not a
-fill. Never change, swap or re-crop the site images.
+### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
+Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
+big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
+stop. Colours are tokens in `:root` of `styles-modern.css`: cream page `#faf7f0`, white cards,
+ink `#14120e`, muted `#6b675e`, yolk `#ffd32a`, green `#1f7a4d` only for the stock dot. Yolk
+yellow is for the logo dot, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
+dots and the closing band; no orange. Rounded cards and pill buttons, a black announcement bar
+with the next Saturday date, and a black footer. Plain, short copy with no jargon. Never change,
+swap or re-crop the site images (the chalk-tray hero and order photos stay exactly as they are).
 
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into

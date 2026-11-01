@@ -34,9 +34,9 @@
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="apple-touch-icon" href="assets/yolko-app-icon-1024.png">
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
-  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) min(100vw - 32px, 420px), 420px" fetchpriority="high">
+  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=149">
+  <link rel="stylesheet" href="styles-modern.css?v=150">
 
   <script type="application/ld+json">
   {
@@ -121,7 +121,7 @@
             "name": "Is my suburb covered?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "If it is on this page, yes. Checkout confirms your exact street and postcode before you pay."
+              "text": "If it is on this page, yes. We check your exact street and postcode before you pay."
             }
           },
           {
@@ -137,7 +137,7 @@
             "name": "Does delivery cost more further out?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "No. It is a flat $5 anywhere in the delivery area."
+              "text": "No. It is $5 flat anywhere in the delivery area."
             }
           },
           {
@@ -145,7 +145,7 @@
             "name": "When do you deliver?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday, 6am to 12pm. Order by Friday night."
+              "text": "Saturday, between 6am and 12pm. Order by Friday night."
             }
           }
         ]
@@ -197,6 +197,25 @@
   alt="" /></noscript>
 </head>
 <body class="local">
+  <div class="announce">
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+  </div>
+  <script>
+  (function () {
+    var el = document.querySelector("[data-next-run]");
+    if (!el || !window.Intl) return;
+    try {
+      var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
+      var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
+      var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+      var ahead = (6 - dow + 7) % 7 || 7;
+      var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
+      var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+      el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
+    } catch (e) {}
+  })();
+  </script>
+
   <header class="topbar">
     <div class="wrap topbar-inner">
       <a class="brand" href="/" aria-label="YOLKO home">
@@ -205,11 +224,14 @@
       </a>
       <nav class="topnav" aria-label="Main navigation">
         <a href="/egg-delivery-sydney">Delivery</a>
-        <a href="/egg-delivery-areas" aria-current="page">Areas</a>
+        <a href="/egg-delivery-areas" aria-current="page">Suburbs</a>
         <a href="/bulk-eggs-sydney">Bulk eggs</a>
-        <a href="#faq">FAQ</a>
+        <a href="#faq">Questions</a>
       </nav>
-      <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      <div class="topbar-actions">
+        <a class="topbar-phone" href="tel:+61433975055">0433 975 055</a>
+        <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+      </div>
     </div>
   </header>
   <main>
@@ -223,35 +245,73 @@
             <span class="crumbs-sep" aria-hidden="true">/</span>
             <span aria-current="page">Delivery areas</span>
           </nav>
-          <p class="hero-kicker">Sydney · 45 km</p>
-          <h1>Every suburb<br>we deliver to</h1>
-          <p class="hero-sub">Nearly 700 Sydney suburbs get Saturday morning egg delivery for a flat <strong>$5</strong>.</p>
+          <p class="hero-pill"><span class="pill-dot" aria-hidden="true"></span>Nearly 700 suburbs</p>
+          <h1>Every suburb we deliver to</h1>
+          <p class="hero-sub">Saturday morning egg delivery across Sydney, $5 flat. Find your suburb below.</p>
           <div class="hero-cta">
-            <a class="btn btn-solid" href="/#order">Order now</a>
+            <a class="btn btn-solid btn-lg" href="/#order">Order now</a>
+            <a class="btn btn-ghost btn-lg" href="#suburbs">Find your suburb</a>
           </div>
+          <ul class="hero-facts">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$5 flat delivery</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
+          </ul>
         </div>
         <div class="hero-showcase">
           <div class="showcase-card">
             <picture class="showcase-photo is-active">
-              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) min(100vw - 32px, 420px), 420px">
-              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) min(100vw - 32px, 420px), 420px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray">
+              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px">
+              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray">
             </picture>
+          </div>
+          <div class="price-card" aria-hidden="true">
+            <span>1 tray · 30 eggs</span>
+            <strong>$13</strong>
+            <span>About 43¢ an egg</span>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="suburbs" class="faq areas-finder">
+    <section class="areas" aria-labelledby="map-title">
       <div class="wrap">
-        <header class="section-head">
-          <h2>Find your suburb</h2>
-          <p>Type a suburb or postcode. Checkout confirms your exact address.</p>
-        </header>
-        <div class="field area-search">
-          <label for="area-q">Suburb or postcode</label>
-          <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
-          <p class="area-status" id="area-status" aria-live="polite"></p>
+        <div class="areas-panel">
+          <div class="areas-copy">
+            <h2 id="map-title">Our Saturday delivery area</h2>
+            <p>From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.</p>
+
+          </div>
+          <figure class="coverage-map">
+            <div class="map-frame" aria-hidden="true">
+              <img src="/assets/coverage-map.svg?v=1" width="560" height="648" loading="lazy" decoding="async" alt="">
+              <span class="map-label" style="left:61.5%;top:24%">Hornsby</span>
+              <span class="map-label" style="left:34.8%;top:33.6%">Blacktown</span>
+              <span class="map-label" style="left:48%;top:40%">Parramatta</span>
+              <span class="map-label" style="left:73.1%;top:37.4%">Chatswood</span>
+              <span class="map-label" style="left:37.2%;top:55.1%">Liverpool</span>
+              <span class="map-label" style="left:76.5%;top:48%">Sydney</span>
+              <span class="map-label" style="left:62.1%;top:61.9%">Hurstville</span>
+              <span class="map-label" style="left:22.1%;top:76%">Campbelltown</span>
+              <span class="map-label" style="left:68.9%;top:75%">Cronulla</span>
+            </div>
+            <figcaption><span class="map-key">We deliver</span><span class="map-key off">Too far for now</span></figcaption>
+          </figure>
         </div>
+      </div>
+    </section>
+
+    <section id="suburbs" class="band areas-finder" aria-labelledby="finder-title">
+      <div class="wrap">
+        <div class="panel">
+          <h2 id="finder-title">Find your suburb</h2>
+          <p>Type a suburb or postcode. We check your exact address before you pay.</p>
+          <div class="field area-search">
+            <label for="area-q">Suburb or postcode</label>
+            <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
+          </div>
+          <p class="area-status" id="area-status" aria-live="polite"></p>
+          <div class="area-bands">
         <!-- areas:start (generated by infra/build-areas-page.mjs, do not edit by hand) -->
         <details class="area-band">
           <summary>A <span>26 suburbs</span></summary>
@@ -1068,18 +1128,26 @@
           </ul>
         </details>
         <!-- areas:end -->
+          </div>
+        </div>
       </div>
     </section>
 
-    <section id="faq" class="faq">
-      <div class="wrap">
-        <header class="section-head">
-          <h2>Delivery area questions</h2>
-        </header>
+    <section id="faq" class="faq" aria-labelledby="faq-title">
+      <div class="wrap faq-layout">
+        <div class="faq-intro">
+          <h2 id="faq-title">Delivery area questions</h2>
+          <p>Can't find your answer? Message us and a real person will reply.</p>
+          <div class="contact-row">
+            <a class="btn btn-ink btn-small" href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+            <a class="btn btn-ghost btn-small" href="tel:+61433975055">Call</a>
+            <a class="btn btn-ghost btn-small" href="mailto:orders@getyolko.com">Email</a>
+          </div>
+        </div>
         <div class="faq-grid">
           <details open>
             <summary>Is my suburb covered?</summary>
-            <p>If it is on this page, yes. Checkout confirms your exact street and postcode before you pay.</p>
+            <p>If it is on this page, yes. We check your exact street and postcode before you pay.</p>
           </details>
           <details>
             <summary>My suburb is not on the list. Can I still order?</summary>
@@ -1087,23 +1155,27 @@
           </details>
           <details>
             <summary>Does delivery cost more further out?</summary>
-            <p>No. It is a flat <strong>$5</strong> anywhere in the delivery area.</p>
+            <p>No. It is <strong>$5</strong> flat anywhere in the delivery area.</p>
           </details>
           <details>
             <summary>When do you deliver?</summary>
-            <p>Saturday, 6am to 12pm. Order by Friday night.</p>
+            <p>Saturday, between 6am and 12pm. Order by Friday night.</p>
           </details>
         </div>
       </div>
     </section>
 
-    <section class="local-cta-band">
+    <section class="cta-band">
       <div class="wrap">
-        <h2>Found it?</h2>
-        <p>Tray $13, two trays $25, or a 180-egg box for $72. Delivery is $5 anywhere on this page.</p>
-        <div class="hero-cta">
-          <a class="btn btn-solid" href="/#order">Order now</a>
-          <a class="btn btn-ghost" href="/bulk-eggs-sydney">Bulk eggs</a>
+        <div class="cta-panel">
+          <div>
+            <h2>Found your suburb?</h2>
+            <p>A tray is $13, two trays $25, and a box of 180 is $72. Delivery is $5 anywhere on this page.</p>
+          </div>
+          <div class="hero-cta">
+            <a class="btn btn-ink btn-lg" href="/#order">Order now</a>
+            <a class="btn btn-ghost btn-lg" href="/bulk-eggs-sydney">Bulk eggs</a>
+          </div>
         </div>
       </div>
     </section>
@@ -1114,7 +1186,7 @@
       <strong>30 eggs · $13</strong>
       <span>Saturday delivery · $5</span>
     </div>
-    <a class="btn btn-small" href="/#order">Order</a>
+    <a class="btn btn-solid btn-small" href="/#order">Order</a>
   </div>
 
   <footer class="foot">
@@ -1125,26 +1197,25 @@
             <span class="brand-dot" aria-hidden="true"></span>
             <span>YOLKO</span>
           </a>
-          <p class="foot-tag">Fresh Pace Farm eggs, delivered in Sydney.</p>
-          <address class="foot-nap">
-            Saturday delivery across Sydney<br>
-            Within 45&nbsp;km of Flemington
-          </address>
+          <p class="foot-tag">Fresh Pace Farm eggs, delivered across Sydney every Saturday morning.</p>
         </div>
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
-          <a href="/#order">Order now</a>
+          <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney">Bulk eggs</a>
+          <a href="/#faq">Questions</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
           <a href="/egg-delivery-sydney">Egg delivery Sydney</a>
-          <a href="/egg-delivery-areas" aria-current="page">Suburbs we cover</a>
-          <a href="/#faq">FAQ</a>
+          <a href="/egg-delivery-areas" aria-current="page">All suburbs</a>
+          <a href="/egg-delivery-strathfield">Strathfield</a>
+          <a href="/egg-delivery-homebush">Homebush</a>
+          <a href="/egg-delivery-parramatta">Parramatta</a>
         </nav>
         <nav class="foot-col" aria-label="Contact">
           <p class="foot-h">Contact</p>
-          <a href="tel:+61433975055">+61 433 975 055</a>
+          <a href="tel:+61433975055">0433 975 055</a>
           <a href="mailto:orders@getyolko.com">orders@getyolko.com</a>
           <a href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </nav>
@@ -1185,18 +1256,35 @@
       if (!term) { status.textContent = ""; return; }
       status.innerHTML = shown
         ? shown + (shown === 1 ? " match. You're in the delivery area." : " matches. You're in the delivery area.")
-        : 'No match. <a href="/#order">Try checkout</a> or <a href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
+        : 'No match. <a href="/#order">Try the order form</a> or <a href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
     }
     q.addEventListener("input", run);
+    // The suburb check on other pages sends people here with ?q=
+    var start = new URLSearchParams(location.search).get("q");
+    if (start) {
+      q.value = start;
+      run();
+      document.getElementById("suburbs").scrollIntoView();
+    }
   })();
+  </script>
 
   <script>
   (function () {
     var bar = document.querySelector(".topbar");
-    if (!bar) return;
-    function sync() { bar.classList.toggle("scrolled", window.scrollY > 8); }
+    var cta = document.querySelector(".mobile-cta");
+    var heroCta = document.querySelector(".hero .hero-cta");
+    function sync() {
+      if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
+      if (cta && heroCta) {
+        var show = heroCta.getBoundingClientRect().bottom < 0;
+        cta.classList.toggle("show", show);
+        cta.inert = !show;
+      }
+    }
     sync();
     window.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync);
   })();
   </script>
 </body>

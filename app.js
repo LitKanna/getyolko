@@ -96,7 +96,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 
 /* ---------- Hero / order tray image auto-rotate ---------- */
 const rotatorTimers = [];
-const HERO_SIZES = "(max-width: 900px) min(100vw - 24px, 480px), min(50vw, 560px)";
+const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), 560px";
 const ASSET_CACHE_VER = "112";
 
 function clearImageRotators() {
@@ -513,6 +513,16 @@ document.querySelectorAll('input[name="bundle"]').forEach((radio) => {
   radio.addEventListener("change", refreshSubmitPrice);
 });
 
+// Price cards on the suburb and bulk pages link to /?b=<pack>#order to pick that pack.
+(function preselectBundle() {
+  const b = new URLSearchParams(location.search).get("b");
+  if (!["tray1", "tray2", "box"].includes(b)) return;
+  const radio = document.querySelector(`input[name="bundle"][value="${b}"]`);
+  if (!radio) return;
+  radio.checked = true;
+  radio.dispatchEvent(new Event("change", { bubbles: true }));
+})();
+
 // Day radios are re-rendered from settings, so listen on the container
 const daySegEl = document.getElementById("day-seg");
 if (daySegEl) daySegEl.addEventListener("change", refreshSubmitPrice);
@@ -762,6 +772,7 @@ function applySettings(settings) {
     const el = document.getElementById("bp-" + key);
     if (el) el.textContent = "$" + BUNDLES[key].price;
   });
+  applyPriceLabels();
   refreshSubmitPrice();
 
   // Stock note
@@ -787,6 +798,18 @@ function applySettings(settings) {
 
   // Keep SERP/social/JSON-LD in sync with live admin settings
   applySeoMeta(settings);
+}
+
+/** Every [data-price] and [data-per-egg] on the page follows the live admin prices. */
+function applyPriceLabels() {
+  document.querySelectorAll("[data-price]").forEach((el) => {
+    const b = BUNDLES[el.dataset.price];
+    if (b) el.textContent = "$" + b.price;
+  });
+  document.querySelectorAll("[data-per-egg]").forEach((el) => {
+    const b = BUNDLES[el.dataset.perEgg];
+    if (b && b.eggs) el.textContent = Math.round((b.price / b.eggs) * 100) + "¢";
+  });
 }
 
 function setMetaContent(attr, key, value) {
@@ -861,10 +884,10 @@ function applySeoMeta(settings) {
 
 const PRODUCT_TYPES = {
   "1.75": {
-    faq: "Pace Farm cage eggs, 30 to a tray (1.75kg). The same supermarket brand, for less.",
+    faq: "Pace Farm extra-large eggs (cage), 30 to a 1.75 kg tray. The same brand as the supermarket, for less.",
   },
   "1.5": {
-    faq: "Pace Farm cage eggs, 30 to a tray (1.5kg). The same supermarket brand, for less.",
+    faq: "Pace Farm large eggs (cage), 30 to a 1.5 kg tray. The same brand as the supermarket, for less.",
   },
   "fr-700": {
     faq: "Pace Farm free range eggs, 700g pack. The same brand you'll find in the big supermarkets, for less.",
