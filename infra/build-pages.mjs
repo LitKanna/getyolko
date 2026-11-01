@@ -27,13 +27,12 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "153";
+const CSS_V = "154";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
 
 const PHONE = "+61433975055";
-const PHONE_LOCAL = "0433 975 055";
 const WHATSAPP = "https://wa.me/61433975055";
 const EMAIL = "orders@getyolko.com";
 const PRICE = { tray1: 13, tray2: 25, box: 72, delivery: 5 };
@@ -675,19 +674,15 @@ function footer(path) {
           <p class="foot-h">Shop</p>
           <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
-          <a href="/#faq">Questions</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
           <a href="/egg-delivery-sydney"${cur("/egg-delivery-sydney")}>Egg delivery Sydney</a>
           <a href="/egg-delivery-areas"${cur("/egg-delivery-areas")}>All suburbs</a>
-          <a href="/egg-delivery-strathfield"${cur("/egg-delivery-strathfield")}>Strathfield</a>
-          <a href="/egg-delivery-homebush"${cur("/egg-delivery-homebush")}>Homebush</a>
-          <a href="/egg-delivery-parramatta"${cur("/egg-delivery-parramatta")}>Parramatta</a>
         </nav>
-        <nav class="foot-col" aria-label="Contact">
-          <p class="foot-h">Contact</p>
-          <a href="tel:${PHONE}">${PHONE_LOCAL}</a>
+        <nav class="foot-col" aria-label="Help">
+          <p class="foot-h">Help</p>
+          <a href="/#faq">Questions</a>
           <a href="mailto:${EMAIL}">${EMAIL}</a>
           <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </nav>
@@ -716,15 +711,18 @@ function mobileCta(line, pack = "tray1") {
 
 // Shades the header once the page scrolls, and slides the phone order bar in
 // after the hero's own Order button has scrolled away (without JS it always shows).
+// It tucks away again at the closing band, which has its own Order button, so it
+// never sits over the footer.
 const TOPBAR_SCRIPT = `  <script>
   (function () {
     var bar = document.querySelector(".topbar");
     var cta = document.querySelector(".mobile-cta");
     var heroCta = document.querySelector(".hero .hero-cta");
+    var end = document.querySelector(".cta-band, .foot");
     function sync() {
       if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
       if (cta && heroCta) {
-        var show = heroCta.getBoundingClientRect().bottom < 0;
+        var show = heroCta.getBoundingClientRect().bottom < 0 && !(end && end.getBoundingClientRect().top < window.innerHeight);
         cta.classList.toggle("show", show);
         cta.inert = !show;
       }

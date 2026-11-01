@@ -394,13 +394,16 @@ window.addEventListener("scroll", () => {
 /* ---------- Sticky mobile booking bar ---------- */
 const mobileCta = document.getElementById("mobile-cta");
 const heroSection = document.querySelector(".hero");
+const closingBand = document.querySelector(".cta-band, .foot");
 
 function updateMobileCta() {
   const pastHero = window.scrollY > heroSection.offsetHeight * 0.7;
   const orderRect = orderSection.getBoundingClientRect();
   const doneVisible = !doneSection.hidden;
   const orderOnScreen = orderRect.top < window.innerHeight && orderRect.bottom > 0;
-  const show = pastHero && !orderOnScreen && !doneVisible;
+  // The closing band has its own Order button; past it the bar would only cover the footer.
+  const endOnScreen = closingBand ? closingBand.getBoundingClientRect().top < window.innerHeight : false;
+  const show = pastHero && !orderOnScreen && !doneVisible && !endOnScreen;
   mobileCta.classList.toggle("show", show);
   // Keep the off-screen bar out of the tab order / a11y tree until it slides in.
   mobileCta.inert = !show;
@@ -1521,20 +1524,24 @@ function clearReferral() {
 }
 
 (function initReferral() {
-  const code = String(new URLSearchParams(location.search).get("ref") || "").toUpperCase();
+  const fresh = String(new URLSearchParams(location.search).get("ref") || "").toUpperCase();
   const saved = savedReferral();
-  if (!REF_RE.test(code) || code === saved?.code) {
-    if (saved) showReferral(saved);
-    return;
-  }
+  const code = REF_RE.test(fresh) ? fresh : saved?.code;
+  if (!code) return;
+  // Check the code with the server on every visit, so a link that has been removed
+  // (like an old sample) stops showing straight away instead of for 60 days.
   fetch(`${API_BASE}/api/referral?code=${code}`)
-    .then((r) => (r.ok ? r.json() : null))
+    .then((r) => (r.ok ? r.json() : r.status === 404 ? { ok: false, gone: true } : null))
     .then((d) => {
+      if (d && d.gone && code === saved?.code) {
+        clearReferral();
+        return;
+      }
       if (!d || !d.ok) {
         if (saved) showReferral(saved);
         return;
       }
-      const r = { code: d.code, name: d.name || "", at: Date.now() };
+      const r = { code: d.code, name: d.name || "", at: code === saved?.code ? saved.at : Date.now() };
       try {
         localStorage.setItem(REF_KEY, JSON.stringify(r));
       } catch {
