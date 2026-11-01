@@ -2027,8 +2027,9 @@ section {
   gap: 20px;
 }
 
-.area-search {
-  max-width: 520px;
+.areas-finder .suburb-check {
+  max-width: 560px;
+  padding-right: 22px;
 }
 
 .area-status {
@@ -2043,51 +2044,75 @@ section {
   color: var(--ink);
 }
 
-.area-band {
-  border-bottom: 1px solid var(--line);
+.area-results {
+  margin-top: -4px;
 }
 
-.area-band:first-of-type {
-  border-top: 1px solid var(--line);
-}
-
-.area-band summary {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 18px 0;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+/* All suburbs, A to Z: one quiet fold at the bottom of /egg-delivery-areas */
+.az-all summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
   list-style: none;
   cursor: pointer;
 }
 
-.area-band summary::-webkit-details-marker {
+.az-all summary::-webkit-details-marker {
   display: none;
 }
 
-.area-band summary span {
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.area-band summary::after {
+.az-all summary::after {
   content: "+";
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 500;
 }
 
-.area-band[open] summary::after {
+.az-all[open] summary::after {
   content: "−";
 }
 
-.area-band .areas-list {
-  padding: 0 0 22px;
+.az-all summary:hover {
+  color: var(--ink);
+}
+
+.az-list {
+  margin-top: 20px;
+  columns: 4 200px;
+  column-gap: 32px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.az-group h3 {
+  margin: 12px 0 2px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  break-after: avoid;
+}
+
+.az-group:first-child h3 {
+  margin-top: 0;
+}
+
+.az-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.az-group small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.az-group a {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .notfound {

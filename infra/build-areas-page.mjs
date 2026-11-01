@@ -35,8 +35,8 @@ const rows = SUBURBS
   .map((s) => ({ ...s, q: quoteDelivery({ lat: s.lat, lng: s.lng, name: s.name, crossing: s.crossing }) }))
   .filter((s) => s.q.deliver);
 
-// A to Z, one collapsed group per letter: people look for their suburb by name,
-// and the search box above the list opens the groups that match.
+// A to Z in one compact block at the bottom of the page. People use the search box
+// at the top; the list is there so every suburb name and postcode is on the page.
 const letters = [...new Set(rows.map((s) => s.name[0].toUpperCase()))].sort();
 const blocks = letters.map((letter) => {
   const inGroup = rows
@@ -52,12 +52,12 @@ const blocks = letters.map((letter) => {
     return `            <li>${esc(s.name)}${pc}</li>`;
   });
   return [
-    `        <details class="area-band">`,
-    `          <summary>${letter} <span>${inGroup.length} ${inGroup.length === 1 ? "suburb" : "suburbs"}</span></summary>`,
-    `          <ul class="areas-list">`,
+    `        <div class="az-group">`,
+    `          <h3>${letter}</h3>`,
+    `          <ul>`,
     ...items,
     `          </ul>`,
-    `        </details>`,
+    `        </div>`,
   ].join("\n");
 });
 

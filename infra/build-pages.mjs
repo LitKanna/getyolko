@@ -973,8 +973,8 @@ function areasPage(existingHtml) {
   const description = `Every Sydney suburb YOLKO delivers eggs to, with postcodes. Nearly 700 suburbs within about 45 km get Saturday morning delivery for a flat $${PRICE.delivery}.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], ["Delivery areas", path]];
   const faqs = [
-    ["Is my suburb covered?", "If it is on this page, yes. We check your exact street and postcode before you pay."],
-    ["My suburb is not on the list. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
+    ["Is my suburb covered?", "If the search on this page finds it, yes. We check your exact street and postcode before you pay."],
+    ["My suburb doesn't come up. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
     ["Does delivery cost more further out?", `No. It is <strong>$${PRICE.delivery}</strong> flat anywhere in the delivery area.`],
     ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Friday night."],
   ];
@@ -1000,60 +1000,69 @@ function areasPage(existingHtml) {
 ${heroSection({
     trail,
     h1: "Every suburb we deliver to",
-    sub: `Saturday morning egg delivery across Sydney, $${PRICE.delivery} flat. Find your suburb below.`,
+    sub: `Saturday morning egg delivery to nearly 700 Sydney suburbs, $${PRICE.delivery} flat. Type yours below to check.`,
     secondary: ["Find your suburb", "#suburbs"],
   })}
-
-${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`)}
 
     <section id="suburbs" class="band areas-finder" aria-labelledby="finder-title">
       <div class="wrap">
         <div class="panel">
           <h2 id="finder-title">Find your suburb</h2>
           <p>Type a suburb or postcode. We check your exact address before you pay.</p>
-          <div class="field area-search">
-            <label for="area-q">Suburb or postcode</label>
+          <div class="suburb-check" role="search">
+            <label class="sr-only" for="area-q">Suburb or postcode</label>
             <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
           </div>
           <p class="area-status" id="area-status" aria-live="polite"></p>
-          <div class="area-bands">
-${list}
-          </div>
+          <ul class="areas-list area-results" id="area-results" hidden></ul>
         </div>
       </div>
     </section>
 
+${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`)}
+
 ${faqSection("Delivery area questions", faqs)}
 
 ${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.tray2}, and a box of 180 is $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
+
+    <section class="band az" aria-label="All suburbs we deliver to">
+      <div class="wrap">
+        <details class="az-all">
+          <summary>See all suburbs we deliver to, A to Z</summary>
+          <div class="az-list">
+${list}
+          </div>
+        </details>
+      </div>
+    </section>
   </main>`;
+  // The search reads the A to Z list at the bottom of the page and shows matches under the box.
   const scripts = `  <script>
   (function () {
     var q = document.getElementById("area-q");
     var status = document.getElementById("area-status");
-    var bands = Array.prototype.slice.call(document.querySelectorAll(".area-band"));
-    if (!q || !bands.length) return;
+    var results = document.getElementById("area-results");
+    var all = Array.prototype.slice.call(document.querySelectorAll(".az-list li"));
+    if (!q || !results || !all.length) return;
     function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
-    var items = Array.prototype.slice.call(document.querySelectorAll(".area-band li")).map(function (li) {
-      return { li: li, text: norm(li.textContent) };
-    });
+    var items = all.map(function (li) { return { li: li, text: norm(li.textContent), name: norm((li.firstChild && li.firstChild.textContent) || li.textContent) }; });
+    var MAX = 40;
     function run() {
       var term = norm(q.value);
-      var shown = 0;
-      items.forEach(function (it) {
-        var hit = !term || it.text.indexOf(term) !== -1;
-        it.li.hidden = !hit;
-        if (hit) shown++;
-      });
-      bands.forEach(function (band) {
-        var any = band.querySelector("li:not([hidden])");
-        band.hidden = !any;
-        band.open = !!term && !!any;
-      });
-      if (!term) { status.textContent = ""; return; }
-      status.innerHTML = shown
-        ? shown + (shown === 1 ? " match. You're in the delivery area." : " matches. You're in the delivery area.")
-        : 'No match. <a href="/#order">Try the order form</a> or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
+      results.innerHTML = "";
+      if (!term) { results.hidden = true; status.textContent = ""; return; }
+      var hits = items.filter(function (it) { return it.text.indexOf(term) !== -1; });
+      // Suburbs whose name starts with what was typed come first.
+      hits.sort(function (a, b) { return (b.name.indexOf(term) === 0) - (a.name.indexOf(term) === 0); });
+      hits.slice(0, MAX).forEach(function (it) { results.appendChild(it.li.cloneNode(true)); });
+      results.hidden = !hits.length;
+      if (!hits.length) {
+        status.innerHTML = 'No match. <a href="/#order">Try the order form</a> or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
+      } else if (hits.length === 1) {
+        status.textContent = "Yes, we deliver there.";
+      } else {
+        status.textContent = hits.length + " matches. We deliver to all of them." + (hits.length > MAX ? " Keep typing to narrow it down." : "");
+      }
     }
     q.addEventListener("input", run);
     // The suburb check on other pages sends people here with ?q=
