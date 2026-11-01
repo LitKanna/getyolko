@@ -36,7 +36,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=153">
+  <link rel="stylesheet" href="styles-modern.css?v=154">
 
   <script type="application/ld+json">
   {
@@ -429,19 +429,15 @@
           <p class="foot-h">Shop</p>
           <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney">Bulk eggs</a>
-          <a href="/#faq">Questions</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
           <a href="/egg-delivery-sydney">Egg delivery Sydney</a>
           <a href="/egg-delivery-areas">All suburbs</a>
-          <a href="/egg-delivery-strathfield" aria-current="page">Strathfield</a>
-          <a href="/egg-delivery-homebush">Homebush</a>
-          <a href="/egg-delivery-parramatta">Parramatta</a>
         </nav>
-        <nav class="foot-col" aria-label="Contact">
-          <p class="foot-h">Contact</p>
-          <a href="tel:+61433975055">0433 975 055</a>
+        <nav class="foot-col" aria-label="Help">
+          <p class="foot-h">Help</p>
+          <a href="/#faq">Questions</a>
           <a href="mailto:orders@getyolko.com">orders@getyolko.com</a>
           <a href="https://wa.me/61433975055" target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </nav>
@@ -461,10 +457,11 @@
     var bar = document.querySelector(".topbar");
     var cta = document.querySelector(".mobile-cta");
     var heroCta = document.querySelector(".hero .hero-cta");
+    var end = document.querySelector(".cta-band, .foot");
     function sync() {
       if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
       if (cta && heroCta) {
-        var show = heroCta.getBoundingClientRect().bottom < 0;
+        var show = heroCta.getBoundingClientRect().bottom < 0 && !(end && end.getBoundingClientRect().top < window.innerHeight);
         cta.classList.toggle("show", show);
         cta.inert = !show;
       }

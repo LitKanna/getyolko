@@ -208,17 +208,15 @@ section {
   position: sticky;
   top: 0;
   z-index: 80;
-  background: rgba(250, 247, 240, 0.86);
-  backdrop-filter: saturate(1.4) blur(16px);
-  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  /* Solid, not frosted glass: a blur smudges whatever scrolls underneath. */
+  background: var(--cream);
   border-bottom: 1px solid transparent;
-  transition: border-color 180ms ease, background 180ms ease;
+  transition: border-color 180ms ease;
   padding-top: env(safe-area-inset-top, 0);
 }
 
 .topbar.scrolled {
   border-bottom-color: var(--line);
-  background: rgba(250, 247, 240, 0.94);
 }
 
 .topbar-inner {
@@ -1686,9 +1684,12 @@ section {
   font-weight: 600;
 }
 
-/* ---------- Closing band ---------- */
+/* ---------- Closing band ----------
+   The yellow panel sits half on the page and half on the footer, so there is no
+   empty strip of cream between the two. */
 .cta-band {
-  padding: 0 0 var(--section);
+  padding: 0;
+  background: linear-gradient(to bottom, transparent 50%, var(--ink) 50%);
 }
 
 .cta-panel {
@@ -2451,10 +2452,6 @@ section {
 
   body {
     padding-bottom: 0;
-  }
-
-  body.local {
-    padding-bottom: 92px;
   }
 
 }

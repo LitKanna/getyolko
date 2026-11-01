@@ -1332,7 +1332,11 @@ ${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width
 
 /** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect? }. */
 async function sendReminderEmail(env, auth, rec, settings, sat, { test = false } = {}) {
-  const ref = await referralFor(env, rec.phone, rec.name).catch(() => null);
+  // A sample's share link is a dummy that opens the plain shop, so tapping it in a
+  // test email never saves a "Test sent you free delivery" note on that phone.
+  const ref = test
+    ? { code: "SAMPLE", link: shareLink("SAMPLE"), credits: 0 }
+    : await referralFor(env, rec.phone, rec.name).catch(() => null);
   const { subject, html } = buildReminderEmail(rec, settings, sat, ref);
   try {
     const acct = await zohoMailAccount(env, auth);
