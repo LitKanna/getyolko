@@ -27,7 +27,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "150";
+const CSS_V = "151";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -467,7 +467,6 @@ function header(path) {
 ${links}
       </nav>
       <div class="topbar-actions">
-        <a class="topbar-phone" href="tel:${PHONE}">${PHONE_LOCAL}</a>
         <a class="btn btn-solid btn-small" href="/#order">Order now</a>
       </div>
     </div>
@@ -491,13 +490,11 @@ const HERO_FACTS = `          <ul class="hero-facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
           </ul>`;
 
-function heroSection({ trail, kicker, h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT, pack = "tray1" }) {
-  const p = PACKS[pack];
+function heroSection({ trail, h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT }) {
   return `    <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
 ${crumbsNav(trail)}
-          <p class="hero-pill"><span class="pill-dot" aria-hidden="true"></span>${kicker}</p>
           <h1>${h1}</h1>
           <p class="hero-sub">${sub}</p>
           <div class="hero-cta">
@@ -512,11 +509,6 @@ ${HERO_FACTS}
               <source type="image/webp" srcset="${heroSrcset("webp")}" sizes="${HERO_SIZES}">
               <img src="assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}" srcset="${heroSrcset("jpg")}" sizes="${HERO_SIZES}" width="1536" height="1536" fetchpriority="high" decoding="async" alt="${esc(alt)}">
             </picture>
-          </div>
-          <div class="price-card" aria-hidden="true">
-            <span>${p.label}</span>
-            <strong>$${p.price}</strong>
-            <span>About ${perEgg(p.price, p.eggs)}¢ an egg</span>
           </div>
         </div>
       </div>
@@ -612,7 +604,6 @@ ${mapFigure()}
 
 const CONTACT_ROW = `          <div class="contact-row">
             <a class="btn btn-ink btn-small" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
-            <a class="btn btn-ghost btn-small" href="tel:${PHONE}">Call</a>
             <a class="btn btn-ghost btn-small" href="mailto:${EMAIL}">Email</a>
           </div>`;
 
@@ -804,7 +795,6 @@ function suburbPage(s) {
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: `${s.name} ${s.postcode} · ${s.region}`,
     h1: `Egg delivery in ${s.name}`,
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, at your door in ${s.name} on Saturday morning. Delivery is $${PRICE.delivery} flat.`,
     secondary: [`Suburbs near ${s.name}`, "#nearby"],
@@ -881,7 +871,6 @@ function sydneyPage() {
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: "Sydney-wide, every Saturday",
     h1: "Egg delivery across Sydney",
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs. Delivery is $${PRICE.delivery} flat.`,
     secondary: ["Check your suburb", "#map-title"],
@@ -932,14 +921,12 @@ function bulkPage() {
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: "Full box · 180 eggs",
     h1: "Bulk eggs in Sydney",
     sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivered on Saturday morning, $${PRICE.delivery} flat.`,
     cta: "Order a box",
     ctaHref: "/?b=box#order",
     secondary: ["WhatsApp us", WHATSAPP],
     alt: `${HERO_ALT}. Six trays make a 180-egg box`,
-    pack: "box",
   })}
 
     <section class="band" aria-labelledby="per-egg-title">
@@ -1012,7 +999,6 @@ function areasPage(existingHtml) {
   const body = `  <main>
 ${heroSection({
     trail,
-    kicker: "Nearly 700 suburbs",
     h1: "Every suburb we deliver to",
     sub: `Saturday morning egg delivery across Sydney, $${PRICE.delivery} flat. Find your suburb below.`,
     secondary: ["Find your suburb", "#suburbs"],
