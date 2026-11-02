@@ -1068,37 +1068,49 @@ async function zohoAccessToken(env, auth) {
 
 /** The shared token from KV, or a new one from Zoho (unless asking is paused). */
 async function zohoSharedToken(env, auth, tag) {
+  // KV only ever holds a one-way id for the login, never a piece of the token.
+  const login = (await sha256Hex(`zoho-login:${auth.refreshToken}`)).slice(0, 16);
   const kept = await env.DATA.get(ZOHO_ACCESS_KEY, "json").catch(() => null);
-  if (kept?.tag === tag && kept.exp > Date.now() + 120000) {
+  if (kept?.login === login && kept.exp > Date.now() + 120000) {
     try {
-      zohoToken = { tag, id: kept.id, token: await openSecret(env, kept.token), exp: kept.exp };
-      return zohoToken.token;
+      const shared = { tag, id: kept.id, token: await openSecret(env, kept.token), exp: kept.exp };
+      zohoToken = shared;
+      return shared.token;
     } catch {
       // Sealed with an older client secret: ask Zoho for a new one below.
     }
   }
   const pause = await env.DATA.get(ZOHO_PAUSE_KEY, "json").catch(() => null);
-  if (pause?.tag === tag && pause.until > Date.now()) {
+  if (pause?.login === login && pause.until > Date.now()) {
     const err = new Error(`${pause.message || "Zoho sign-in failed"}. Try again in a minute`);
     err.reconnect = Boolean(pause.reconnect);
+    err.signin = true;
     throw err;
   }
   let data;
   try {
     data = await zohoRefresh(env, auth);
   } catch (err) {
-    const note = { tag, until: Date.now() + ZOHO_PAUSE_MS, message: String(err?.message || err).slice(0, 200), reconnect: Boolean(err?.reconnect) };
+    // The sign-in failed, not any one email: callers can keep their work for later.
+    if (err && typeof err === "object") err.signin = true;
+    const note = { login, until: Date.now() + ZOHO_PAUSE_MS, message: String(err?.message || err).slice(0, 200), reconnect: Boolean(err?.reconnect) };
     await env.DATA.put(ZOHO_PAUSE_KEY, JSON.stringify(note), { expirationTtl: Math.ceil(ZOHO_PAUSE_MS / 1000) }).catch(() => null);
     throw err;
   }
   await env.DATA.delete(ZOHO_PAUSE_KEY).catch(() => null);
   const life = Math.max(300, Number(data.expires_in) || 3600) * 1000;
-  zohoToken = { tag, id: randomHex(6), token: data.access_token, exp: Date.now() + life };
-  const sealed = await sealSecret(env, data.access_token);
-  await env.DATA.put(ZOHO_ACCESS_KEY, JSON.stringify({ tag, id: zohoToken.id, token: sealed, exp: zohoToken.exp }), {
-    expirationTtl: Math.floor(life / 1000) - 60,
-  }).catch(() => null);
-  return zohoToken.token;
+  // A local copy: other requests in this isolate can change zohoToken while this one waits on KV.
+  const fresh = { tag, id: randomHex(6), token: data.access_token, exp: Date.now() + life };
+  zohoToken = fresh;
+  try {
+    const sealed = await sealSecret(env, fresh.token);
+    await env.DATA.put(ZOHO_ACCESS_KEY, JSON.stringify({ login, id: fresh.id, token: sealed, exp: fresh.exp }), {
+      expirationTtl: Math.floor(life / 1000) - 60,
+    });
+  } catch {
+    // Not shared this time: this isolate still has it, and the others ask Zoho themselves.
+  }
+  return fresh.token;
 }
 
 /** Ask Zoho for a new access token, with one more try when Zoho's side hiccups. */
@@ -1173,7 +1185,12 @@ async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = fals
   if (resp.status === 401) await zohoDropToken(env, token);
   if (raw && resp.ok) return resp;
   const data = await resp.json().catch(() => null);
-  if (!resp.ok) throw new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
+  if (!resp.ok) {
+    const err = new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
+    // A turned-down token is a sign-in problem; the next call signs in again.
+    if (resp.status === 401) err.signin = true;
+    throw err;
+  }
   return data;
 }
 
@@ -1419,7 +1436,7 @@ ${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width
   return { subject, html };
 }
 
-/** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect? }. */
+/** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect?, signin? }. */
 async function sendReminderEmail(env, auth, rec, settings, sat, { test = false } = {}) {
   // A sample's share link is a dummy that opens the plain shop, so tapping it in a
   // test email never saves a "Test sent you free delivery" note on that phone.
@@ -1435,7 +1452,7 @@ async function sendReminderEmail(env, auth, rec, settings, sat, { test = false }
     });
     return { ok: true };
   } catch (err) {
-    return { ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) };
+    return { ok: false, reconnect: Boolean(err?.reconnect), signin: Boolean(err?.signin), error: String(err?.message || err).slice(0, 300) };
   }
 }
 
@@ -1468,8 +1485,9 @@ async function runReminders(env, now = new Date()) {
       continue;
     }
     const result = await sendReminderEmail(env, auth, rec, settings, sat);
-    if (result.reconnect) {
-      // The mailbox login expired: keep the rest for after it's reconnected.
+    if (result.reconnect || result.signin) {
+      // The mailbox login expired, or Zoho turned the sign-in away for now. Nothing is
+      // wrong with this customer, so keep them and the rest for a later run.
       run.pending.unshift(...batch.slice(i));
       run.lastError = result.error;
       break;
