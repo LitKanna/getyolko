@@ -1040,35 +1040,136 @@ async function zohoAuth(env) {
   return { ...saved, token: undefined, refreshToken, source: "login" };
 }
 
-// Per isolate only, keyed to the login they came from.
+// Zoho allows only 10 new access tokens per 10 minutes per login, and turns the
+// login away for a while past that. So one access token is shared by every isolate
+// through KV (sealed, like the login) and the site asks Zoho about once an hour;
+// parallel calls in one request share one ask; and after a failed ask every isolate
+// waits a minute before asking again instead of hammering Zoho.
+const ZOHO_ACCESS_KEY = "zoho:mail:access";
+const ZOHO_PAUSE_KEY = "zoho:mail:pause";
+const ZOHO_PAUSE_MS = 60000;
+// This isolate's copy, keyed to the login it came from.
 let zohoToken = null;
 let zohoAccount = null;
+// A refresh in flight, per request: each request builds its own auth object, so a
+// promise is never awaited by a request other than the one that started it.
+const zohoAsking = new WeakMap();
 
 async function zohoAccessToken(env, auth) {
   const tag = auth.refreshToken.slice(-12);
   if (zohoToken && zohoToken.tag === tag && zohoToken.exp > Date.now() + 60000) return zohoToken.token;
-  const resp = await fetch(`${auth.accountsUrl}/oauth/v2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: auth.refreshToken,
-      client_id: String(env.ZOHO_CLIENT_ID).trim(),
-      client_secret: String(env.ZOHO_CLIENT_SECRET).trim(),
-    }),
-    signal: AbortSignal.timeout(10000),
-  });
-  const data = await resp.json().catch(() => null);
-  // Zoho answers some failures with HTTP 200 and an error field.
-  if (!resp.ok || !data?.access_token) {
-    const err = new Error(
-      data?.error === "invalid_code" ? "The Zoho login has expired. Connect Zoho Mail again" : `Zoho sign-in failed${data?.error ? `: ${data.error}` : ` (HTTP ${resp.status})`}`
-    );
-    err.reconnect = data?.error === "invalid_code";
+  let asking = zohoAsking.get(auth);
+  if (!asking) {
+    asking = zohoSharedToken(env, auth, tag).finally(() => zohoAsking.delete(auth));
+    zohoAsking.set(auth, asking);
+  }
+  return asking;
+}
+
+/** The shared token from KV, or a new one from Zoho (unless asking is paused). */
+async function zohoSharedToken(env, auth, tag) {
+  // KV only ever holds a one-way id for the login, never a piece of the token.
+  const login = (await sha256Hex(`zoho-login:${auth.refreshToken}`)).slice(0, 16);
+  const kept = await env.DATA.get(ZOHO_ACCESS_KEY, "json").catch(() => null);
+  if (kept?.login === login && kept.exp > Date.now() + 120000) {
+    try {
+      const shared = { tag, id: kept.id, token: await openSecret(env, kept.token), exp: kept.exp };
+      zohoToken = shared;
+      return shared.token;
+    } catch {
+      // Sealed with an older client secret: ask Zoho for a new one below.
+    }
+  }
+  const pause = await env.DATA.get(ZOHO_PAUSE_KEY, "json").catch(() => null);
+  if (pause?.login === login && pause.until > Date.now()) {
+    const err = new Error(`${pause.message || "Zoho sign-in failed"}. Try again in a minute`);
+    err.reconnect = Boolean(pause.reconnect);
+    err.signin = true;
     throw err;
   }
-  zohoToken = { tag, token: data.access_token, exp: Date.now() + (Number(data.expires_in) || 3600) * 1000 };
-  return zohoToken.token;
+  let data;
+  try {
+    data = await zohoRefresh(env, auth);
+  } catch (err) {
+    // The sign-in failed, not any one email: callers can keep their work for later.
+    if (err && typeof err === "object") err.signin = true;
+    const note = { login, until: Date.now() + ZOHO_PAUSE_MS, message: String(err?.message || err).slice(0, 200), reconnect: Boolean(err?.reconnect) };
+    await env.DATA.put(ZOHO_PAUSE_KEY, JSON.stringify(note), { expirationTtl: Math.ceil(ZOHO_PAUSE_MS / 1000) }).catch(() => null);
+    throw err;
+  }
+  await env.DATA.delete(ZOHO_PAUSE_KEY).catch(() => null);
+  const life = Math.max(300, Number(data.expires_in) || 3600) * 1000;
+  // A local copy: other requests in this isolate can change zohoToken while this one waits on KV.
+  const fresh = { tag, id: randomHex(6), token: data.access_token, exp: Date.now() + life };
+  zohoToken = fresh;
+  try {
+    const sealed = await sealSecret(env, fresh.token);
+    await env.DATA.put(ZOHO_ACCESS_KEY, JSON.stringify({ login, id: fresh.id, token: sealed, exp: fresh.exp }), {
+      expirationTtl: Math.floor(life / 1000) - 60,
+    });
+  } catch {
+    // Not shared this time: this isolate still has it, and the others ask Zoho themselves.
+  }
+  return fresh.token;
+}
+
+/** Ask Zoho for a new access token, with one more try when Zoho's side hiccups. */
+async function zohoRefresh(env, auth) {
+  const clientId = String(env.ZOHO_CLIENT_ID).trim();
+  const clientSecret = String(env.ZOHO_CLIENT_SECRET).trim();
+  let err = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 1500));
+    let resp;
+    let text = "";
+    try {
+      resp = await fetch(`${auth.accountsUrl}/oauth/v2/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: auth.refreshToken, client_id: clientId, client_secret: clientSecret }),
+        signal: AbortSignal.timeout(10000),
+      });
+      text = await resp.text();
+    } catch (e) {
+      err = new Error(`Zoho sign-in failed: ${e?.name === "TimeoutError" ? "Zoho didn't answer in 10 seconds" : String(e?.message || e).slice(0, 120)}`);
+      continue;
+    }
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {}
+    // Zoho answers some failures with HTTP 200 and an error field.
+    if (resp.ok && data?.access_token) return data;
+    const expired = data?.error === "invalid_code";
+    const said = data?.error ? `: ${String(data.error).slice(0, 120)}` : ` (HTTP ${resp.status}${zohoErrorText(text, [auth.refreshToken, clientId, clientSecret])})`;
+    err = new Error(expired ? "The Zoho login has expired. Connect Zoho Mail again" : `Zoho sign-in failed${said}`);
+    err.reconnect = expired;
+    // Only a hiccup on Zoho's side is worth one more try; a refusal stands.
+    if (resp.status < 500) break;
+  }
+  throw err;
+}
+
+/** A short, safe excerpt of an error page: no markup, and never anything we sent. */
+function zohoErrorText(text, secrets) {
+  let s = String(text || "")
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  for (const v of secrets) if (v && v.length >= 8) s = s.split(v).join("[hidden]");
+  s = s.slice(0, 120);
+  return s ? `: ${s}` : "";
+}
+
+/** Forget an access token Zoho turned down, here and in KV (unless KV already holds a newer one). */
+async function zohoDropToken(env, token) {
+  if (!zohoToken || zohoToken.token !== token) return;
+  const { id } = zohoToken;
+  zohoToken = null;
+  const kept = await env.DATA.get(ZOHO_ACCESS_KEY, "json").catch(() => null);
+  if (id && kept?.id === id) await env.DATA.delete(ZOHO_ACCESS_KEY).catch(() => null);
 }
 
 async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = false } = {}) {
@@ -1081,10 +1182,15 @@ async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = fals
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(15000),
   });
-  if (resp.status === 401) zohoToken = null;
+  if (resp.status === 401) await zohoDropToken(env, token);
   if (raw && resp.ok) return resp;
   const data = await resp.json().catch(() => null);
-  if (!resp.ok) throw new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
+  if (!resp.ok) {
+    const err = new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
+    // A turned-down token is a sign-in problem; the next call signs in again.
+    if (resp.status === 401) err.signin = true;
+    throw err;
+  }
   return data;
 }
 
@@ -1330,7 +1436,7 @@ ${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width
   return { subject, html };
 }
 
-/** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect? }. */
+/** Send one reminder from the Zoho mailbox. Returns { ok, error?, reconnect?, signin? }. */
 async function sendReminderEmail(env, auth, rec, settings, sat, { test = false } = {}) {
   // A sample's share link is a dummy that opens the plain shop, so tapping it in a
   // test email never saves a "Test sent you free delivery" note on that phone.
@@ -1346,7 +1452,7 @@ async function sendReminderEmail(env, auth, rec, settings, sat, { test = false }
     });
     return { ok: true };
   } catch (err) {
-    return { ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) };
+    return { ok: false, reconnect: Boolean(err?.reconnect), signin: Boolean(err?.signin), error: String(err?.message || err).slice(0, 300) };
   }
 }
 
@@ -1379,8 +1485,9 @@ async function runReminders(env, now = new Date()) {
       continue;
     }
     const result = await sendReminderEmail(env, auth, rec, settings, sat);
-    if (result.reconnect) {
-      // The mailbox login expired: keep the rest for after it's reconnected.
+    if (result.reconnect || result.signin) {
+      // The mailbox login expired, or Zoho turned the sign-in away for now. Nothing is
+      // wrong with this customer, so keep them and the rest for a later run.
       run.pending.unshift(...batch.slice(i));
       run.lastError = result.error;
       break;
@@ -2986,6 +3093,7 @@ async function handleApi(request, env, url, ctx) {
       await fetch(`${auth.accountsUrl}/oauth/v2/token/revoke?token=${encodeURIComponent(auth.refreshToken)}`, { method: "POST", signal: AbortSignal.timeout(10000) }).catch(() => null);
     }
     await env.DATA.delete(ZOHO_AUTH_KEY);
+    await Promise.all([env.DATA.delete(ZOHO_ACCESS_KEY), env.DATA.delete(ZOHO_PAUSE_KEY)]).catch(() => null);
     zohoToken = null;
     zohoAccount = null;
     return json({ ok: true, stillConnected: auth?.source === "secret" });
@@ -3913,7 +4021,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "214",
+      "X-Yolko-Build": "215",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
