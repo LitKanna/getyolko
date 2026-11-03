@@ -971,6 +971,33 @@ body:has(#savebar) .toasts { bottom:84px; }
   .nwl .nt { font-size:17px; }
 }
 
+/* ---------- growers ---------- */
+/* Egg farms read like Contacts: a round badge, the farm, one quiet line under it, grouped by
+   region. Search and two pickers sit above the list; a farm opens in a sheet. */
+.gr-tools { display:grid; grid-template-columns:minmax(0,1fr) 220px 180px; gap:8px; margin:0 0 6px; }
+.gr-q { position:relative; display:block; }
+.gr-q .i { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--muted); pointer-events:none; }
+.gr-q .inp { padding-left:38px; font-weight:400; }
+.grl { display:flex; flex-direction:column; margin:0 -12px; }
+.grl .row { grid-template-columns:40px minmax(0,1fr) auto; min-height:64px; color:inherit; text-decoration:none; }
+.grl .av { font-size:14px; letter-spacing:0; }
+.grl .row.lead .av { background:var(--subtle); color:var(--ink); }
+.grl .tm { text-align:right; }
+.grl .tm b, .grl .tm .gs { display:block; }
+.grl .tm b { color:var(--ink); font-size:13px; line-height:18px; font-weight:600; }
+.grl .row:has(+ .nday)::after { display:none; }
+.gr-more { align-self:center; margin-top:14px; }
+.modal.gr-sheet { width:min(560px, 100%); }
+.gr-sheet .zcell a { color:var(--ink); font-weight:600; text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+.gr-src { display:flex; flex-direction:column; gap:2px; margin:2px 0 0; padding:0; list-style:none; color:var(--muted); font-size:15px; line-height:20px; }
+@media (max-width:899px) {
+  .kpis.three.gr-k { grid-template-columns:1fr 1fr; }
+  .kpis.three.gr-k .kpi:last-child { grid-column:1 / -1; }
+  .gr-tools { grid-template-columns:1fr 1fr; }
+  .gr-tools .gr-q { grid-column:1 / -1; }
+}
+@media (max-width:599px) { .grl .tm .gs { display:none; } }
+
 /* ---------- visits ---------- */
 .vlist { display:flex; flex-direction:column; gap:10px; }
 .vcard { padding:14px 16px; }
@@ -1429,6 +1456,14 @@ body:has(#savebar) .toasts { bottom:84px; }
       <div id="nw-body"></div>
     </section>
 
+    <section class="view grow" data-view="growers" id="v-growers" hidden>
+      <div class="vhead">
+        <div class="min0"><h1>Growers</h1><p class="sub" id="gr-sub"></p></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="gr-csv" aria-label="Download the list as a spreadsheet"><span data-icon="download"></span><span class="lbl">Download</span></button><button class="btn ghost sm" type="button" data-action="gr-check" id="gr-check" aria-label="Check Farm Transparency now"><span data-icon="refresh"></span><span class="lbl">Check now</span></button></div>
+      </div>
+      <div id="gr-body"></div>
+    </section>
+
     <section class="view grow" data-view="visits" id="v-visits" hidden>
       <div class="vhead">
         <div class="min0"><h1>Flyer visits</h1></div>
@@ -1526,6 +1561,7 @@ const ICONS = {
   news: '<path d="M4 5.5h12v13a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2v-13z"/><path d="M16 9h4v9.5a2 2 0 0 1-2 2"/><path d="M7.5 9h5M7.5 12.5h5M7.5 16h3"/>',
   bird: '<path d="M3.5 16.5c3.2 0 5.4-1.6 6.6-4.6 1.1-2.8 2.9-4.4 5.6-4.4 1.4 0 2.4.5 3 1.4l1.8.6-1.8 1c-.2 5-3.9 8.5-9.2 8.5-2.5 0-4.6-.9-6-2.5z"/><path d="M10 19.5 8.5 21M13 19.5l-1 1.5"/><circle cx="16" cy="9.6" r=".9" fill="currentColor" stroke="none"/>',
   barn: '<path d="M3.5 10.5 12 4l8.5 6.5V20h-17z"/><path d="M9 20v-5.5h6V20"/><path d="M9 14.5l6 5.5M15 14.5 9 20"/>',
+  download: '<path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M5 19.5h14"/>',
 };
 function ic(name, size) {
   const s = size || 18;
@@ -2918,10 +2954,11 @@ const VIEWS = [
   { id: "customers", label: "Customers", icon: "users", hash: "customers" },
   { id: "competitors", label: "Competitors", icon: "trend", hash: "prices" },
   { id: "news", label: "News", icon: "news", hash: "news" },
+  { id: "growers", label: "Growers", icon: "barn", hash: "growers" },
   { id: "visits", label: "Flyer visits", icon: "qr", hash: "visits" },
   { id: "images", label: "Images", icon: "image", hash: "assets" },
 ];
-const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", news: "news", visits: "visits", assets: "images", images: "images", more: "more" };
+const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", news: "news", growers: "growers", visits: "visits", assets: "images", images: "images", more: "more" };
 // The phone tab bar is for moving between sections only; everything else lives on the More page.
 const TAB_IDS = ["orders", "run", "stock", "emails"];
 function navBadge(id) {
@@ -3921,7 +3958,7 @@ function composeMail(o) {
     zohoHelp("inbox");
     return;
   }
-  const dkey = o.replyTo ? "r:" + o.replyTo.messageId : o.orderId ? "o:" + o.orderId : "new";
+  const dkey = o.draftKey || (o.replyTo ? "r:" + o.replyTo.messageId : o.orderId ? "o:" + o.orderId : "new");
   const saved = draftGet(dkey) || {};
   const val = function (k) { return saved[k] != null ? saved[k] : (o[k] || ""); };
   let sent = false;
@@ -4638,6 +4675,252 @@ async function nwFeedRemove(t) {
 // While the News page is open, new stories come in by themselves every 5 minutes.
 setInterval(function () { if (S.view === "news" && document.visibilityState === "visible" && KEY) loadNews(true); }, 5 * 60 * 1000);
 
+/* ============================== growers ============================== */
+// Australian egg farms. NSW was checked farm by farm (its own site, Google Maps, the ACO organic
+// register and Farm Transparency); other states come from Farm Transparency only, so they're
+// leads until checked. The Worker re-reads Farm Transparency once a month and marks changes.
+let GR = null, GR_LIMIT = 80;
+const GF = { show: "all", q: "", area: "", eggs: "" };
+const GR_REGIONS = ["Greater Sydney", "Central Coast", "Southern Highlands", "Illawarra and South Coast", "Hunter", "Central West and Orana", "Southern Tablelands", "Mid North Coast", "New England and North West", "Northern Rivers", "Riverina and Murray", "Snowy Monaro"];
+const GR_STATES = ["NSW", "ACT", "VIC", "QLD", "SA", "TAS", "WA", "NT"];
+const GR_STATE_NAME = { NSW: "New South Wales", ACT: "ACT", VIC: "Victoria", QLD: "Queensland", SA: "South Australia", TAS: "Tasmania", WA: "Western Australia", NT: "Northern Territory" };
+const GR_EGGS = [["free", "Free range", /free.range/i], ["pasture", "Pastured", /pastur/i], ["barn", "Barn laid or cage free", /barn|cage free/i], ["caged", "Caged", /\bcaged\b/i], ["organic", "Organic", /organic/i], ["quail", "Quail", /quail/i]];
+const GR_SHOW = [["all", "All"], ["confirmed", "Confirmed"], ["leads", "Leads"]];
+const GR_SRC = { site: "Its website", maps: "Google Maps", ft: "Farm Transparency", aco: "ACO organic register" };
+function grGroup(g) { return g.state === "NSW" && g.region ? g.region : GR_STATE_NAME[g.state] || g.state; }
+function grRank(g) { const r = g.state === "NSW" ? GR_REGIONS.indexOf(g.region) : -1; return GR_STATES.indexOf(g.state) * 100 + (r < 0 ? 99 : r); }
+function grSorted() {
+  return (GR.growers || []).slice().sort(function (a, b) { return grRank(a) - grRank(b) || (b.confirmed ? 1 : 0) - (a.confirmed ? 1 : 0) || a.name.localeCompare(b.name); });
+}
+function grEggsOk(g) {
+  if (!GF.eggs) return true;
+  const e = GR_EGGS.filter(function (x) { return x[0] === GF.eggs; })[0];
+  return !e || e[2].test(g.eggs || "") || (GF.eggs === "organic" && /organic/i.test(g.cert || ""));
+}
+function grShown(g) {
+  if (GF.show === "confirmed" && !g.confirmed) return false;
+  if (GF.show === "leads" && g.confirmed) return false;
+  if (GF.area) {
+    if (GF.area.indexOf("r:") === 0) { if (g.state !== "NSW" || g.region !== GF.area.slice(2)) return false; }
+    else if (g.state !== GF.area) return false;
+  }
+  if (!grEggsOk(g)) return false;
+  if (GF.q) {
+    const hay = [g.name, (g.towns || []).join(" "), g.region, g.state, GR_STATE_NAME[g.state], g.eggs, g.cert, g.note, g.email, g.address, g.phone].join(" ").toLowerCase();
+    if (GF.q.toLowerCase().split(/\s+/).filter(Boolean).some(function (w) { return hay.indexOf(w) < 0; })) return false;
+  }
+  return true;
+}
+/** The letters in a farm's round badge: the first two words that count. */
+function grMono(name) {
+  const w = String(name || "?").replace(/\(.*?\)/g, " ").replace(/^the\s+/i, "").split(/\s+/).filter(function (x) { return /^[a-z0-9]/i.test(x); });
+  return ((w[0] || "?").charAt(0) + (w.length > 1 ? w[1].charAt(0) : (w[0] || "").charAt(1))).toUpperCase();
+}
+function grKinds(g) {
+  const out = [];
+  (g.sources || []).forEach(function (s) { if (out.indexOf(s.kind) < 0) out.push(s.kind); });
+  return out;
+}
+function grLine(g) {
+  const t = g.towns || [];
+  const where = t.slice(0, 2).join(", ") + (t.length > 2 ? " and " + (t.length - 2) + " more" : "");
+  return [where, g.eggs].filter(Boolean).join(" · ");
+}
+function grRow(g) {
+  const n = grKinds(g).length;
+  const side = g.flag ? "May be closed" : g.isNew ? "New" : plural(n, "source");
+  const top = g.flag ? "Check" : g.confirmed ? "Confirmed" : "Lead";
+  return '<button type="button" class="row' + (g.confirmed ? "" : " lead") + '" data-action="gr-open" data-id="' + esc(g.id) + '" aria-label="' + esc(g.name + ". " + grLine(g) + ". " + (g.confirmed ? "Confirmed" : "Lead") + ". " + side) + '">' +
+    '<span class="av" aria-hidden="true">' + esc(grMono(g.name)) + '</span><span class="min0"><span class="nm"><b>' + esc(g.name) + '</b></span><span class="mt">' + esc(grLine(g) || grGroup(g)) + "</span></span>" +
+    '<span class="tm"><b>' + top + '</b><span class="gs">' + esc(side) + "</span></span></button>";
+}
+function grListHtml(list) {
+  if (!list.length) return '<div class="empty-state">' + ic("barn", 28) + "<b>No farms match</b><p>Try another area or egg type, or clear the search.</p></div>";
+  const counts = {};
+  list.forEach(function (g) { const k = grGroup(g); counts[k] = (counts[k] || 0) + 1; });
+  let html = "", group = "";
+  list.slice(0, GR_LIMIT).forEach(function (g) {
+    const k = grGroup(g);
+    if (k !== group) { group = k; html += '<div class="nday">' + esc(k + " · " + counts[k]) + "</div>"; }
+    html += grRow(g);
+  });
+  return html;
+}
+function grMoreHtml(list) {
+  const left = list.length - GR_LIMIT;
+  return left > 0 ? '<button type="button" class="btn ghost sm gr-more" data-action="gr-more">Show ' + esc(plural(Math.min(left, 80), "more farm")) + "</button>" : "";
+}
+function grAreaOptions() {
+  const all = GR.growers || [];
+  const by = function (f) { return all.filter(f).length; };
+  let html = '<option value="">All of Australia</option><optgroup label="New South Wales"><option value="NSW"' + (GF.area === "NSW" ? " selected" : "") + ">All of NSW (" + by(function (g) { return g.state === "NSW"; }) + ")</option>";
+  GR_REGIONS.forEach(function (r) {
+    const n = by(function (g) { return g.state === "NSW" && g.region === r; });
+    if (n) html += '<option value="r:' + esc(r) + '"' + (GF.area === "r:" + r ? " selected" : "") + ">" + esc(r) + " (" + n + ")</option>";
+  });
+  html += '</optgroup><optgroup label="Other states">';
+  GR_STATES.slice(1).forEach(function (s) {
+    const n = by(function (g) { return g.state === s; });
+    if (n) html += '<option value="' + s + '"' + (GF.area === s ? " selected" : "") + ">" + esc(GR_STATE_NAME[s]) + " (" + n + ")</option>";
+  });
+  return html + "</optgroup>";
+}
+function grEggOptions() {
+  return '<option value="">Any eggs</option>' + GR_EGGS.map(function (e) { return '<option value="' + e[0] + '"' + (GF.eggs === e[0] ? " selected" : "") + ">" + esc(e[1]) + "</option>"; }).join("");
+}
+function grCountText(list) {
+  const total = (GR.growers || []).length;
+  return list.length === total ? plural(total, "farm") : list.length + " of " + plural(total, "farm");
+}
+function renderGrSub() {
+  const el = $("gr-sub");
+  if (!el || !GR) return;
+  const bad = (GR.states || []).filter(function (s) { return s.ok === false; });
+  if (bad.length) {
+    el.innerHTML = '<span class="sub-issue">' + ic("alert", 14) + esc("Couldn't read Farm Transparency for " + bad.map(function (s) { return s.state; }).join(", ") + " last time. Showing the last good list") + "</span>";
+    return;
+  }
+  const read = (GR.states || []).map(function (s) { return s.okAt; }).filter(Boolean).sort();
+  el.textContent = read.length ? "Farm Transparency read " + rel(read[0]) : "List from " + grDate(GR.checked);
+}
+function grDate(ymd) {
+  if (!ymd) return "";
+  return new Date(ymd + "T12:00:00Z").toLocaleDateString("en-AU", { timeZone: TZ, day: "numeric", month: "short", year: "numeric" });
+}
+function renderGrowers() {
+  const body = $("gr-body");
+  if (!GR || !body) return;
+  renderGrSub();
+  const all = GR.growers || [];
+  const conf = all.filter(function (g) { return g.confirmed; }).length;
+  const syd = all.filter(function (g) { return g.state === "NSW" && g.region === "Greater Sydney"; });
+  const seg = GR_SHOW.map(function (f) { return '<button type="button" class="' + (GF.show === f[0] ? "on" : "") + '" data-action="gr-filter" data-f="' + f[0] + '">' + f[1] + "</button>"; }).join("");
+  const list = grSorted().filter(grShown);
+  body.innerHTML =
+    '<div class="kpis three gr-k">' +
+      kpi("Confirmed", String(conf), "Its own site, ACO or two sources", "gr-k-confirmed", "", "check") +
+      kpi("Leads", String(all.length - conf), "Only one source so far", "gr-k-leads", "", "search") +
+      kpi("Greater Sydney", plural(syd.length, "farm"), plural(syd.filter(function (g) { return g.confirmed; }).length, "confirmed", "confirmed"), "gr-k-syd", "", "pin") +
+    "</div>" +
+    '<div class="card"><div class="chead nw-head"><div><h2>Egg farms</h2><p class="csub" id="gr-count">' + esc(grCountText(list)) + '</p></div><div class="seg" role="tablist" aria-label="Show">' + seg + "</div></div>" +
+      '<div class="gr-tools"><label class="gr-q">' + ic("search", 18) + '<input class="inp" id="gr-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search farms or towns" aria-label="Search farms or towns" value="' + esc(GF.q) + '"></label>' +
+        '<select class="dd" id="gr-area" aria-label="Area">' + grAreaOptions() + '</select><select class="dd" id="gr-eggs" aria-label="Eggs">' + grEggOptions() + "</select></div>" +
+      '<div class="grl cascade" id="gr-list">' + grListHtml(list) + "</div>" + grMoreHtml(list) +
+    "</div>";
+}
+/** Redraws the list and count only, so the search box keeps focus while typing. */
+function grRenderList() {
+  const box = $("gr-list");
+  if (!GR || !box) return;
+  const list = grSorted().filter(grShown);
+  box.innerHTML = grListHtml(list);
+  const more = box.parentNode.querySelector(".gr-more");
+  if (more) more.remove();
+  box.insertAdjacentHTML("afterend", grMoreHtml(list));
+  const c = $("gr-count");
+  if (c) c.textContent = grCountText(list);
+}
+function grFilter(t) {
+  GF.show = t.getAttribute("data-f") || "all";
+  GR_LIMIT = 80;
+  qsa('[data-action="gr-filter"]').forEach(function (b) { b.classList.toggle("on", b === t); });
+  grRenderList();
+  const box = $("gr-list");
+  if (box) { box.classList.remove("cascade"); void box.offsetWidth; box.classList.add("cascade"); }
+}
+function grSet(k) {
+  GR_LIMIT = 80;
+  if (k === "syd") { GF.show = "all"; GF.area = "r:Greater Sydney"; }
+  else GF.show = k;
+  renderGrowers();
+  const c = document.querySelector("#gr-body .card");
+  if (c) c.scrollIntoView({ behavior: REDUCED.matches ? "auto" : "smooth", block: "start" });
+}
+function grMore(t) {
+  GR_LIMIT += 80;
+  t.remove();
+  grRenderList();
+}
+async function loadGrowers(quiet) {
+  const body = $("gr-body");
+  if (!GR && !quiet) body.innerHTML = '<div class="kpis three">' + [1, 2, 3].map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("") + '</div><div class="card"><span class="sk" style="height:420px"></span></div>';
+  const r = await api("/api/growers");
+  if (!r.ok) {
+    if (!GR) body.innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load the growers</b><p>Check the connection and try again.</p></div></div>";
+    else if (!quiet) toast("Could not refresh the growers");
+    return;
+  }
+  const first = !GR;
+  GR = r.data;
+  if (S.view !== "growers") return;
+  if (first) renderGrowers(); else { renderGrSub(); grRenderList(); }
+}
+async function grCheckNow() {
+  const btn = $("gr-check");
+  if (btn.classList.contains("busy")) return;
+  btn.classList.add("busy");
+  const r = await api("/api/growers/check", { method: "POST" });
+  btn.classList.remove("busy");
+  if (!r.ok) { toast(r.data.error || "Couldn't check Farm Transparency"); return; }
+  GR = r.data;
+  renderGrowers();
+  const d = r.data;
+  toast(!d.ran ? "Checked a few minutes ago" : d.failed ? "Checked. " + plural(d.failed, "state") + " didn't load" : d.added ? "Checked. " + plural(d.added, "new farm") + " on Farm Transparency" : "Checked every state on Farm Transparency");
+}
+function grCell(icon, k, html, sub) {
+  return '<div class="zcell"><span class="zic">' + ic(icon, 16) + '</span><div class="min0"><span class="k">' + esc(k) + "</span><b>" + html + "</b>" + (sub ? "<p>" + esc(sub) + "</p>" : "") + "</div></div>";
+}
+function grHost(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; } }
+function grSafe(u) { return /^https?:\/\//i.test(u || "") ? u : "#"; }
+function grOpen(t) {
+  const g = GR && (GR.growers || []).filter(function (x) { return x.id === t.getAttribute("data-id"); })[0];
+  if (!g) return;
+  const cells = [grCell("pin", "Where", esc((g.towns || []).join(", ")), [g.state === "NSW" ? g.region : "", GR_STATE_NAME[g.state]].filter(Boolean).join(", "))];
+  if (g.eggs) cells.push(grCell("barn", "Eggs", esc(g.eggs), ""));
+  if (g.website) cells.push(grCell("link", "Website", '<a href="' + esc(grSafe(g.website)) + '" target="_blank" rel="noopener noreferrer">' + esc(grHost(g.website)) + "</a>", "Its own site"));
+  if (g.phone) cells.push(grCell("phone", "Phone", '<a href="tel:' + esc(g.phone.replace(/[^\d+]/g, "")) + '">' + esc(g.phone) + "</a>", "As shown on its website"));
+  if (g.email) cells.push(grCell("mail", "Email", '<a href="mailto:' + esc(g.email) + '" data-action="gr-mail" data-to="' + esc(g.email) + '">' + esc(g.email) + "</a>", "As shown on its website. Writes from orders@getyolko.com"));
+  if (g.contactForm || g.contactPage) {
+    const cu = g.contactForm || g.contactPage;
+    cells.push(grCell("chat", g.contactForm ? "Contact form" : "Contact page", '<a href="' + esc(grSafe(cu)) + '" target="_blank" rel="noopener noreferrer">' + esc(grHost(cu)) + "</a>", g.contactForm ? "A form on its own site" : "On its own site"));
+  }
+  if (g.address) cells.push(grCell("navigate", "Address", esc(g.address), "As shown on its website"));
+  if (g.cert) cells.push(grCell("star", "Certification", esc(g.cert), ""));
+  cells.push(grCell(g.confirmed ? "check" : "search", "Status", esc(g.flag ? "Check it's still open" : g.confirmed ? "Confirmed" : g.isNew ? "New lead" : "Lead"),
+    g.flag ? g.flag + ". Its own site or Google Maps says otherwise" : g.confirmed ? "Its own site, the ACO register or two sources list it" : "Only one source so far. Worth a check before calling"));
+  if (g.note) cells.push(grCell("pencil", "Note", esc(g.note), ""));
+  const src = (g.sources || []).map(function (s) {
+    const extra = s.kind === "ft" ? [s.status, s.town !== (g.towns || [])[0] || (g.sources || []).filter(function (x) { return x.kind === "ft"; }).length > 1 ? s.town : ""].filter(Boolean).join(", ") : "";
+    return '<li><a href="' + esc(grSafe(s.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(GR_SRC[s.kind] || s.kind) + "</a>" + (extra ? " · " + esc(extra) : "") + "</li>";
+  }).join("");
+  cells.push('<div class="zcell"><span class="zic">' + ic("external", 16) + '</span><div class="min0"><span class="k">Found in</span><ul class="gr-src">' + src + "</ul></div></div>");
+  cells.push(grCell("refresh", "Checked", esc(grDate(g.checked)), ""));
+  openModal({ title: g.name, cls: "gr-sheet", html: '<div class="zstack">' + cells.join("") + "</div>", actions: [{ label: "Done", kind: "primary", value: true }] });
+}
+/** Downloads the farms showing now as a CSV file for Numbers or Excel. */
+function grCsv() {
+  if (!GR) { toast("The list is still loading"); return; }
+  const list = grSorted().filter(grShown);
+  const cell = function (v) {
+    let s = v == null ? "" : String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const head = ["Farm", "State", "Region", "Towns", "Address", "Eggs", "Website", "Phone", "Email", "Contact form", "Contact details from", "Certification", "Status", "Check", "Note", "Found in", "Links", "Checked"];
+  const lines = [head.join(",")].concat(list.map(function (g) {
+    return [g.name, g.state, g.state === "NSW" ? g.region : "", (g.towns || []).join("; "), g.address, g.eggs, g.website, g.phone, g.email, g.contactForm || g.contactPage, g.phoneFrom || (g.email || g.address ? g.contactPage || g.website : ""), g.cert, g.confirmed ? "Confirmed" : "Lead", g.flag, g.note,
+      grKinds(g).map(function (k) { return GR_SRC[k] || k; }).join("; "), (g.sources || []).map(function (s) { return s.url; }).join(" "), g.checked].map(cell).join(",");
+  }));
+  const blob = new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "yolko-egg-growers-" + sydDate(Date.now()) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast("Downloaded " + plural(list.length, "farm"));
+}
+
 /* ============================== flyer visits ============================== */
 let VISIT_FILTER = "flyer";
 async function loadVisits(filter) {
@@ -4875,6 +5158,7 @@ function showView(v) {
   syncWakeLock();
   if (v === "competitors" && changed) loadPriceWatch();
   if (v === "news" && changed) { NW_SEEN = nwSeenGet(); nwSeenSet(Date.now()); NW_LIMIT = 60; if (NW) renderNews(); loadNews(); }
+  if (v === "growers" && changed) { GR_LIMIT = 80; if (GR) renderGrowers(); loadGrowers(); }
   if (v === "visits" && changed) loadVisits();
   if (v === "images" && changed) loadAssets();
 }
@@ -4963,6 +5247,15 @@ const ACTIONS = {
   "nw-feed-add": function () { nwFeedAdd(); },
   "nw-feed-remove": nwFeedRemove,
   "nw-nsw": function () { window.open("https://www.nsw.gov.au/regional-and-primary-industries/biosecurity/bird-flu", "_blank", "noopener"); },
+  "gr-filter": grFilter,
+  "gr-more": grMore,
+  "gr-open": grOpen,
+  "gr-csv": grCsv,
+  "gr-mail": function (t) { composeMail({ to: t.getAttribute("data-to"), subject: "", draftKey: "g:" + t.getAttribute("data-to") }); },
+  "gr-check": grCheckNow,
+  "gr-k-confirmed": function () { grSet("confirmed"); },
+  "gr-k-leads": function () { grSet("leads"); },
+  "gr-k-syd": function () { grSet("syd"); },
   "visits-filter": function (t) { loadVisits(t.getAttribute("data-f")); },
   "visits-refresh": function () { loadVisits(); },
   "assets-refresh": function () { loadAssets(); },
@@ -4986,11 +5279,14 @@ document.addEventListener("input", function (e) {
   // Toggles and radios are handled on "change"; typing fields update as you type.
   if (t.closest && t.closest("#v-stock") && t.matches('input:not([type="checkbox"]):not([type="radio"])')) { onStockInput(t); return; }
   if (t.id === "im-q") { AF.q = t.value; renderAssets(); }
+  if (t.id === "gr-q") { GF.q = t.value; GR_LIMIT = 80; grRenderList(); }
 });
 document.addEventListener("change", function (e) {
   const t = e.target;
   if (/^st-n-/.test(t.id || "")) { if (t.value === "") { t.value = 0; onStockInput(t); } return; }
   if (t.id === "im-cat") { AF.cat = t.value; renderAssets(); return; }
+  if (t.id === "gr-area") { GF.area = t.value; GR_LIMIT = 80; grRenderList(); return; }
+  if (t.id === "gr-eggs") { GF.eggs = t.value; GR_LIMIT = 80; grRenderList(); return; }
   if (t.id === "im-view") { AF.view = t.value; renderAssets(); return; }
   if (t.id === "im-all") { ASSET_VISIBLE_IDS.forEach(function (id) { if (t.checked) ASSET_SELECTED[id] = true; else delete ASSET_SELECTED[id]; }); renderAssets(); return; }
   if (t.hasAttribute && t.hasAttribute("data-asset-pick")) {
