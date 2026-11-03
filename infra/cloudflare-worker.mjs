@@ -5,7 +5,7 @@ import { qrcode } from "qrcode-generator";
 import ADMIN_HTML from "./admin.html";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "4a01f0b0bc579bd56d8be4ec64144d1a7d1862ce";
+const DEPLOY_SHA = "8709b9b4e7d926790473778ad91fa3968df55dd5";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -1531,9 +1531,12 @@ const remindSubKey = (h) => `remind:sub:${h}`;
 const remindTokKey = (t) => `remind:tok:${t}`;
 const remindRunKey = (sat) => `remind:run:${sat}`;
 const REMIND_TOKEN_RE = /^[a-f0-9]{32}$/;
-// Thursday 10am Sydney until Friday 10am, a few per cron tick so one run stays well
-// inside the Worker's per-invocation subrequest limit.
+// Thursday is the last day to order, so reminders go from 10am until 8pm Sydney
+// time, leaving a few hours before orders close at midnight. A few per cron tick
+// (every 15 minutes, so up to 160 a week) keeps one run well inside the Worker's
+// per-invocation subrequest limit.
 const REMIND_START_HOUR = 10;
+const REMIND_END_HOUR = 20;
 const REMIND_BATCH = 4;
 const REMIND_MAX = 2000;
 const DELIVERY_HOURS = "6am to 12pm";
@@ -1559,12 +1562,22 @@ function saturdayFrom(clock, ahead) {
   return { iso: d.toISOString().slice(0, 10), label: `${d.getUTCDate()} ${SHORT_MONTHS[d.getUTCMonth()]}` };
 }
 
-/** The Saturday this week's reminders are for, or null outside Thursday 10am to Friday 10am. */
+/**
+ * The Saturday a new order goes to. Orders close Thursday night (Sydney time): until
+ * then it is this week's run, and from Friday the one after. app.js shows the same
+ * date on the order form. `cutoff` is how an email names the deadline.
+ */
+function deliverySaturday(now = new Date()) {
+  const c = sydneyClock(now);
+  const idx = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[c.weekday];
+  return { ...saturdayFrom(c, 6 - idx + (idx >= 5 ? 7 : 0)), cutoff: idx === 4 ? "tonight" : "Thursday night" };
+}
+
+/** The Saturday this week's reminders are for, or null outside Thursday 10am to 8pm. */
 function reminderWindow(now = new Date()) {
   const c = sydneyClock(now);
-  if (c.weekday === "Thu" && c.hour >= REMIND_START_HOUR) return saturdayFrom(c, 2);
-  if (c.weekday === "Fri" && c.hour < REMIND_START_HOUR) return saturdayFrom(c, 1);
-  return null;
+  if (c.weekday !== "Thu" || c.hour < REMIND_START_HOUR || c.hour >= REMIND_END_HOUR) return null;
+  return deliverySaturday(now);
 }
 
 /** The next Thursday reminders go out (today while today's window is still open). */
@@ -1663,10 +1676,11 @@ function buildReminderEmail(rec, settings, sat, ref = null) {
   const item = reminderItem(rec, settings, free);
   const label = BUNDLE_CHECKOUT_LABELS[item.bundle] || "Eggs";
   const links = reminderLinks(rec.token);
-  const subject = `Eggs this Saturday, ${sat.label}?`;
+  const cutoff = sat.cutoff || "Thursday night";
+  const subject = `Eggs this Saturday, ${sat.label}? Order by ${cutoff}`;
   const C = { canvas: "#faf7f0", paper: "#fffefb", ink: "#171714", ink2: "#3d3b36", muted: "#6d6b64", line: "#e5e0d5", subtle: "#f3efe6", yellow: "#ffd32a" };
   const FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
-  const preheader = `We deliver Saturday ${sat.label}, ${DELIVERY_HOURS}. Your last order is ready to go again.`;
+  const preheader = `Orders close ${cutoff} for Saturday ${sat.label}, ${DELIVERY_HOURS}. Your last order is ready to go again.`;
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
 <style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
 <body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
@@ -1677,7 +1691,7 @@ function buildReminderEmail(rec, settings, sat, ref = null) {
 <tr><td style="background:${C.paper};border:1px solid ${C.line};border-radius:16px;padding:28px 24px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">Hi ${htmlEscape(first)}, eggs this Saturday?</td></tr>
-<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We deliver on Saturday ${htmlEscape(sat.label)}, ${DELIVERY_HOURS}. Want the same again?</td></tr>
+<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We deliver on Saturday ${htmlEscape(sat.label)}, ${DELIVERY_HOURS}, and orders close ${htmlEscape(cutoff)}. Want the same again?</td></tr>
 <tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Your order</span><strong style="font-weight:600">${htmlEscape(item.quantity > 1 ? `${item.quantity} x ${label}` : label)}</strong><br>${htmlEscape(free ? `${money(item.subtotal)} + free delivery = ${money(item.total)}` : `${money(item.subtotal)} + ${money(item.deliveryFee)} delivery = ${money(item.total)}`)}</td></tr></table></td></tr>
 ${free ? `<tr><td style="padding-top:14px;font-size:15px;line-height:22px;color:${C.ink2}">You've earned a free delivery, so this one is on us. It comes off at checkout.</td></tr>` : ""}
 <tr><td style="padding-top:24px"><a href="${htmlEscape(links.reorder)}" style="display:inline-block;background:${C.yellow};color:${C.ink};text-decoration:none;font-weight:700;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">Order again</a></td></tr>
@@ -1891,6 +1905,18 @@ async function deliveryPerk(env, { phone, ref, street, postcode, suburb, pickupD
   else if (refFrom) perk = "friend";
   else if (Number(cust?.credits) > 0) perk = "credit";
   return { perk, refFrom, refBy: refFrom ? friend.name || "" : "", building };
+}
+
+/**
+ * An unpaid order paid for after orders closed (made Thursday, paid Friday) moves to
+ * the next Saturday, and its free delivery is checked again for that run.
+ */
+async function rollDeliveryDate(env, order) {
+  if (order.fulfillment !== "delivery") return;
+  const { label } = deliverySaturday();
+  if (order.pickupDate === label) return;
+  order.pickupDate = label;
+  applyDeliveryPerk(order, await deliveryPerk(env, perkInput(order, { ref: order.refFrom })));
 }
 
 function perkInput(order, body) {
@@ -2463,9 +2489,9 @@ function suggestDozenSell(caseCost) {
 
 async function getSettings(env) {
   const stored = (await env.DATA.get("settings", "json")) || {};
+  // Tray prices are exactly what the owner saved in Admin. Nothing here derives them from
+  // each other or from the box cost.
   const prices = { ...DEFAULT_SETTINGS.prices, ...(stored.prices || {}) };
-  // When single tray is $13, full box is $72
-  if (Number(prices.tray1) === 13) prices.box = 72;
   // Fill missing case sell prices from matching dozen × 15
   for (const caseKey of CASE_KEYS) {
     const unitKey = CASE_UNIT[caseKey];
@@ -2508,8 +2534,6 @@ async function handleApi(request, env, url, ctx) {
       const n = Number(body?.prices?.[key]);
       if (Number.isFinite(n) && n > 0) prices[key] = Math.round(n);
     }
-    // When single tray is $13, full box is $72
-    if (Number(prices.tray1) === 13) prices.box = 72;
     const dozenCosts = { ...current.dozenCosts };
     if (body?.dozenCosts && typeof body.dozenCosts === "object") {
       for (const key of DOZEN_KEYS) {
@@ -2682,6 +2706,8 @@ async function handleApi(request, env, url, ctx) {
 
     if (fulfillment === "delivery") {
       pickupDay = "Saturday";
+      // The Worker decides the run, so a stale tab can't book a Saturday that has closed.
+      pickupDate = deliverySaturday().label;
       const street = deliveryStreet || legacyAddress;
       deliveryZone = checkDeliveryAddress({
         street,
@@ -2881,6 +2907,7 @@ async function handleApi(request, env, url, ctx) {
     // Don't block checkout on branding. refresh in background if needed.
     maybeEnsureStripeBranding(env, ctx);
 
+    await rollDeliveryDate(env, order);
     const settings = await getSettings(env);
     const result = await createCheckoutForOrder(env, order, settings, ctx);
     if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
@@ -2926,6 +2953,8 @@ async function handleApi(request, env, url, ctx) {
 
     if (fulfillment === "delivery") {
       pickupDay = "Saturday";
+      // The Worker decides the run, so a stale tab can't book a Saturday that has closed.
+      pickupDate = deliverySaturday().label;
       const street = deliveryStreet || legacyAddress;
       deliveryZone = checkDeliveryAddress({
         street,
@@ -3261,9 +3290,7 @@ async function handleApi(request, env, url, ctx) {
     };
     await env.DATA.put(remindSubKey("test"), JSON.stringify(rec));
     if (!prev?.token) await env.DATA.put(remindTokKey(token), "test");
-    const c = sydneyClock();
-    const sat = saturdayFrom(c, ((6 - { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[c.weekday] + 7) % 7) || 7);
-    const result = await sendReminderEmail(env, auth, rec, await getSettings(env), sat, { test: true });
+    const result = await sendReminderEmail(env, auth, rec, await getSettings(env), deliverySaturday(), { test: true });
     return json(result, result.ok ? 200 : 502);
   }
 
@@ -4329,7 +4356,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "215",
+      "X-Yolko-Build": "217",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

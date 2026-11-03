@@ -167,8 +167,9 @@ const SHIPPING = {
   shippingDestination: { "@type": "DefinedRegion", addressCountry: "AU", addressRegion: ["NSW"] },
   deliveryTime: {
     "@type": "ShippingDeliveryTime",
-    // Orders wait for the next Saturday run, then arrive that morning.
-    handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 6, unitCode: "DAY" },
+    // Orders close Thursday night and wait for the next Saturday run (up to 7 days
+    // for a Friday order), then arrive that morning.
+    handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 7, unitCode: "DAY" },
     transitTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: 1, unitCode: "DAY" },
   },
 };
@@ -418,7 +419,8 @@ ${META_PIXEL}
 </head>`;
 }
 
-// Fills in the coming Saturday (Sydney time). Without JS the bar still says "Saturday delivery".
+// Fills in the Saturday a new order goes to (Sydney time): this week until Thursday night,
+// then the week after. Without JS the bar still says "Saturday delivery".
 const NEXT_RUN_SCRIPT = `  <script>
   (function () {
     var el = document.querySelector("[data-next-run]");
@@ -427,7 +429,8 @@ const NEXT_RUN_SCRIPT = `  <script>
       var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
       var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
       var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
-      var ahead = (6 - dow + 7) % 7 || 7;
+      // Orders close Thursday night, so from Friday the next run is the Saturday after.
+      var ahead = 6 - dow + (dow >= 5 ? 7 : 0);
       var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
       var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
       el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
@@ -436,7 +439,7 @@ const NEXT_RUN_SCRIPT = `  <script>
   </script>`;
 
 const ANNOUNCE = `  <div class="announce">
-    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Thursday night.</span></p>
   </div>
 ${NEXT_RUN_SCRIPT}`;
 
@@ -538,7 +541,7 @@ ${steps.map(([when, t, d]) => `          <li>
 }
 
 const STEPS = (last) => [
-  ["By Friday night", "Order online", "Choose a tray, two trays or a 180-egg box, and pay by card."],
+  ["By Thursday night", "Order online", "Choose a tray, two trays or a 180-egg box, and pay by card."],
   ["Straight away", "Get your receipt", "We email your order and receipt as soon as you pay."],
   ["Saturday, 6am to 12pm", "Eggs at your door", last],
 ];
@@ -755,12 +758,12 @@ const EGGS_FAQ = "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray. 
 function suburbPage(s) {
   const path = suburbPath(s);
   const title = `Egg Delivery ${s.name} ${s.postcode} | 30 Eggs $${PRICE.tray1} | YOLKO`;
-  const description = `Cheap, fresh Pace Farm eggs delivered to ${s.name} ${s.postcode} every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery. Order by Friday night.`;
+  const description = `Cheap, fresh Pace Farm eggs delivered to ${s.name} ${s.postcode} every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery. Order by Thursday night.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], [s.name, path]];
   const near = nearestCovered(s);
   const faqs = [
     [`Do you deliver eggs to ${s.name}?`, `Yes. ${s.name} ${s.postcode} is in our Saturday delivery area, and so are ${s.nearby[0]} and ${s.nearby[1]}. We check your address before you pay.`],
-    ["When will my eggs arrive?", "Saturday, between 6am and 12pm. Order by Friday night."],
+    ["When will my eggs arrive?", "Saturday, between 6am and 12pm. Order by Thursday night."],
     ["How much does it cost?", PRICE_FAQ],
     s.faq,
     ["What eggs are they?", EGGS_FAQ],
@@ -826,7 +829,7 @@ ${priceCards(`Egg prices in ${s.name}`, `Same eggs in every pack. Delivery to ${
 
 ${faqSection(`${s.name} delivery questions`, faqs)}
 
-${ctaBand(`Eggs in ${s.name} this Saturday`, `Order by Friday night. Delivery is $${PRICE.delivery} flat.`)}
+${ctaBand(`Eggs in ${s.name} this Saturday`, `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`)}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery to ${s.name}` });
 }
@@ -837,7 +840,7 @@ function sydneyPage() {
   const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery within 45 km. Order online with YOLKO.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", path]];
   const faqs = [
-    ["When is egg delivery in Sydney?", "Saturday, between 6am and 12pm. Order by Friday night."],
+    ["When is egg delivery in Sydney?", "Saturday, between 6am and 12pm. Order by Thursday night."],
     ["How far do you deliver?", `Most of Sydney: the inner west, Parramatta, Ryde, Bankstown, Liverpool, Hornsby, Chatswood, Hurstville, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
     ["How much are the eggs and delivery?", PRICE_FAQ],
     ["How do I order?", `Use the <a href="/#order">order form</a> and pay by card. We deliver the next Saturday morning.`],
@@ -891,7 +894,7 @@ ${priceCards("Prices")}
 
 ${faqSection("Sydney delivery questions", faqs)}
 
-${ctaBand("Fresh eggs this Saturday", `Order by Friday night. Delivery is $${PRICE.delivery} flat.`, ["All suburbs", "/egg-delivery-areas"])}
+${ctaBand("Fresh eggs this Saturday", `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`, ["All suburbs", "/egg-delivery-areas"])}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
 }
@@ -906,7 +909,7 @@ function bulkPage() {
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>.`],
     ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers order full boxes for Saturday delivery, and many set up a weekly standing order."],
     ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
-    ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big amounts."],
+    ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."],
     ["How should I store 180 eggs?", "In the fridge, in their trays, stacked flat. Use them by the best-before date on the pack."],
   ];
   const graph = [webPage(path, "Bulk eggs in Sydney", description), breadcrumbs(path, trail), PRODUCT_BOX, RETURNS, faqPage(path, faqs), BUSINESS_REF];
@@ -974,7 +977,7 @@ function areasPage(existingHtml) {
     ["Is my suburb covered?", "If the search on this page finds it, yes. We check your exact street and postcode before you pay."],
     ["My suburb doesn't come up. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
     ["Does delivery cost more further out?", `No. It is <strong>$${PRICE.delivery}</strong> flat anywhere in the delivery area.`],
-    ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Friday night."],
+    ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Thursday night."],
   ];
   const service = {
     "@type": "Service",
@@ -1109,7 +1112,7 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES, ["Bulk eggs", "/
 /* ---------- Homepage: structured data, FAQ, map and next delivery date ---------- */
 
 const HOME_FAQ = [
-  ["When do you deliver?", `Saturday, between 6am and 12pm. Order by Friday night. Delivery is $${PRICE.delivery} flat.`],
+  ["When do you deliver?", `Saturday, between 6am and 12pm. Order by Thursday night. Delivery is $${PRICE.delivery} flat.`],
   ["Which suburbs do you cover?", `Nearly 700 suburbs across Sydney, from Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
   ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a tray of 30 (about ${perEgg(PRICE.tray1, 30)}¢ an egg), <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is $${PRICE.delivery} flat.`],
   ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],

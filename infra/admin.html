@@ -2863,7 +2863,6 @@ function renderWeek() {
 }
 
 /* ============================== stock & prices ============================== */
-const PRICE_RATIO = { tray1: 12, tray2: 23, box: 66 };
 const DOZEN_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "fr800"];
 const DOZEN_LABELS = { cage600: "Cage 600g", cage700: "Cage 700g", cage800: "Cage 800g", fr600: "Free range 600g", fr700: "Free range 700g", fr800: "Free range 800g" };
 const DOZEN_COST_DEFAULTS = { cage600: 75, cage700: 75, cage800: 75, fr600: 90, fr700: 90, fr800: 90 };
@@ -2871,26 +2870,11 @@ const BASE_BOX_COST = 55;
 const DOZENS_IN_CASE = 15;
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const WEIGHTS = [["1.75", "Cage 1.75 kg"], ["1.5", "Cage 1.5 kg"], ["fr-700", "Free range 700 g"], ["fr-600", "Free range 600 g"]];
-function roundMoney(n) { return Math.max(1, Math.round(Number(n))); }
 /** Suggested sell for one dozen from that product's case cost only. */
 function suggestDozenSell(caseCost) {
   const per = Number(caseCost) / DOZENS_IN_CASE;
   if (!Number.isFinite(per) || per < 0) return 1;
   return Math.max(1, Math.round(per + 1));
-}
-/** When a single tray is $13, the full box is $72. */
-function applyTrayExceptions(p) { return p && Number(p.tray1) === 13 ? Object.assign({}, p, { box: 72 }) : p; }
-function pricesFromTrayAnchor(which, value) {
-  const v = Number(value);
-  if (!Number.isFinite(v) || v <= 0 || !PRICE_RATIO[which]) return null;
-  const scale = v / PRICE_RATIO[which];
-  return applyTrayExceptions({ tray1: roundMoney(PRICE_RATIO.tray1 * scale), tray2: roundMoney(PRICE_RATIO.tray2 * scale), box: roundMoney(PRICE_RATIO.box * scale) });
-}
-function pricesFromBoxCost(cost) {
-  const c = Number(cost);
-  if (!Number.isFinite(c) || c < 0) return null;
-  const scale = c / BASE_BOX_COST;
-  return applyTrayExceptions({ tray1: roundMoney(PRICE_RATIO.tray1 * scale), tray2: roundMoney(PRICE_RATIO.tray2 * scale), box: roundMoney(PRICE_RATIO.box * scale) });
 }
 function normalizeSettings(s) {
   s = s || {};
@@ -2999,7 +2983,7 @@ function renderStock() {
         "</div></div>" +
       "</div>" +
       // Pickup days stay saved but aren't shown: the shop is Saturday delivery only (app.js).
-      '<div class="card"><div class="chead"><div><h2>Tray prices</h2><p class="csub">Change one and the others follow.</p></div></div>' +
+      '<div class="card"><div class="chead"><div><h2>Tray prices</h2><p class="csub">Customers pay exactly these. Your cost only changes the profit.</p></div></div>' +
         [["tray1", "1 tray"], ["tray2", "2 trays"], ["box", "Full box"]].map(function (x) {
           return '<div class="srow"><div class="t"><b>' + x[1] + '</b><span class="profit" id="st-pf-' + x[0] + '"></span></div><span class="money"><i>$</i><input class="inp num" id="st-' + x[0] + '" data-f="' + x[0] + '" type="number" inputmode="numeric" min="1" step="1" value="' + d.prices[x[0]] + '" aria-label="' + x[1] + ' price"></span></div>';
         }).join("") +
@@ -3048,14 +3032,6 @@ function updateStockDerived() {
   const stp = $("st-dozens");
   if (stp) stp.closest(".stepper").classList.toggle("dis", !on);
 }
-function setTrayPrices(next, skip) {
-  if (!next) return;
-  ["tray1", "tray2", "box"].forEach(function (k) {
-    DRAFT.prices[k] = next[k];
-    const el = $("st-" + k);
-    if (el && k !== skip) el.value = next[k];
-  });
-}
 function onStockInput(t) {
   if (!DRAFT) return;
   const f = t.getAttribute("data-f") || t.id;
@@ -3067,8 +3043,9 @@ function onStockInput(t) {
       if (DRAFT.dozensAvailable > 0) rememberDozens(DRAFT.dozensAvailable);
     }
   }
-  else if (f === "tray1" || f === "tray2" || f === "box") { if (v > 0) { DRAFT.prices[f] = Math.round(v); setTrayPrices(pricesFromTrayAnchor(f, v), f); } }
-  else if (f === "boxCost") { if (Number.isFinite(v) && v >= 0) { DRAFT.boxCost = v; setTrayPrices(pricesFromBoxCost(v)); } }
+  // Tray prices are fixed: each one changes only when the owner types it. The box cost only moves the profit lines.
+  else if (f === "tray1" || f === "tray2" || f === "box") { if (v > 0) DRAFT.prices[f] = Math.round(v); }
+  else if (f === "boxCost") { if (Number.isFinite(v) && v >= 0) DRAFT.boxCost = v; }
   else if (f === "dcost") {
     const k = t.getAttribute("data-k");
     if (Number.isFinite(v) && v >= 0) {
@@ -3298,7 +3275,7 @@ async function openReminders() {
     : '<p class="minor">No one has signed up yet. The box sits just above Buy now.</p>';
   const v = await openModal({
     title: "Thursday reminders",
-    html: "<p>Customers who tick “Email me a reminder each Thursday” get one email at 10am every Thursday from orders@getyolko.com. Its Order again button fills in their last order, and every email has an unsubscribe link. Nobody gets one in a sold-out week, or when they have already ordered for that Saturday.</p>" +
+    html: "<p>Customers who tick “Email me a reminder each Thursday” get one email at 10am every Thursday, the last day to order for Saturday, from orders@getyolko.com. Its Order again button fills in their last order, and every email has an unsubscribe link. Nobody gets one in a sold-out week, or when they have already ordered for that Saturday.</p>" +
       '<p class="minor">' + esc(status) + "</p>" + list,
     actions: [{ label: d.on ? "Pause" : "Resume", kind: "ghost", value: "toggle" }, { label: "Send me a sample", kind: "primary", value: "test" }],
   });
