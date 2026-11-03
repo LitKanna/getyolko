@@ -910,6 +910,34 @@ body:has(#savebar) .toasts { bottom:84px; }
 .feed .m { color:var(--muted); margin-top:2px; font-size:13px; line-height:18px; }
 .kpis.three { grid-template-columns:repeat(3, minmax(0,1fr)); }
 
+/* ---------- news ---------- */
+/* Egg news reads like a Mail list: a round outlet badge, the headline, one quiet line under it.
+   A small solid dot marks stories that came in since the page was last opened. */
+.nw-head { flex-wrap:wrap; }
+.nwl { display:flex; flex-direction:column; margin:0 -12px; }
+.nwl .row { grid-template-columns:40px minmax(0,1fr); align-items:start; min-height:68px; color:inherit; text-decoration:none; }
+.nwl .av { font-size:13px; letter-spacing:0; }
+.nwl .nt { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; font-size:17px; line-height:22px; font-weight:600; letter-spacing:-.012em; overflow-wrap:anywhere; }
+.nwl .ns { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; margin-top:2px; color:var(--muted); font-size:15px; line-height:20px; overflow-wrap:anywhere; }
+.nwl .mt2 { display:block; margin-top:3px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nwl .row.new::before { content:""; position:absolute; left:2px; top:27px; width:7px; height:7px; border-radius:50%; background:var(--ink); }
+.nday { padding:18px 12px 6px; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
+.nday:first-child { padding-top:2px; }
+.nwl .row:has(+ .nday)::after { display:none; }
+.nw-more { align-self:center; margin-top:14px; }
+.nw-add { margin-top:18px; }
+.nw-add > span { display:block; margin-bottom:8px; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
+.nw-feed { display:flex; gap:8px; }
+.nw-feed .inp { flex:1; min-width:0; }
+.nw-steps { margin:10px 0 0; padding-left:20px; color:var(--muted); font-size:15px; line-height:22px; }
+.nw-steps a { color:var(--ink); font-weight:600; }
+.modal.nw-sheet { width:min(560px, 100%); }
+@media (max-width:899px) {
+  .kpis.three.nw-k { grid-template-columns:1fr 1fr; }
+  .kpis.three.nw-k .kpi:last-child { grid-column:1 / -1; }
+  .nwl .nt { font-size:17px; }
+}
+
 /* ---------- visits ---------- */
 .vlist { display:flex; flex-direction:column; gap:10px; }
 .vcard { padding:14px 16px; }
@@ -1360,6 +1388,14 @@ body:has(#savebar) .toasts { bottom:84px; }
       <div id="pw-body"></div>
     </section>
 
+    <section class="view grow" data-view="news" id="v-news" hidden>
+      <div class="vhead">
+        <div class="min0"><h1>News</h1><p class="sub" id="nw-sub"></p></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="nw-sources" aria-label="News sources"><span data-icon="gear"></span><span class="lbl">Sources</span></button><button class="btn ghost sm" type="button" data-action="nw-poll" id="nw-poll" aria-label="Refresh the news"><span data-icon="refresh"></span><span class="lbl">Refresh</span></button></div>
+      </div>
+      <div id="nw-body"></div>
+    </section>
+
     <section class="view grow" data-view="visits" id="v-visits" hidden>
       <div class="vhead">
         <div class="min0"><h1>Flyer visits</h1></div>
@@ -1454,6 +1490,9 @@ const ICONS = {
   navigate: '<path d="M12 3 4.5 20 12 16l7.5 4L12 3z"/>',
   gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   unread: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7.5 8.5 6 8.5-6"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/>',
+  news: '<path d="M4 5.5h12v13a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2v-13z"/><path d="M16 9h4v9.5a2 2 0 0 1-2 2"/><path d="M7.5 9h5M7.5 12.5h5M7.5 16h3"/>',
+  bird: '<path d="M3.5 16.5c3.2 0 5.4-1.6 6.6-4.6 1.1-2.8 2.9-4.4 5.6-4.4 1.4 0 2.4.5 3 1.4l1.8.6-1.8 1c-.2 5-3.9 8.5-9.2 8.5-2.5 0-4.6-.9-6-2.5z"/><path d="M10 19.5 8.5 21M13 19.5l-1 1.5"/><circle cx="16" cy="9.6" r=".9" fill="currentColor" stroke="none"/>',
+  barn: '<path d="M3.5 10.5 12 4l8.5 6.5V20h-17z"/><path d="M9 20v-5.5h6V20"/><path d="M9 14.5l6 5.5M15 14.5 9 20"/>',
 };
 function ic(name, size) {
   const s = size || 18;
@@ -2804,10 +2843,11 @@ const VIEWS = [
   { id: "emails", label: "Emails", icon: "mail", hash: "emails" },
   { id: "customers", label: "Customers", icon: "users", hash: "customers" },
   { id: "competitors", label: "Competitors", icon: "trend", hash: "prices" },
+  { id: "news", label: "News", icon: "news", hash: "news" },
   { id: "visits", label: "Flyer visits", icon: "qr", hash: "visits" },
   { id: "images", label: "Images", icon: "image", hash: "assets" },
 ];
-const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", visits: "visits", assets: "images", images: "images", more: "more" };
+const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", news: "news", visits: "visits", assets: "images", images: "images", more: "more" };
 // The phone tab bar is for moving between sections only; everything else lives on the More page.
 const TAB_IDS = ["orders", "run", "stock", "emails"];
 function navBadge(id) {
@@ -4190,6 +4230,204 @@ async function pwRemove(o) {
   } });
 }
 
+/* ============================== news ============================== */
+// Australian egg news: supply, prices, bird flu and the industry. The Worker reads Google News,
+// ABC, Reddit, the NSW bird flu page, NSW DPIRD, Australian Eggs, Egg Farmers of Australia,
+// Inside FMCG and any feed added here (a Google Alert, say) every 15 minutes.
+let NW = null, NW_FILTER = "all", NW_LIMIT = 60, NW_SEEN = 0;
+const NW_FILTERS = [["all", "All"], ["birdflu", "Bird flu"], ["prices", "Prices"], ["reddit", "Reddit"]];
+const NW_MONO = { "ABC News": "ABC", "SBS News": "SBS", "NSW Government": "NSW", "NSW DPIRD": "DPI", "Australian Eggs": "AE", "Egg Farmers of Australia": "EFA", "Inside FMCG": "IF" };
+function nwSeenGet() { try { return Number(localStorage.getItem("yolko_news_seen")) || 0; } catch (e) { return 0; } }
+function nwSeenSet(t) { try { localStorage.setItem("yolko_news_seen", String(t)); } catch (e) {} }
+function nwShown(s) {
+  if (NW_FILTER === "reddit") return s.kind === "reddit";
+  if (NW_FILTER === "birdflu" || NW_FILTER === "prices") return (s.topics || []).indexOf(NW_FILTER) >= 0;
+  return true;
+}
+/** The letters in a story's round badge: the outlet, as people say it. */
+function nwMono(s) {
+  if (s.kind === "reddit") return "r/";
+  if (NW_MONO[s.source]) return NW_MONO[s.source];
+  const w = String(s.source || "?").replace(/^the\s+/i, "").replace(/\.(com|net|org|gov)(\.au)?$|\.au$/i, "").split(/[\s.&-]+/).filter(Boolean);
+  return ((w[0] || "?").charAt(0) + (w.length > 1 ? w[1].charAt(0) : (w[0] || "").charAt(1))).toUpperCase();
+}
+/** Today's stories say how long ago; older ones sit under their day, since many feeds only give
+ *  the date and a made-up time would mislead. */
+function nwTime(iso) {
+  return iso && sydDate(Date.parse(iso)) === sydDate(Date.now()) ? rel(iso) : "";
+}
+function nwRow(s) {
+  const fresh = NW_SEEN && Date.parse(s.seen) > NW_SEEN;
+  const tags = (s.topics || []).map(function (t) { return t === "birdflu" ? "Bird flu" : "Prices"; }).join(", ");
+  const meta = [s.source, nwTime(s.at), tags].filter(Boolean).join(" · ");
+  const href = /^https:\/\//i.test(s.url || "") ? s.url : "#";
+  return '<a class="row' + (fresh ? " new" : "") + '" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(s.title + ". " + meta + (fresh ? ". New" : "") + ". Opens in a new tab") + '">' +
+    '<span class="av" aria-hidden="true">' + esc(nwMono(s)) + '</span><span class="min0"><span class="nt">' + esc(s.title) + "</span>" +
+    (s.summary ? '<span class="ns">' + esc(s.summary) + "</span>" : "") + '<span class="mt2">' + esc(meta) + "</span></span></a>";
+}
+function nwListHtml() {
+  const all = (NW.items || []).filter(nwShown);
+  if (!all.length) {
+    const what = { birdflu: "bird flu stories", prices: "price or supply stories", reddit: "Reddit posts about eggs" }[NW_FILTER] || "stories";
+    return '<div class="empty-state">' + ic("news", 28) + "<b>No " + esc(what) + " yet</b><p>" + (NW.updatedAt ? "New ones show up here within 15 minutes." : "The first check runs within 15 minutes.") + "</p></div>";
+  }
+  const list = all.slice(0, NW_LIMIT);
+  let html = "", day = "";
+  const today = sydDate(Date.now()), yday = sydDate(Date.now() - 864e5);
+  list.forEach(function (s) {
+    const d = sydDate(Date.parse(s.at));
+    if (d !== day) { day = d; html += '<div class="nday">' + esc(d === today ? "Today" : d === yday ? "Yesterday" : fmtDay(s.at)) + "</div>"; }
+    html += nwRow(s);
+  });
+  return html;
+}
+function nwMoreHtml() {
+  const left = (NW.items || []).filter(nwShown).length - NW_LIMIT;
+  return left > 0 ? '<button type="button" class="btn ghost sm nw-more" data-action="nw-more">Show ' + esc(plural(Math.min(left, 60), "older story", "older stories")) + "</button>" : "";
+}
+function nwGroups(list) {
+  const out = [];
+  list.forEach(function (s) { const g = s.custom ? s.name : s.group; if (out.indexOf(g) < 0) out.push(g); });
+  return out.length > 2 ? out.slice(0, 2).join(", ") + " and " + (out.length - 2) + " more" : out.join(" and ");
+}
+function renderNwSub() {
+  const el = $("nw-sub");
+  if (!el || !NW) return;
+  const failed = (NW.sources || []).filter(function (s) { return s.ok === false; });
+  if (failed.length) {
+    el.innerHTML = '<button type="button" class="sub-issue" data-action="nw-sources">' + ic("alert", 14) + esc("Couldn't read " + nwGroups(failed) + " last time. Showing the rest") + "</button>";
+    return;
+  }
+  el.textContent = NW.updatedAt ? "Checked " + rel(NW.updatedAt) : "Not checked yet";
+}
+function renderNews() {
+  const body = $("nw-body");
+  if (!NW || !body) return;
+  renderNwSub();
+  const n = NW.nsw;
+  const items = NW.items || [];
+  const week = items.filter(function (s) { return Date.now() - Date.parse(s.at) < 7 * 864e5; });
+  const outlets = {};
+  week.forEach(function (s) { outlets[s.source] = 1; });
+  const fresh = NW_SEEN ? items.filter(function (s) { return Date.parse(s.seen) > NW_SEEN; }).length : 0;
+  const seg = NW_FILTERS.map(function (f) {
+    return '<button type="button" class="' + (NW_FILTER === f[0] ? "on" : "") + '" data-action="nw-filter" data-f="' + f[0] + '">' + f[1] + "</button>";
+  }).join("");
+  body.innerHTML =
+    '<div class="kpis three nw-k">' +
+      kpi("Bird flu in NSW", n && n.events != null ? plural(n.events, "case") : "-", n ? (n.latest ? "Newest: " + n.latest : "In wild birds") : "Not read yet", n ? "nw-nsw" : "", "", "bird") +
+      kpi("NSW farms", n ? (n.farmsClear ? "None hit" : "Check now") : "-", n ? (n.farmsClear ? "No cases on poultry farms" : "The NSW advice changed") : "", n ? "nw-nsw" : "", n && !n.farmsClear ? "red" : "", "barn") +
+      kpi("This week", plural(week.length, "story", "stories"), Object.keys(outlets).length ? "From " + plural(Object.keys(outlets).length, "outlet") : "", "", "", "news") +
+    "</div>" +
+    '<div class="card"><div class="chead nw-head"><div><h2>Egg news</h2>' + (fresh ? '<p class="csub">' + esc(plural(fresh, "new story", "new stories")) + " since you last looked</p>" : "") + '</div><div class="seg" role="tablist" aria-label="Show">' + seg + "</div></div>" +
+      '<div class="nwl cascade" id="nw-list">' + nwListHtml() + "</div>" + nwMoreHtml() +
+    "</div>";
+}
+async function loadNews(quiet) {
+  const body = $("nw-body");
+  if (!NW && !quiet) body.innerHTML = '<div class="kpis three">' + [1, 2, 3].map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("") + '</div><div class="card"><span class="sk" style="height:420px"></span></div>';
+  const r = await api("/api/news");
+  if (!r.ok) {
+    if (!NW) body.innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load the news</b><p>Check the connection and try again.</p></div></div>";
+    else if (!quiet) toast("Could not refresh the news");
+    return;
+  }
+  NW = r.data;
+  if (S.view === "news") renderNews();
+  nwRefreshSheet();
+}
+async function pollNewsNow() {
+  const btn = $("nw-poll");
+  if (btn.classList.contains("busy")) return;
+  btn.classList.add("busy");
+  const r = await api("/api/news/poll", { method: "POST" });
+  btn.classList.remove("busy");
+  if (!r.ok) { toast(r.data.error || "Couldn't refresh the news"); return; }
+  NW = r.data;
+  renderNews();
+  nwRefreshSheet();
+  const d = r.data;
+  toast(!d.ran ? "Checked a moment ago" : d.added ? plural(d.added, "new story", "new stories") + (d.failed ? ". " + plural(d.failed, "source") + " didn't answer" : "") : d.failed ? "Checked. " + plural(d.failed, "source") + " didn't answer" : "Checked. Nothing new");
+}
+function nwFilter(t) {
+  NW_FILTER = t.getAttribute("data-f") || "all";
+  NW_LIMIT = 60;
+  qsa('[data-action="nw-filter"]').forEach(function (b) { b.classList.toggle("on", b === t); });
+  const list = $("nw-list");
+  if (!list) return;
+  list.innerHTML = nwListHtml();
+  const more = list.parentNode.querySelector(".nw-more");
+  if (more) more.remove();
+  list.insertAdjacentHTML("afterend", nwMoreHtml());
+  list.classList.remove("cascade"); void list.offsetWidth; list.classList.add("cascade");
+}
+function nwMore(t) {
+  NW_LIMIT += 60;
+  const list = $("nw-list");
+  if (!list) return;
+  list.innerHTML = nwListHtml();
+  t.remove();
+  list.insertAdjacentHTML("afterend", nwMoreHtml());
+}
+/* The Sources sheet: how each source did last time, and feeds added here (Google Alerts). */
+function nwSourceCell(s) {
+  const ok = s.ok === true, bad = s.ok === false;
+  const icon = s.custom ? "link" : s.group === "Reddit" ? "chat" : /^NSW/.test(s.group) ? "bird" : "news";
+  let line;
+  if (s.ok == null) line = "Not read yet";
+  else if (bad) line = "Didn't answer at " + fmtClock(s.checkedAt) + (s.error ? " (" + s.error + ")" : "") + (s.okAt ? ". Last worked " + rel(s.okAt) : "");
+  else line = (s.id === "nsw-birdflu" ? "Read " : plural(s.count || 0, "egg story", "egg stories") + " · read ") + rel(s.checkedAt);
+  const extra = s.custom ? '<button type="button" class="more" data-action="nw-feed-remove" data-id="' + esc(s.id) + '">Remove ' + ic("chevron", 12) + "</button>" : "";
+  return zcell(icon, ok ? "ok" : bad ? "bad" : "", s.custom ? "Added feed" : s.group, s.custom ? s.name : s.about, line, extra);
+}
+function nwSourceCells() { return NW ? (NW.sources || []).map(nwSourceCell).join("") : ""; }
+function nwRefreshSheet() { const box = $("nw-src"); if (box) box.innerHTML = nwSourceCells(); }
+function nwSources() {
+  openModal({
+    title: "News sources",
+    cls: "nw-sheet",
+    html: '<div class="zstack" id="nw-src">' + nwSourceCells() + "</div>" +
+      '<div class="nw-add"><span>Add a feed, such as a Google Alert</span><div class="nw-feed"><input class="inp" id="nw-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste the feed link" aria-label="Feed link"><button type="button" class="btn dark" data-action="nw-feed-add" id="nw-add">Add</button></div>' +
+      '<ol class="nw-steps"><li>Open <a href="https://www.google.com/alerts" target="_blank" rel="noopener">Google Alerts</a> and type a search, such as eggs australia</li><li>Tap Show options and set Deliver to: RSS feed</li><li>Tap Create alert, then copy the link on the feed icon and paste it here</li></ol></div>',
+    actions: [{ label: "Done", kind: "primary", value: true }],
+  });
+  const inp = $("nw-url");
+  if (inp) inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); nwFeedAdd(); } });
+}
+async function nwFeedAdd() {
+  const inp = $("nw-url"), btn = $("nw-add");
+  if (!inp || !btn || btn.classList.contains("busy")) return;
+  const url = inp.value.trim();
+  if (!url) { toast("Paste the feed link first"); inp.focus(); return; }
+  btn.classList.add("busy");
+  const r = await api("/api/news/feeds", { method: "POST", body: { url: url } });
+  btn.classList.remove("busy");
+  if (!r.ok) { toast(r.data.error || "Not added. Try again"); return; }
+  NW = r.data;
+  inp.value = "";
+  nwRefreshSheet();
+  renderNews();
+  toast(((r.data.feed && r.data.feed.name) || "Feed") + " added" + (r.data.added ? ". " + plural(r.data.added, "new story", "new stories") : ""));
+}
+async function nwFeedRemove(t) {
+  const id = t.getAttribute("data-id");
+  const r = await api("/api/news/feeds", { method: "POST", body: { id: id, remove: true } });
+  if (!r.ok) { toast(r.data.error || "Not removed. Try again"); return; }
+  NW = r.data;
+  nwRefreshSheet();
+  renderNews();
+  const gone = r.data.removed || {};
+  toast((gone.name || "Feed") + " removed", { label: "Undo", run: async function () {
+    const u = await api("/api/news/feeds", { method: "POST", body: { url: gone.url, name: gone.name, id: gone.id } });
+    if (!u.ok) { toast(u.data.error || "Couldn't put it back"); return; }
+    NW = u.data;
+    nwRefreshSheet();
+    renderNews();
+  } });
+}
+// While the News page is open, new stories come in by themselves every 5 minutes.
+setInterval(function () { if (S.view === "news" && document.visibilityState === "visible" && KEY) loadNews(true); }, 5 * 60 * 1000);
+
 /* ============================== flyer visits ============================== */
 let VISIT_FILTER = "flyer";
 async function loadVisits(filter) {
@@ -4426,6 +4664,7 @@ function showView(v) {
   if (v === "run") { if (changed) S.runOpen = null; renderRun(); }
   syncWakeLock();
   if (v === "competitors" && changed) loadPriceWatch();
+  if (v === "news" && changed) { NW_SEEN = nwSeenGet(); nwSeenSet(Date.now()); NW_LIMIT = 60; if (NW) renderNews(); loadNews(); }
   if (v === "visits" && changed) loadVisits();
   if (v === "images" && changed) loadAssets();
 }
@@ -4505,6 +4744,13 @@ const ACTIONS = {
   "pw-add": function (t) { pwSheet(null, t.getAttribute("data-shop") || ""); },
   "pw-new": function () { pwSheet(null, ""); },
   "pw-edit": function (t) { const o = PW && (PW.typed || []).filter(function (x) { return x.id === t.getAttribute("data-id"); })[0]; if (o) pwSheet(o); },
+  "nw-poll": pollNewsNow,
+  "nw-filter": nwFilter,
+  "nw-more": nwMore,
+  "nw-sources": nwSources,
+  "nw-feed-add": function () { nwFeedAdd(); },
+  "nw-feed-remove": nwFeedRemove,
+  "nw-nsw": function () { window.open("https://www.nsw.gov.au/regional-and-primary-industries/biosecurity/bird-flu", "_blank", "noopener"); },
   "visits-filter": function (t) { loadVisits(t.getAttribute("data-f")); },
   "visits-refresh": function () { loadVisits(); },
   "assets-refresh": function () { loadAssets(); },

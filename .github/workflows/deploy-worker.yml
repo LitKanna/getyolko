@@ -9,6 +9,7 @@ on:
       - "infra/delivery-zones.mjs"
       - "infra/nsw-suburb-centroids.mjs"
       - "infra/price-watch.mjs"
+      - "infra/news-feed.mjs"
       - "package.json"
       - "package-lock.json"
       - "wrangler.toml"

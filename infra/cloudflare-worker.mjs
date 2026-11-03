@@ -1,5 +1,6 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
+import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed } from "./news-feed.mjs";
 import { qrcode } from "qrcode-generator";
 // The admin page lives in its own file; wrangler bundles .html as a text module.
 import ADMIN_HTML from "./admin.html";
@@ -4707,11 +4708,33 @@ async function handleApi(request, env, url, ctx) {
     return json(result);
   }
 
+  // Admin > News: Australian egg news, the NSW bird flu advice and how each source is doing.
+  if (url.pathname === "/api/news" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    return json(await newsView(env));
+  }
+
+  // Admin: read every news source now (the Refresh button). A second tap within a minute is free.
+  if (url.pathname === "/api/news/poll" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const result = await runNewsPoll(env);
+    return json({ ...(await newsView(env)), ran: result.ran, added: result.added || 0, failed: result.failed || 0 });
+  }
+
+  // Admin: add or remove a pasted news feed, such as a Google Alerts RSS link.
+  if (url.pathname === "/api/news/feeds" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => ({}));
+    const result = await saveNewsFeed(env, body);
+    if (result.error) return json(result, 400);
+    return json({ ...(await newsView(env)), ...result });
+  }
+
   return json({ error: "not found" }, 404);
 }
 
 export default {
-  // Every cron tick: Meta stock sync, competitor prices (checked once every 6 hours),
+  // Every cron tick: Meta stock sync, competitor prices (checked once every 6 hours), egg news,
   // the missed-payment safety net and, on Thursdays, reorder reminders.
   async scheduled(_event, env, ctx) {
     const settings = await getSettings(env);
@@ -4719,6 +4742,11 @@ export default {
     ctx.waitUntil(
       runScheduledPoll(env).catch((err) => {
         console.log("price-watch poll failed", String(err?.message || err));
+      })
+    );
+    ctx.waitUntil(
+      runScheduledNews(env).catch((err) => {
+        console.log("news poll failed", String(err?.message || err));
       })
     );
     ctx.waitUntil(
