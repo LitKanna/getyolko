@@ -1,6 +1,7 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
 import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
+import { growersView, runGrowersCheck, runScheduledGrowers } from "./growers.mjs";
 import {
   MAIN, DOZENS_PER_CASE, VARIETIES, BUNDLES, BUNDLE_KEYS, isBundle, bundleLabel,
   stockOf, addStock, holdFor, heldBy, traysIn, stockProblem, catalogueView, shopView,
@@ -4741,12 +4742,26 @@ async function handleApi(request, env, url, ctx) {
     return json(result);
   }
 
+  // Admin > Growers: Australian egg farms with each Farm Transparency link's latest status.
+  if (url.pathname === "/api/growers" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    return json(await growersView(env));
+  }
+
+  // Admin: re-read every state's Farm Transparency list now (at most every 10 minutes).
+  if (url.pathname === "/api/growers/check" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const result = await runGrowersCheck(env, { force: true });
+    return json({ ...(await growersView(env)), ran: result.ran, read: result.read, failed: result.failed });
+  }
+
   return json({ error: "not found" }, 404);
 }
 
 export default {
   // Every cron tick: Meta stock sync, competitor prices (checked once every 6 hours), egg news,
-  // the missed-payment safety net and, on Thursdays, reorder reminders.
+  // the monthly Farm Transparency re-check for Admin > Growers, the missed-payment safety net
+  // and, on Thursdays, reorder reminders.
   async scheduled(_event, env, ctx) {
     const settings = await getSettings(env);
     ctx.waitUntil(syncMetaAdsForStock(env, settings.traysAvailable));
@@ -4758,6 +4773,11 @@ export default {
     ctx.waitUntil(
       runScheduledNews(env).catch((err) => {
         console.log("news poll failed", String(err?.message || err));
+      })
+    );
+    ctx.waitUntil(
+      runScheduledGrowers(env).catch((err) => {
+        console.log("growers check failed", String(err?.message || err));
       })
     );
     ctx.waitUntil(
@@ -4879,7 +4899,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "223",
+      "X-Yolko-Build": "224",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

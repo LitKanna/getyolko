@@ -8,6 +8,7 @@
                     "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1",
                     "test:delivery":  "node infra/delivery-zones-test.mjs",
                     "test:news":  "node infra/news-feed-test.mjs",
+                    "test:growers":  "node infra/growers-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {
