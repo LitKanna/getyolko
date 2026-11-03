@@ -22,6 +22,7 @@ const EVENTS_KEY = "pricewatch:v2:events";
 const TYPED_KEY = "pricewatch:v2:typed";
 const EVENTS_MAX = 200;
 const EVERY_MS = 6 * 60 * 60 * 1000;
+const RETRY_MS = 30 * 60 * 1000;
 // A tap on Check now within a minute of the last check shows that check instead of asking again.
 const MIN_GAP_MS = 60 * 1000;
 const UA = "Mozilla/5.0 (compatible; YolkoPriceCheck/2.0; +https://getyolko.com)";
@@ -501,11 +502,13 @@ async function runPoll(env, { force = false } = {}) {
   return { ran: true, changeCount: changes.length };
 }
 
-/** Cron: every 15 minutes the Worker asks; the shops are only checked once every 6 hours. */
+/** Cron: every 15 minutes the Worker asks; the shops are only checked once every 6 hours, or
+ *  after 30 minutes when a shop didn't answer last time (Umall's Shopify sometimes says 429). */
 async function runScheduledPoll(env) {
   const prev = await getLatest(env);
   const age = prev?.updatedAt ? Date.now() - Date.parse(prev.updatedAt) : Infinity;
-  if (age < EVERY_MS - 5 * 60 * 1000) return { ran: false };
+  const failed = Object.values(prev?.sources || {}).some((s) => s && !s.ok);
+  if (age < (failed ? RETRY_MS : EVERY_MS - 5 * 60 * 1000)) return { ran: false };
   return runPoll(env, { force: true });
 }
 

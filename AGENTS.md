@@ -163,7 +163,8 @@ shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
 Gourmet Grocer product page (JSON-LD) and Umall (Shopify `/products/<handle>.js`). Never read Coles
 `/search/` or Aldi `/results` (robots.txt disallows them). From Coles and Aldi it keeps the cheapest
 egg per housing (caged, barn, free range) plus every pack of 24 or more. The cron asks every 15
-minutes but the shops are only read once every 6 hours (`pricewatch:v2:latest`); Check now in the
+minutes but the shops are only read once every 6 hours (30 minutes after a shop failed; Umall's
+Shopify sometimes answers 429 to Cloudflare) (`pricewatch:v2:latest`); Check now in the
 admin reads them at once (at most once a minute). A shop that fails keeps its last prices, marked
 stale, and the page says so under the heading. Changes go to `pricewatch:v2:events`.
 Woolworths blocks every automated request (Akamai 403, even robots.txt, from Cloudflare and from
