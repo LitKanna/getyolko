@@ -934,6 +934,9 @@ function nextPickupDate(dayName) {
   const base = Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")));
   let ahead = (DAY_INDEX[dayName] - todayIdx + 7) % 7;
   if (ahead === 0) ahead = 7;
+  // Saturday orders close Thursday night, so from Friday they go to the Saturday after.
+  // The Worker applies the same rule when it saves the order.
+  if (dayName === "Saturday" && todayIdx === DAY_INDEX.Friday) ahead += 7;
   const d = new Date(base + ahead * 86400 * 1000);
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
@@ -1474,7 +1477,7 @@ function applyReorder(d) {
   refreshDeliveryZoneHint();
   refreshSubmitPrice();
   orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-  showFormMessage("Your last order is filled in. Check it, then tap Buy now.", false);
+  showFormMessage(`Your last order is filled in for Saturday ${nextPickupDate("Saturday")}. Check it, then tap Buy now.`, false);
 }
 
 if (window.YOLKO_REORDER) {

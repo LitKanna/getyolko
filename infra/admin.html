@@ -3296,7 +3296,7 @@ async function openReminders() {
     : '<p class="minor">No one has signed up yet. The box sits just above Buy now.</p>';
   const v = await openModal({
     title: "Thursday reminders",
-    html: "<p>Customers who tick “Email me a reminder each Thursday” get one email at 10am every Thursday from orders@getyolko.com. Its Order again button fills in their last order, and every email has an unsubscribe link. Nobody gets one in a sold-out week, or when they have already ordered for that Saturday.</p>" +
+    html: "<p>Customers who tick “Email me a reminder each Thursday” get one email at 10am every Thursday, the last day to order for Saturday, from orders@getyolko.com. Its Order again button fills in their last order, and every email has an unsubscribe link. Nobody gets one in a sold-out week, or when they have already ordered for that Saturday.</p>" +
       '<p class="minor">' + esc(status) + "</p>" + list,
     actions: [{ label: d.on ? "Pause" : "Resume", kind: "ghost", value: "toggle" }, { label: "Send me a sample", kind: "primary", value: "test" }],
   });
