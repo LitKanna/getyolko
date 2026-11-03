@@ -3994,7 +3994,11 @@ function renderPwSub() {
   const el = $("pw-sub");
   if (!el || !PW) return;
   const failed = Object.keys(PW.sources || {}).map(function (k) { return PW.sources[k]; }).filter(function (s) { return s && !s.ok; });
-  if (failed.length) { el.textContent = "Couldn't read " + failed.map(function (s) { return s.shop; }).join(" and ") + " at " + fmtClock(failed[0].checked_at) + ". Showing their last prices"; return; }
+  if (failed.length) {
+    const kept = (PW.offers || []).some(function (o) { return o.stale; });
+    el.textContent = "Couldn't read " + failed.map(function (s) { return s.shop; }).join(" and ") + " at " + fmtClock(failed[0].checked_at) + (kept ? ". Showing their last prices" : ". Trying again soon");
+    return;
+  }
   el.textContent = PW.updatedAt ? "Checked " + rel(PW.updatedAt) : "Not checked yet";
 }
 function renderPriceWatch() {
