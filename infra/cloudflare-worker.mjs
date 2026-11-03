@@ -1427,7 +1427,7 @@ async function zohoDropToken(env, token) {
   if (id && kept?.id === id) await env.DATA.delete(ZOHO_ACCESS_KEY).catch(() => null);
 }
 
-async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = false } = {}) {
+async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = false, timeout = 15000 } = {}) {
   const token = await zohoAccessToken(env, auth);
   const headers = { Authorization: `Zoho-oauthtoken ${token}`, Accept: raw ? "*/*" : "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -1435,7 +1435,8 @@ async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = fals
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(15000),
+    // A raw download streams after this returns, and the timer covers the whole body.
+    signal: AbortSignal.timeout(timeout),
   });
   if (resp.status === 401) await zohoDropToken(env, token);
   if (raw && resp.ok) return resp;
@@ -1494,6 +1495,272 @@ function mailRow(m) {
     unread: String(m.status) === "0",
     hasAttachment: String(m.hasAttachment) === "1",
   };
+}
+
+/* ---------- Pictures and attachments in the admin mailbox ----------
+   Zoho's message HTML points inline pictures at its own web app (/mail/ImageDisplay?...&cid=...),
+   which only works inside mail.zoho.com, so on getyolko.com they were broken boxes. cid: links,
+   http: pictures and hosts that refuse other sites' Referer don't load in the admin either. So every
+   picture and attachment comes through the site: inline pictures and files straight from the Zoho
+   API, remote pictures through a small proxy (no cookies, no Referer, and Kanna's IP stays hidden).
+   <img> tags and new tabs can't send the admin's Bearer key, so each link carries an HMAC made with
+   a key derived from ADMIN_KEY, and links to the mailbox's own files run out after about a week. */
+const MAIL_FILE_DAYS = 7;
+const MAIL_IMAGE_MAX = 25 * 1024 * 1024;
+let mailSigning = null;
+
+async function mailSigningKey(env) {
+  const secret = String(env.ADMIN_KEY || "").trim();
+  if (!secret) throw new Error("ADMIN_KEY isn't set");
+  if (mailSigning?.secret === secret) return mailSigning.key;
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`yolko-mail-files:${secret}`));
+  const key = await crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  mailSigning = { secret, key };
+  return key;
+}
+
+async function mailSign(env, text) {
+  const mac = await crypto.subtle.sign("HMAC", await mailSigningKey(env), new TextEncoder().encode(text));
+  return b64(mac.slice(0, 16)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function mailSigOk(env, text, sig) {
+  if (!sig || !env.ADMIN_KEY) return false;
+  const want = await mailSign(env, text);
+  if (want.length !== sig.length) return false;
+  let diff = 0;
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ sig.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Links to the mailbox's own files last a week, rounded to the day so the browser can cache them. */
+function mailFileExpiry() {
+  const day = 86400;
+  return (Math.floor(Date.now() / 1000 / day) + MAIL_FILE_DAYS + 1) * day;
+}
+
+function mailLink(origin, path, params) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  return `${origin}${path}?${q}`;
+}
+
+/** A picture on the web, through the site's proxy. The address is the whole secret, so it never runs out. */
+async function mailRemoteImageLink(env, origin, href) {
+  return mailLink(origin, "/api/admin/mail/image", { u: href, s: await mailSign(env, `img\n${href}`) });
+}
+
+/** One inline picture of a message (by its Content-ID, and Zoho's attachment id when known). */
+async function mailInlineLink(env, origin, folderId, messageId, cid, attId, x) {
+  const s = await mailSign(env, `inl\n${folderId}\n${messageId}\n${cid}\n${attId}\n${x}`);
+  return mailLink(origin, "/api/admin/mail/inline", { f: folderId, m: messageId, c: cid, a: attId, x, s });
+}
+
+/** One attachment. The name is signed too: its extension decides how the file is served. */
+async function mailFileLink(env, origin, folderId, messageId, attId, name, x, download) {
+  const s = await mailSign(env, `att\n${folderId}\n${messageId}\n${attId}\n${name}\n${x}`);
+  return mailLink(origin, "/api/admin/mail/file", { f: folderId, m: messageId, a: attId, n: name, x, s, dl: download ? 1 : "" });
+}
+
+function decodeAttr(v) {
+  return String(v).replace(/&(#x[0-9a-f]+|#\d+|amp|quot|apos|lt|gt|nbsp);/gi, (m, e) => {
+    const k = e.toLowerCase();
+    if (k[0] === "#") {
+      const n = k[1] === "x" ? parseInt(k.slice(2), 16) : parseInt(k.slice(1), 10);
+      return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
+    }
+    return { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: "\u00a0" }[k];
+  });
+}
+
+function escAttr(v) {
+  return String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** A Content-ID without its <angle brackets>. Compare with cidKey(); send Zoho the original. */
+function normCid(v) {
+  return String(v || "").trim().replace(/^<|>$/g, "");
+}
+
+function cidKey(v) {
+  return normCid(v).toLowerCase();
+}
+
+const ZOHO_WEB_HOST = /(^|\.)zoho(mail)?\.[a-z.]+$/i;
+
+/** What a picture address in a message points at: a remote picture, an inline part, or nothing we can fetch. */
+function mailImageTarget(raw) {
+  const v = String(raw || "").trim();
+  if (!v || /^(data|blob|about|javascript):/i.test(v)) return null;
+  if (/^cid:/i.test(v)) {
+    let cid = v.slice(4);
+    try { cid = decodeURIComponent(cid); } catch {}
+    return { inline: true, cid: normCid(cid), file: "" };
+  }
+  let u;
+  try {
+    u = new URL(v.startsWith("//") ? `https:${v}` : v, "https://mail.zoho.com");
+  } catch {
+    return null;
+  }
+  const relative = !/^[a-z][a-z0-9+.-]*:/i.test(v) && !v.startsWith("//");
+  if ((relative || ZOHO_WEB_HOST.test(u.hostname)) && /\/ImageDisplay$/i.test(u.pathname)) {
+    return { inline: true, cid: normCid(u.searchParams.get("cid")), file: String(u.searchParams.get("f") || "") };
+  }
+  if (relative || !/^https?:$/.test(u.protocol) || u.href.length > 4000) return null;
+  return { inline: false, href: u.href };
+}
+
+/**
+ * The message HTML with every picture pointed at the site: <img src/srcset>, background="",
+ * style="...url()" and <style> blocks. Remote <img>s keep their address in data-yolko-orig, so the
+ * admin can try it directly if the proxy can't get it.
+ */
+async function rewriteMailImages(env, origin, html, { folderId, messageId, inline = [] }) {
+  html = String(html || "");
+  const x = mailFileExpiry();
+  const own = new URL(origin).host;
+  const links = new Map();
+  const byCid = new Map(inline.filter((p) => p.cid).map((p) => [cidKey(p.cid), p]));
+  const resolve = (raw) => {
+    const key = String(raw || "").trim();
+    if (links.has(key)) return;
+    const t = mailImageTarget(key);
+    if (!t) return links.set(key, null);
+    if (!t.inline) {
+      if (new URL(t.href).host === own) return links.set(key, null);
+      return links.set(key, mailRemoteImageLink(env, origin, t.href).then((href) => ({ href, orig: t.href })));
+    }
+    // Zoho names inline parts 1.png, 2.jpg... in the order they come, so that is the fallback match.
+    const n = /^(\d+)\./.exec(t.file);
+    const same = t.cid ? byCid.get(cidKey(t.cid)) : null;
+    const part = same || (n ? inline[Number(n[1]) - 1] : null) || null;
+    const cid = same ? normCid(same.cid) : t.cid || (part ? normCid(part.cid) : "");
+    if (!cid && !part) return links.set(key, null);
+    links.set(key, mailInlineLink(env, origin, folderId, messageId, cid, part ? part.attachmentId : "", x).then((href) => ({ href })));
+  };
+
+  const TAG = /<([a-z][\w:-]*)((?:\s+(?:[^\s"'>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*(\/?)>/gi;
+  const ATTR = /(\s+)([^\s"'>/=]+)(?:(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+  const CSS_URL = /url\(\s*(['"]?)([^'")]+?)\1\s*\)/gi;
+  const STYLE_BLOCK = /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi;
+  const srcsetUrls = (v) => v.split(/,\s+|,(?=\S)/).map((c) => c.trim().split(/\s+/)[0]).filter(Boolean);
+  const attrValue = (m) => decodeAttr(m[5] ?? m[6] ?? m[7] ?? "");
+
+  // First pass: find every address and sign them all at once.
+  for (const tag of html.matchAll(TAG)) {
+    for (const a of (tag[2] || "").matchAll(ATTR)) {
+      const name = a[2].toLowerCase();
+      if (a[4] === undefined) continue;
+      const val = attrValue(a);
+      if (name === "src" || name === "background" || name === "poster") resolve(val);
+      else if (name === "srcset") srcsetUrls(val).forEach(resolve);
+      else if (name === "style") for (const u of val.matchAll(CSS_URL)) resolve(u[2]);
+    }
+  }
+  for (const b of html.matchAll(STYLE_BLOCK)) for (const u of b[2].matchAll(CSS_URL)) resolve(u[2]);
+  if (!links.size) return html;
+  const done = new Map();
+  await Promise.all([...links].map(async ([k, p]) => done.set(k, p ? await p.catch(() => null) : null)));
+  const swap = (raw) => done.get(String(raw || "").trim())?.href || null;
+  const swapCss = (css) => css.replace(CSS_URL, (m, q, u) => (swap(u) ? `url("${swap(u)}")` : m));
+
+  // Second pass: write the new addresses in.
+  html = html.replace(STYLE_BLOCK, (m, open, css, close) => open + swapCss(css) + close);
+  return html.replace(TAG, (whole, tagName, attrs, slash) => {
+    if (!attrs) return whole;
+    let orig = "";
+    const out = attrs.replace(ATTR, (m, sp, name, eq, _q, dq, sq, bare) => {
+      if (eq === undefined) return m;
+      const n = name.toLowerCase();
+      const val = decodeAttr(dq ?? sq ?? bare ?? "");
+      if (n === "src" || n === "background" || n === "poster") {
+        const hit = done.get(val.trim());
+        if (!hit) return m;
+        if (hit.orig && n === "src") orig = hit.orig;
+        return `${sp}${name}="${escAttr(hit.href)}"`;
+      }
+      if (n === "srcset") {
+        const next = val.replace(/(^|,)(\s*)([^\s,]+)/g, (mm, c, ws, u) => (swap(u) ? `${c}${ws}${swap(u)}` : mm));
+        return next === val ? m : `${sp}${name}="${escAttr(next)}"`;
+      }
+      if (n === "style" && /url\(/i.test(val)) {
+        const next = swapCss(val);
+        return next === val ? m : `${sp}${name}="${escAttr(next)}"`;
+      }
+      return m;
+    });
+    if (out === attrs) return whole;
+    return `<${tagName}${out}${orig && /^img$/i.test(tagName) ? ` data-yolko-orig="${escAttr(orig)}"` : ""}${slash ? " /" : ""}>`;
+  });
+}
+
+/** What a mail attachment is, from its name: a picture to show, a file the browser can open, or one to save. */
+const MAIL_FILE_TYPES = {
+  png: ["image/png", "image"], jpg: ["image/jpeg", "image"], jpeg: ["image/jpeg", "image"], jpe: ["image/jpeg", "image"],
+  gif: ["image/gif", "image"], webp: ["image/webp", "image"], avif: ["image/avif", "image"], bmp: ["image/bmp", "image"],
+  pdf: ["application/pdf", "open"], txt: ["text/plain; charset=utf-8", "open"], csv: ["text/plain; charset=utf-8", "open"],
+  log: ["text/plain; charset=utf-8", "open"], mp3: ["audio/mpeg", "open"], m4a: ["audio/mp4", "open"], wav: ["audio/wav", "open"],
+  mp4: ["video/mp4", "open"], mov: ["video/quicktime", "open"], webm: ["video/webm", "open"],
+};
+
+function mailFileType(name) {
+  const ext = (/\.([a-z0-9]{1,8})$/i.exec(String(name || "")) || [])[1];
+  return MAIL_FILE_TYPES[String(ext || "").toLowerCase()] || ["application/octet-stream", "file"];
+}
+
+/** The picture format from the first bytes, for hosts and Zoho parts that say application/octet-stream. */
+function sniffImage(buf) {
+  const b = new Uint8Array(buf.slice(0, 64));
+  const at = (i, ...xs) => xs.every((x, j) => b[i + j] === x);
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "image/png";
+  if (at(0, 0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (at(0, 0x47, 0x49, 0x46, 0x38)) return "image/gif";
+  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "image/webp";
+  if (at(4, 0x66, 0x74, 0x79, 0x70) && /^avi[fs]$/.test(String.fromCharCode(...b.slice(8, 12)))) return "image/avif";
+  if (at(0, 0x42, 0x4d)) return "image/bmp";
+  if (at(0, 0, 0, 1, 0)) return "image/x-icon";
+  const head = new TextDecoder().decode(buf.slice(0, 1024)).replace(/^\ufeff/, "").trimStart();
+  if (/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!doctype svg[^>]*>\s*)?<svg[\s>]/i.test(head)) return "image/svg+xml";
+  return null;
+}
+
+const MAIL_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/apng"]);
+
+// Served from getyolko.com, so a file must never run as a page there: sandbox anything that could.
+const MAIL_FILE_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "Cross-Origin-Resource-Policy": "same-origin",
+};
+const MAIL_SANDBOX = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; media-src 'self'; sandbox";
+
+function mailMiss(status = 404) {
+  return new Response(null, { status, headers: { "Cache-Control": "no-store", ...MAIL_FILE_HEADERS } });
+}
+
+/** A picture response, or null when the bytes aren't a picture. */
+async function mailImageResponse(resp, maxAge) {
+  if (!resp?.ok) return null;
+  if (Number(resp.headers.get("Content-Length")) > MAIL_IMAGE_MAX) return null;
+  let type = String(resp.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase().replace("image/jpg", "image/jpeg");
+  let body = resp.body;
+  if (!MAIL_IMAGE_TYPES.has(type)) {
+    const buf = await resp.arrayBuffer().catch(() => null);
+    if (!buf || buf.byteLength > MAIL_IMAGE_MAX) return null;
+    type = sniffImage(buf);
+    if (!type) return null;
+    body = buf;
+  }
+  return new Response(body, {
+    headers: { "Content-Type": type, "Content-Security-Policy": MAIL_SANDBOX, "Cache-Control": `private, max-age=${maxAge}`, ...MAIL_FILE_HEADERS },
+  });
+}
+
+/** Content-Disposition with the real file name (RFC 6266 / 5987). */
+function contentDisposition(kind, name) {
+  const plain = String(name || "file").replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  return `${kind}; filename="${plain}"; filename*=UTF-8''${encodeURIComponent(String(name || "file"))}`;
 }
 
 const EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]+$/;
@@ -3448,7 +3715,7 @@ async function handleApi(request, env, url, ctx) {
       const [content, details, files] = await Promise.all([
         zohoMailFetch(env, auth, `${base}/content`),
         zohoMailFetch(env, auth, `${base}/details`).catch(() => null),
-        zohoMailFetch(env, auth, `${base}/attachmentinfo`).catch(() => null),
+        zohoMailFetch(env, auth, `${base}/attachmentinfo?includeInline=true`).catch(() => null),
       ]);
       const d = details?.data || {};
       if (url.searchParams.get("markRead") === "1") {
@@ -3457,14 +3724,27 @@ async function handleApi(request, env, url, ctx) {
           body: { mode: "markAsRead", messageId: [messageId] },
         }).catch(() => null);
       }
-      const attachments = (Array.isArray(files?.data?.attachments) ? files.data.attachments : []).map((a) => ({
-        id: String(a.attachmentId || ""),
-        name: String(a.attachmentName || "attachment"),
-        size: Number(a.attachmentSize) || 0,
+      // Inline pictures and attachments load through signed links to this site (see rewriteMailImages).
+      const inline = (Array.isArray(files?.data?.inline) ? files.data.inline : []).map((p) => ({
+        cid: String(p.cid || p.contentId || ""),
+        attachmentId: String(p.attachmentId || ""),
+        name: String(p.attachmentName || ""),
       }));
+      const x = mailFileExpiry();
+      const attachments = await Promise.all(
+        (Array.isArray(files?.data?.attachments) ? files.data.attachments : []).map(async (a) => {
+          const id = String(a.attachmentId || "");
+          const name = decodeMailEntities(a.attachmentName) || "attachment";
+          const [, kind] = mailFileType(name);
+          const download = await mailFileLink(env, url.origin, folderId, messageId, id, name, x, true);
+          const open = kind === "file" ? download : await mailFileLink(env, url.origin, folderId, messageId, id, name, x, false);
+          return { id, name, size: Number(a.attachmentSize) || 0, kind, url: open, download };
+        })
+      );
+      const html = await rewriteMailImages(env, url.origin, String(content?.data?.content || ""), { folderId, messageId, inline }).catch(() => String(content?.data?.content || ""));
       return json({
         ok: true,
-        html: String(content?.data?.content || ""),
+        html,
         subject: decodeMailEntities(d.subject),
         from: decodeMailEntities(d.fromAddress),
         fromName: decodeMailEntities(d.sender),
@@ -3502,6 +3782,91 @@ async function handleApi(request, env, url, ctx) {
       });
     } catch (err) {
       return json({ ok: false, error: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
+
+  // Admin: a picture from the web inside a message, fetched by the site. Signed instead of the
+  // Bearer key because <img> can't send headers (see rewriteMailImages).
+  if (url.pathname === "/api/admin/mail/image" && request.method === "GET") {
+    const u = String(url.searchParams.get("u") || "");
+    if (!(await mailSigOk(env, `img\n${u}`, url.searchParams.get("s")))) return mailMiss(403);
+    let target;
+    try {
+      target = new URL(u);
+    } catch {
+      return mailMiss(400);
+    }
+    if (!/^https?:$/.test(target.protocol)) return mailMiss(400);
+    const resp = await fetch(target.href, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; YOLKO-Mail-Images/1.0; +https://getyolko.com)",
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      },
+      redirect: "follow",
+      cf: { cacheEverything: true, cacheTtl: 86400, cacheTtlByStatus: { "200-299": 86400, "400-599": 0 } },
+      signal: AbortSignal.timeout(15000),
+    }).catch(() => null);
+    return (await mailImageResponse(resp, 604800).catch(() => null)) || mailMiss(resp && !resp.ok ? 404 : 502);
+  }
+
+  // Admin: an inline picture of a message (the ones Zoho writes as /mail/ImageDisplay?...&cid=).
+  if (url.pathname === "/api/admin/mail/inline" && request.method === "GET") {
+    const q = (k) => String(url.searchParams.get(k) || "");
+    const [folderId, messageId, cid, attId, x] = ["f", "m", "c", "a", "x"].map(q);
+    if (!/^\d{1,30}$/.test(folderId) || !/^\d{1,30}$/.test(messageId) || !/^\d{1,12}$/.test(x)) return mailMiss(400);
+    if (Number(x) * 1000 < Date.now()) return mailMiss(410);
+    if (!(await mailSigOk(env, `inl\n${folderId}\n${messageId}\n${cid}\n${attId}\n${x}`, q("s")))) return mailMiss(403);
+    const auth = await zohoAuth(env);
+    if (!auth) return mailMiss(503);
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const base = `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}`;
+      const maxAge = Math.max(0, Number(x) - Math.floor(Date.now() / 1000));
+      const tryPath = async (path) => mailImageResponse(await zohoMailFetch(env, auth, path, { raw: true, timeout: 30000 }).catch(() => null), maxAge).catch(() => null);
+      let out = null;
+      if (cid) out = await tryPath(`${base}/inline?contentId=${encodeURIComponent(cid)}`);
+      if (!out && /^[\w.-]{1,80}$/.test(attId)) out = await tryPath(`${base}/attachments/${attId}`);
+      if (!out) {
+        // Look the part up again in case Zoho's ids moved on.
+        const info = await zohoMailFetch(env, auth, `${base}/attachmentinfo?includeInline=true`).catch(() => null);
+        const parts = Array.isArray(info?.data?.inline) ? info.data.inline : [];
+        const hit = parts.find((p) => cid && cidKey(p.cid || p.contentId) === cidKey(cid));
+        if (hit?.attachmentId && String(hit.attachmentId) !== attId) out = await tryPath(`${base}/attachments/${encodeURIComponent(hit.attachmentId)}`);
+        if (!out && hit?.cid && normCid(hit.cid) !== cid) out = await tryPath(`${base}/inline?contentId=${encodeURIComponent(normCid(hit.cid))}`);
+      }
+      return out || mailMiss(404);
+    } catch {
+      return mailMiss(502);
+    }
+  }
+
+  // Admin: open or save an attachment. Pictures, PDFs, text and media open in the browser;
+  // anything else (and dl=1) downloads with its real name.
+  if (url.pathname === "/api/admin/mail/file" && request.method === "GET") {
+    const q = (k) => String(url.searchParams.get(k) || "");
+    const [folderId, messageId, attId, name, x] = ["f", "m", "a", "n", "x"].map(q);
+    if (!/^\d{1,30}$/.test(folderId) || !/^\d{1,30}$/.test(messageId) || !/^[\w.-]{1,80}$/.test(attId) || !/^\d{1,12}$/.test(x)) return mailMiss(400);
+    if (Number(x) * 1000 < Date.now()) return mailMiss(410);
+    if (!(await mailSigOk(env, `att\n${folderId}\n${messageId}\n${attId}\n${name}\n${x}`, q("s")))) return mailMiss(403);
+    const auth = await zohoAuth(env);
+    if (!auth) return mailMiss(503);
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      const resp = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/attachments/${attId}`, { raw: true, timeout: 120000 });
+      const [type, kind] = mailFileType(name);
+      const save = q("dl") === "1" || kind === "file";
+      const headers = {
+        "Content-Type": save ? "application/octet-stream" : type,
+        "Content-Disposition": contentDisposition(save ? "attachment" : "inline", name),
+        "Cache-Control": `private, max-age=${Math.max(0, Number(x) - Math.floor(Date.now() / 1000))}`,
+        ...MAIL_FILE_HEADERS,
+      };
+      // Chrome won't show a PDF in a sandboxed page, and a PDF or media file can't run script here anyway.
+      if (!save && kind === "image") headers["Content-Security-Policy"] = MAIL_SANDBOX;
+      if (!save && type.startsWith("text/")) headers["Content-Security-Policy"] = MAIL_SANDBOX;
+      return new Response(resp.body, { headers });
+    } catch {
+      return mailMiss(502);
     }
   }
 

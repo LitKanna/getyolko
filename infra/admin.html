@@ -680,6 +680,7 @@ button.kpi:active { scale:.97; transition:background-color .15s, scale .12s var(
 .ep-body { flex:1 0 auto; background:var(--paper2); padding:16px; }
 .ep-body iframe { display:block; width:100%; max-width:640px; margin:0 auto; border:0; border-radius:16px; background:#fff; min-height:300px; }
 .ep-body iframe.dk { background:transparent; }
+.ep-body iframe.plain { min-height:0; }
 .ep-body:has(> iframe.plain) { background:none; padding-top:0; }
 .ep-note { max-width:640px; margin:10px auto 0; font-size:13px; line-height:18px; color:var(--muted); text-align:center; }
 
@@ -691,8 +692,22 @@ button.kpi:active { scale:.97; transition:background-color .15s, scale .12s var(
 .att { display:inline-flex; align-items:center; gap:8px; max-width:100%; height:36px; padding:0 14px; border-radius:18px; background:var(--subtle); font-size:15px; font-weight:500; }
 .att:hover { background:var(--press); }
 .att .min0 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
-.att small { color:var(--muted); font-size:13px; }
+.att small { flex:none; white-space:nowrap; color:var(--muted); font-size:13px; }
 .att.busy { opacity:.6; pointer-events:none; }
+/* Attachments at the end of the message: pictures as tiles (one picture shows whole), files as chips. */
+.ep-files { max-width:640px; margin:12px auto 0; display:flex; flex-direction:column; gap:12px; }
+.ep-pics { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
+.ep-pic { display:block; padding:0; border:0; border-radius:16px; overflow:hidden; aspect-ratio:1; background:var(--subtle); cursor:zoom-in; }
+.ep-pic img { display:block; width:100%; height:100%; object-fit:cover; }
+.ep-pics.one { grid-template-columns:minmax(0, 1fr); }
+.ep-pics.one .ep-pic { aspect-ratio:auto; justify-self:start; max-width:100%; }
+.ep-pics.one .ep-pic img { width:auto; max-width:100%; height:auto; max-height:520px; object-fit:contain; }
+.ep-docs { display:flex; flex-wrap:wrap; gap:8px; }
+.ep-docs .att { color:var(--ink); }
+.lightbox figcaption { display:flex; align-items:center; gap:12px; max-width:100%; }
+.lightbox figcaption span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-save { flex:none; display:inline-flex; align-items:center; height:36px; padding:0 16px; border-radius:18px; background:rgba(255,255,255,.16); color:#fff; font-size:15px; font-weight:600; }
+.lb-save:hover { background:rgba(255,255,255,.24); }
 .em-line.bad span { color:var(--red); }
 .modal.compose { width:min(640px, 100%); }
 .modal.compose .field { margin-top:12px; }
@@ -1200,7 +1215,7 @@ body:has(#savebar) .toasts { bottom:84px; }
   .dayh a::after { content:""; position:absolute; inset:-4px -2px; }
   .zcell .more { padding:12px 0; margin:-12px 0; }
   .sub-issue { padding:13px 0; margin:-13px 0; }
-  .order-pill, .att { height:44px; border-radius:22px; }
+  .order-pill, .att, .lb-save { height:44px; border-radius:22px; }
   .sec .sact { width:44px; height:44px; margin-top:-22px; }
   .inp, .dd, .inp.sm, .dd.sm, .search input { font-size:16px; }
   .inp.sm, .dd.sm { height:44px; }
@@ -3425,7 +3440,8 @@ function markEmailRow() {
   if (r) r.classList.add("sel");
 }
 function emailFrameDoc(html) {
-  const base = '<base target="_blank">';
+  // Pictures come through the site (the Worker rewrites them); any that load directly send no Referer.
+  const base = '<base target="_blank"><meta name="referrer" content="no-referrer">';
   return /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i, "<head$1>" + base) : base + html;
 }
 /** The email frame is as tall as the email, so the pane has one scroll and no box inside a box. */
@@ -3446,7 +3462,8 @@ function fitEmailFrame() {
   de.style.overflowY = "hidden";
   fr.style.height = "0px";
   shrinkWideEmail(de);
-  let h = Math.max(300, de.scrollHeight + 2);
+  // A plain message hugs its text, so its attachments sit right under it; a designed one keeps its paper.
+  let h = Math.max(fr.classList.contains("plain") ? 40 : 300, de.scrollHeight + 2);
   fr.style.height = h + "px";
   // Anything still wider than the pane scrolls sideways; leave room for that scrollbar under the email.
   const hbar = doc.defaultView ? doc.defaultView.innerHeight - de.clientHeight : 0;
@@ -3493,9 +3510,26 @@ function mountEmailFrame(html) {
       return;
     }
     fit();
+    doc.addEventListener("error", emailImageFailed, true);
     ["load", "error", "toggle"].forEach(function (t) { doc.addEventListener(t, fit, true); });
+    // A picture that failed before we were listening.
+    Array.prototype.forEach.call(doc.images, function (img) { if (img.complete && !img.naturalWidth && img.getAttribute("src")) emailImageFailed({ target: img }); });
     if (BODY_RO) BODY_RO.observe(doc.body);
   })(0);
+}
+/** A web picture the site couldn't fetch gets one try straight from its host. One that still won't
+    load is hidden, so the email never shows a broken-image box; a picture with alt text keeps it. */
+function emailImageFailed(e) {
+  const img = e.target;
+  if (!img || img.tagName !== "IMG") return;
+  const orig = img.getAttribute("data-yolko-orig");
+  if (orig && !img.hasAttribute("data-yolko-direct")) {
+    img.setAttribute("data-yolko-direct", "");
+    img.removeAttribute("srcset");
+    img.src = orig;
+    return;
+  }
+  if (!(img.getAttribute("alt") || "").trim()) img.style.setProperty("visibility", "hidden", "important");
 }
 /** On wide screens the subject row stays pinned; it gets a hairline once the email scrolls under it. */
 function watchEmailScroll(pane) {
@@ -3563,8 +3597,7 @@ async function renderMailDetail(pane, folder) {
   const line = [name !== addr ? addr : "", cc ? "Cc " + cc : ""].filter(Boolean).join(" · ");
   const custName = cust && cust.latest.name && cust.latest.name.toLowerCase() !== String(name).toLowerCase() ? cust.latest.name + " · " : "";
   const more = (cust ? '<button type="button" class="order-pill" data-action="goto-order" data-id="' + esc(cust.latest.id) + '" title="Open order">' + ic("orders", 16) +
-      "<span>" + esc(custName + "Order #" + orderRef(cust.latest) + " · " + dayLabel(cust.latest)) + (cust.count > 1 ? " <small>· " + esc(plural(cust.count, "order")) + "</small>" : "") + "</span>" + ic("chevron", 14) + "</button>" : "") +
-    (full && full.attachments ? full.attachments.map(function (a) { return '<button type="button" class="att" data-action="mail-attachment" data-id="' + esc(id) + '" data-att="' + esc(a.id) + '" data-name="' + esc(a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(fmtSize(a.size)) + "</small></button>"; }).join("") : "");
+      "<span>" + esc(custName + "Order #" + orderRef(cust.latest) + " · " + dayLabel(cust.latest)) + (cust.count > 1 ? " <small>· " + esc(plural(cust.count, "order")) + "</small>" : "") + "</span>" + ic("chevron", 14) + "</button>" : "");
   const replyLabel = sent ? "Write again" : "Reply";
   pane.innerHTML = '<div class="dp-top"><button type="button" class="ib" data-action="close-detail" aria-label="Back">' + ic("back") + "</button><b>" + (folder === "sent" ? "Sent" : "Message") + "</b>" +
     '<button type="button" class="ib" data-action="mail-reply" data-folder="' + folder + '" data-id="' + esc(id) + '" aria-label="' + replyLabel + '" title="' + replyLabel + '">' + ic("reply") + '</button></div><div class="ep-scroll">' +
@@ -3590,7 +3623,7 @@ async function renderMailDetail(pane, folder) {
   // Apple Mail. A designed one keeps its white paper.
   const plain = !/(^|[\s;"'{])(background(-color)?|color)\s*:|\bbgcolor\s*=|<font\b[^>]*\bcolor\s*=/i.test(full.html || "");
   const dark = plain && document.documentElement.classList.contains("dk");
-  b.innerHTML = '<iframe id="ep-frame"' + (plain ? ' class="plain' + (dark ? " dk" : "") + '"' : "") + ' title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>';
+  b.innerHTML = '<iframe id="ep-frame"' + (plain ? ' class="plain' + (dark ? " dk" : "") + '"' : "") + ' title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>' + mailFilesHtml(full.attachments);
   mountEmailFrame('<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#171717;background:#fff;margin:0;padding:20px;word-wrap:break-word}img{max-width:100%;height:auto}pre{white-space:pre-wrap}blockquote{margin:0 0 0 4px;padding-left:12px;border-left:3px solid #e5e5e5;color:#3d3d3d}' +
     (dark ? ":root{color-scheme:dark}body{color:#f2f2f2;background:transparent}a{color:#fff}blockquote{border-left-color:#3d3d3d;color:#ccc}" : "") + "</style></head><body>" + (full.html || "") + "</body></html>");
 }
@@ -3692,22 +3725,42 @@ function replyTo(folder, id) {
     quote: { header: "On " + fmtDateTime(m.receivedAt) + ", " + (m.fromName || m.from) + " wrote:", text: full ? htmlToText(full.html) : (m.summary || "") },
   });
 }
-async function downloadAttachment(t) {
-  const id = t.getAttribute("data-id");
-  const m = mailMsg(S.emailFilter, id);
-  if (!m) return;
-  t.classList.add("busy");
-  try {
-    const res = await fetch("/api/admin/mail/attachment?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + "&attachmentId=" + encodeURIComponent(t.getAttribute("data-att")), { headers: { Authorization: "Bearer " + KEY } });
-    if (!res.ok) throw new Error(String(res.status));
-    const blob = await res.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = t.getAttribute("data-name") || "attachment";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
-  } catch (e) { toast("Could not download that attachment"); }
-  t.classList.remove("busy");
+/** Attachments sit at the end of the message, as in Mail: pictures show, and a file opens (a PDF,
+    text or media in a new tab) or downloads with its own name. The links are signed by the Worker. */
+function mailFilesHtml(list) {
+  if (!list || !list.length) return "";
+  const pics = list.filter(function (a) { return a.kind === "image" && a.url; });
+  const files = list.filter(function (a) { return pics.indexOf(a) < 0; });
+  return '<div class="ep-files">' +
+    (pics.length ? '<div class="ep-pics' + (pics.length === 1 ? " one" : "") + '">' + pics.map(function (a) {
+      return '<button type="button" class="ep-pic" data-action="mail-pic" data-src="' + esc(a.url) + '" data-dl="' + esc(a.download || a.url) + '" data-name="' + esc(a.name) + '" data-size="' + esc(fmtSize(a.size)) + '" aria-label="' + esc("Show " + a.name) + '"><img src="' + esc(a.url) + '" alt="' + esc(a.name) + '" decoding="async"></button>';
+    }).join("") + "</div>" : "") +
+    (files.length ? '<div class="ep-docs">' + files.map(function (a) { return mailFileChip(a); }).join("") + "</div>" : "") +
+  "</div>";
+}
+function mailFileChip(a, sizeText) {
+  const save = a.kind !== "open";
+  const href = save ? a.download || a.url : a.url;
+  return '<a class="att" href="' + esc(href || "#") + '"' + (save ? ' download="' + esc(a.name) + '"' : ' target="_blank" rel="noopener"') + ' title="' + esc((save ? "Download " : "Open ") + a.name) + '">' + ic("clip", 14) + '<span class="min0">' + esc(a.name) + "</span><small>" + esc(sizeText || fmtSize(a.size)) + "</small></a>";
+}
+/** A picture attachment that won't show (HEIC on Windows, say) becomes a file to download. */
+document.addEventListener("error", function (e) {
+  const img = e.target;
+  const pic = img && img.tagName === "IMG" && img.parentElement && img.parentElement.classList.contains("ep-pic") ? img.parentElement : null;
+  if (!pic) return;
+  const box = pic.closest(".ep-files");
+  let docs = box.querySelector(".ep-docs");
+  if (!docs) { docs = document.createElement("div"); docs.className = "ep-docs"; box.appendChild(docs); }
+  docs.insertAdjacentHTML("afterbegin", mailFileChip({ kind: "file", name: pic.getAttribute("data-name"), download: pic.getAttribute("data-dl") }, pic.getAttribute("data-size")));
+  const pics = pic.parentElement;
+  pic.remove();
+  if (!pics.children.length) pics.remove();
+  else pics.classList.toggle("one", pics.children.length === 1);
+}, true);
+function openMailPic(t) {
+  const name = t.getAttribute("data-name") || "Picture";
+  $("lightbox-slot").innerHTML = '<div class="lightbox" id="lightbox" data-action="lb-close"><figure><img src="' + esc(t.getAttribute("data-src")) + '" alt="' + esc(name) + '"><figcaption><span>' + esc(name) + '</span><a class="lb-save" href="' + esc(t.getAttribute("data-dl")) + '" download="' + esc(name) + '">Download</a></figcaption></figure><button type="button" class="ib" data-action="lb-close" aria-label="Close">' + ic("x") + "</button></div>";
+  document.body.style.overflow = "hidden";
 }
 async function markUnread(id) {
   const m = mailMsg("inbox", id);
@@ -4352,7 +4405,7 @@ const ACTIONS = {
   "open-mail": function (t) { openMail(t.getAttribute("data-folder"), t.getAttribute("data-id")); },
   "mail-reply": function (t) { replyTo(t.getAttribute("data-folder"), t.getAttribute("data-id")); },
   "mail-unread": function (t) { markUnread(t.getAttribute("data-id")); },
-  "mail-attachment": downloadAttachment,
+  "mail-pic": openMailPic,
   "mail-more": function (t) { loadMail(t.getAttribute("data-folder"), true); },
   "mail-refresh": function () { if (S.emailFilter === "inbox" || S.emailFilter === "sent") loadMail(S.emailFilter); },
   "compose": function () { composeMail({}); },
