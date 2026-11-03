@@ -182,6 +182,23 @@ to 30 eggs and ranked against the 1 tray price. This is comparison only: nothing
 change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
 admin only.
 
+### Egg news (Admin > News, Nov 2026)
+`infra/news-feed.mjs` gathers Australian egg news from public feeds: two Google News searches
+(egg prices, supply and farms; bird flu on poultry farms), the ABC "Poultry and egg production"
+(`/news/feed/2276/rss.xml`) and "Bird flu" (`/news/feed/1676/rss.xml`) topic feeds, NSW DPIRD's
+bird flu updates (extensionAUS feed), Australian Eggs, Egg Farmers of Australia, Inside FMCG (egg
+stories only) and Reddit search (r/sydney, r/australia, r/AusFinance, posts with "eggs" in the
+title, "nest egg" and Easter eggs left out). The NSW bird flu page has no feed, so the Worker reads
+its "Latest advice" box for the case count and whether NSW farms are clear, and adds a story when
+it changes. The owner can paste more feeds (Google Alerts set to "Deliver to: RSS feed") in the
+Sources sheet (`news:v1:custom`, up to 10). The cron asks every 15 minutes and reads at most 6
+due sources a tick (Google News and ABC every 15 minutes, others every 30 or 60); Refresh reads
+them all (at most once a minute). Stories are kept 90 days, 500 at most, one row per headline (an
+outlet's own copy replaces the Google News one), all in one KV key `news:v1`, written only when
+something changed or every half hour. Routes (admin only): `GET /api/news`, `POST /api/news/poll`,
+`POST /api/news/feeds {url}` or `{id, remove: true}`. Run `npm run test:news` after changing the
+parser. Nothing here is shown on the shop.
+
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
 under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system, 16px inputs on
