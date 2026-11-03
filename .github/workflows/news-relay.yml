@@ -1,0 +1,36 @@
+name: News relay
+
+# Google News answers Cloudflare Workers with 503, so this job reads the two Google News egg
+# searches and posts them to getyolko.com/api/news/relay for Admin > News. The Worker checks
+# GitHub's OIDC token for this file on main, so no secret is needed.
+on:
+  schedule:
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: news-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: infra
+          sparse-checkout-cone-mode: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Relay Google News to the site
+        run: node infra/news-relay.mjs
