@@ -49,6 +49,14 @@ not raw `svh`/`dvh` alone. Chalk-tray heroes are **1:1**. keep `aspect-ratio: 1 
 on `.showcase-card` (do not revert to `3/4`). After Worker deploys, bump
 `X-Yolko-Build` and keep `CHALK_ASSETS_SHA` so the hero does not 404 black.
 
+### Order cutoff (Kanna, 3 Nov 2026)
+Orders close Thursday night, Sydney time. An order placed Sunday to Thursday is for that week's
+Saturday run (6am to 12pm); from Friday it goes to the Saturday after. `deliverySaturday()` in the
+Worker sets every order's `pickupDate` (the client's date is ignored), `nextPickupDate("Saturday")`
+in `app.js` shows the same date on the form, and the announcement bar script in
+`infra/build-pages.mjs` (`NEXT_RUN_SCRIPT`) uses the same rule. An unpaid order reopened at
+`/api/checkout` after the cutoff moves to the next Saturday. All copy says "Order by Thursday night".
+
 ### Ordering flow works fully client-side (non-obvious)
 `app.js` sets `API_BASE` to `https://getyolko.com` whenever the site is **not** served from a
 `getyolko.com` host (i.e. always in local dev). The `/api/*` calls (`settings`, `orders`,
@@ -100,7 +108,8 @@ credentials, so there is no token: an event only counts when its request id matc
 Thursday reorder reminders: the order form's "Email me a reminder each Thursday" box sends
 `remind: true`; the order carries `remindOptIn`, and `markOrderPaid` signs the Stripe email up
 (`remind:sub:<sha256(email) prefix>`, list in `remind:index`, link token in `remind:tok:<token>`).
-The cron sends from Thursday 10am to Friday 10am Sydney time, 4 per tick, through the Zoho Mail
+The cron sends on Thursday (the last day to order) from 10am to 8pm Sydney time, 4 per tick, and the
+email says orders close tonight. It goes through the Zoho Mail
 mailbox (never the CPaaS order sender, which forbids marketing). It skips sold-out weeks, people
 who already ordered for that Saturday, and everything while `remind:off` is set (admin Pause).
 "Order again" links to `/#reorder=<token>`: `index.html` lifts the token out of the URL before the

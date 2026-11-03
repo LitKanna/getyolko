@@ -128,7 +128,7 @@
               "handlingTime": {
                 "@type": "QuantitativeValue",
                 "minValue": 0,
-                "maxValue": 6,
+                "maxValue": 7,
                 "unitCode": "DAY"
               },
               "transitTime": {
@@ -198,7 +198,7 @@
             "name": "When is bulk delivery?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday, between 6am and 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big amounts."
+              "text": "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."
             }
           },
           {
@@ -259,7 +259,7 @@
 </head>
 <body class="local">
   <div class="announce">
-    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Thursday night.</span></p>
   </div>
   <script>
   (function () {
@@ -269,7 +269,8 @@
       var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
       var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
       var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
-      var ahead = (6 - dow + 7) % 7 || 7;
+      // Orders close Thursday night, so from Friday the next run is the Saturday after.
+      var ahead = 6 - dow + (dow >= 5 ? 7 : 0);
       var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
       var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
       el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
@@ -392,7 +393,7 @@
           </details>
           <details>
             <summary>When is bulk delivery?</summary>
-            <p>Saturday, between 6am and 12pm, with the tray orders. Order by Friday night. Stock is limited each week, so order early for big amounts.</p>
+            <p>Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts.</p>
           </details>
           <details>
             <summary>How should I store 180 eggs?</summary>

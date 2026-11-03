@@ -165,7 +165,7 @@
             "name": "When is egg delivery in Sydney?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday, between 6am and 12pm. Order by Friday night."
+              "text": "Saturday, between 6am and 12pm. Order by Thursday night."
             }
           },
           {
@@ -242,7 +242,7 @@
 </head>
 <body class="local">
   <div class="announce">
-    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Thursday night.</span></p>
   </div>
   <script>
   (function () {
@@ -252,7 +252,8 @@
       var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
       var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
       var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
-      var ahead = (6 - dow + 7) % 7 || 7;
+      // Orders close Thursday night, so from Friday the next run is the Saturday after.
+      var ahead = 6 - dow + (dow >= 5 ? 7 : 0);
       var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
       var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
       el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
@@ -317,7 +318,7 @@
         </header>
         <ol class="timeline">
           <li>
-            <span class="tl-when">By Friday night</span>
+            <span class="tl-when">By Thursday night</span>
             <h3>Order online</h3>
             <p>Choose a tray, two trays or a 180-egg box, and pay by card.</p>
           </li>
@@ -497,7 +498,7 @@
         <div class="faq-grid">
           <details open>
             <summary>When is egg delivery in Sydney?</summary>
-            <p>Saturday, between 6am and 12pm. Order by Friday night.</p>
+            <p>Saturday, between 6am and 12pm. Order by Thursday night.</p>
           </details>
           <details>
             <summary>How far do you deliver?</summary>
@@ -520,7 +521,7 @@
         <div class="cta-panel">
           <div>
             <h2>Fresh eggs this Saturday</h2>
-            <p>Order by Friday night. Delivery is $5 flat.</p>
+            <p>Order by Thursday night. Delivery is $5 flat.</p>
           </div>
           <div class="hero-cta">
             <a class="btn btn-ink btn-lg" href="/#order">Order now</a>

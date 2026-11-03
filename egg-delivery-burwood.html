@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="format-detection" content="telephone=no">
   <title>Egg Delivery Burwood 2134 | 30 Eggs $13 | YOLKO</title>
-  <meta name="description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Friday night.">
+  <meta name="description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Thursday night.">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <meta name="theme-color" content="#faf7f0">
   <meta name="geo.region" content="AU-NSW">
@@ -15,7 +15,7 @@
   <meta property="og:site_name" content="YOLKO">
   <meta property="og:locale" content="en_AU">
   <meta property="og:title" content="Egg Delivery Burwood 2134 | 30 Eggs $13 | YOLKO">
-  <meta property="og:description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Friday night.">
+  <meta property="og:description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Thursday night.">
   <meta property="og:image" content="https://getyolko.com/assets/chalk-tray/13-1536.jpg?v=112">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1536">
@@ -25,7 +25,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Egg Delivery Burwood 2134 | 30 Eggs $13 | YOLKO">
-  <meta name="twitter:description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Friday night.">
+  <meta name="twitter:description" content="Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Thursday night.">
   <meta name="twitter:image" content="https://getyolko.com/assets/chalk-tray/13-1536.jpg?v=112">
   <meta name="twitter:image:alt" content="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray">
 
@@ -47,7 +47,7 @@
         "@id": "https://getyolko.com/egg-delivery-burwood#page",
         "url": "https://getyolko.com/egg-delivery-burwood",
         "name": "Egg delivery in Burwood",
-        "description": "Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Friday night.",
+        "description": "Cheap, fresh Pace Farm eggs delivered to Burwood 2134 every Saturday morning. 30-egg tray $13, flat $5 delivery. Order by Thursday night.",
         "isPartOf": {
           "@id": "https://getyolko.com/#website"
         },
@@ -132,7 +132,7 @@
             "name": "When will my eggs arrive?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Saturday, between 6am and 12pm. Order by Friday night."
+              "text": "Saturday, between 6am and 12pm. Order by Thursday night."
             }
           },
           {
@@ -209,7 +209,7 @@
 </head>
 <body class="local">
   <div class="announce">
-    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Friday night.</span></p>
+    <p><span class="announce-dot" aria-hidden="true"></span><span data-next-run>Saturday delivery, <b>6am to 12pm</b>.</span><span class="announce-more"> Order by Thursday night.</span></p>
   </div>
   <script>
   (function () {
@@ -219,7 +219,8 @@
       var parts = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", year: "numeric", month: "numeric", day: "numeric", weekday: "short" }).formatToParts(new Date());
       var get = function (t) { for (var i = 0; i < parts.length; i++) if (parts[i].type === t) return parts[i].value; };
       var dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
-      var ahead = (6 - dow + 7) % 7 || 7;
+      // Orders close Thursday night, so from Friday the next run is the Saturday after.
+      var ahead = 6 - dow + (dow >= 5 ? 7 : 0);
       var d = new Date(Date.UTC(+get("year"), +get("month") - 1, +get("day")) + ahead * 864e5);
       var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
       el.innerHTML = "Next delivery <b>Saturday " + d.getUTCDate() + " " + mon + ", 6am to 12pm</b>.";
@@ -374,7 +375,7 @@
           </details>
           <details>
             <summary>When will my eggs arrive?</summary>
-            <p>Saturday, between 6am and 12pm. Order by Friday night.</p>
+            <p>Saturday, between 6am and 12pm. Order by Thursday night.</p>
           </details>
           <details>
             <summary>How much does it cost?</summary>
@@ -397,7 +398,7 @@
         <div class="cta-panel">
           <div>
             <h2>Eggs in Burwood this Saturday</h2>
-            <p>Order by Friday night. Delivery is $5 flat.</p>
+            <p>Order by Thursday night. Delivery is $5 flat.</p>
           </div>
           <div class="hero-cta">
             <a class="btn btn-ink btn-lg" href="/#order">Order now</a>
