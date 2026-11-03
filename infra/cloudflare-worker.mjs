@@ -1,5 +1,5 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
-import { ingestSnapshot, getLatest, getEvents, runScheduledPoll } from "./price-watch.mjs";
+import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
 import { qrcode } from "qrcode-generator";
 // The admin page lives in its own file; wrangler bundles .html as a text module.
 import ADMIN_HTML from "./admin.html";
@@ -2487,6 +2487,12 @@ function suggestDozenSell(caseCost) {
   return Math.max(1, Math.round(per + 1));
 }
 
+/** YOLKO's own tray prices, for setting competitors against them (never changed from there). */
+async function myTrayPrices(env) {
+  const { prices } = await getSettings(env);
+  return { tray1: Number(prices.tray1), tray2: Number(prices.tray2), box: Number(prices.box) };
+}
+
 async function getSettings(env) {
   const stored = (await env.DATA.get("settings", "json")) || {};
   // Tray prices are exactly what the owner saved in Admin. Nothing here derives them from
@@ -4178,48 +4184,25 @@ async function handleApi(request, env, url, ctx) {
     });
   }
 
-  // Public: latest competitor egg prices (reactive watch snapshot)
+  // Admin > Competitors: competitor egg prices, typed-in prices and recent changes, in one answer.
   if (url.pathname === "/api/price-watch" && request.method === "GET") {
-    const latest = await getLatest(env);
-    if (!latest) {
-      return json({
-        ok: true,
-        updatedAt: null,
-        offers: [],
-        summary: null,
-        note: "No snapshot yet. Wait for cron poll or POST /api/price-watch/ingest",
-      });
-    }
-    return json({
-      ok: true,
-      updatedAt: latest.updatedAt,
-      source: latest.source,
-      summary: latest.summary,
-      offers: latest.offers,
-      last_changes: latest.last_changes || [],
-    });
-  }
-
-  // Admin: change event stream (price/stock flips)
-  if (url.pathname === "/api/price-watch/events" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 50));
-    const events = (await getEvents(env)).slice(0, limit);
-    return json({ ok: true, count: events.length, events });
+    return json({ ...(await priceWatchView(env)), mine: await myTrayPrices(env) });
   }
 
-  // Admin: ingest a full scout snapshot (GitHub Action / local scout --push)
-  if (url.pathname === "/api/price-watch/ingest" && request.method === "POST") {
-    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    const body = await request.json().catch(() => ({}));
-    const result = await ingestSnapshot(env, body, { source: body?.source || "ingest" });
-    return json(result);
-  }
-
-  // Admin: force an immediate open-source poll (Umall + Gourmet Grocer)
+  // Admin: check every shop now (the Check now button). A second tap within a minute is free.
   if (url.pathname === "/api/price-watch/poll" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    const result = await runScheduledPoll(env);
+    const result = await runPoll(env);
+    return json({ ...(await priceWatchView(env)), mine: await myTrayPrices(env), ran: result.ran, changeCount: result.changeCount || 0 });
+  }
+
+  // Admin: add, change or remove a typed-in price (Costco and Woolworths block automatic checks).
+  if (url.pathname === "/api/price-watch/typed" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => ({}));
+    const result = await saveTyped(env, body);
+    if (result.error) return json(result, 400);
     return json(result);
   }
 
@@ -4227,7 +4210,7 @@ async function handleApi(request, env, url, ctx) {
 }
 
 export default {
-  // Every cron tick: Meta stock sync, competitor price poll (diff → events/webhook),
+  // Every cron tick: Meta stock sync, competitor prices (checked once every 6 hours),
   // the missed-payment safety net and, on Thursdays, reorder reminders.
   async scheduled(_event, env, ctx) {
     const settings = await getSettings(env);
@@ -4356,7 +4339,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "217",
+      "X-Yolko-Build": "218",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

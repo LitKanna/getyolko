@@ -143,6 +143,25 @@ makes a share code for each customer still to deliver and returns a QR code as S
 Worker with the `qrcode-generator` package) for `/r/<CODE>?m=card`. The admin prints four A6 cards
 per A4 sheet with print CSS; the `?m=card` tag shows card scans as `utm_medium=card`.
 
+### Competitor egg prices (Admin > Competitors, Nov 2026)
+No Australian supermarket has a price API. `infra/price-watch.mjs` reads public pages that the
+shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
+`/browse/dairy-eggs-fridge/eggs` (Next.js `__NEXT_DATA__`, every egg on one page), Aldi
+`/products/dairy-eggs-fridge/eggs/k/1111111162` (server-rendered product tiles), one IGA and one
+Gourmet Grocer product page (JSON-LD) and Umall (Shopify `/products/<handle>.js`). Never read Coles
+`/search/` or Aldi `/results` (robots.txt disallows them). From Coles and Aldi it keeps the cheapest
+egg per housing (caged, barn, free range) plus every pack of 24 or more. The cron asks every 15
+minutes but the shops are only read once every 6 hours (`pricewatch:v2:latest`); Check now in the
+admin reads them at once (at most once a minute). A shop that fails keeps its last prices, marked
+stale, and the page says so under the heading. Changes go to `pricewatch:v2:events`.
+Woolworths blocks every automated request (Akamai 403, even robots.txt, from Cloudflare and from
+cloud servers) and Costco only sells eggs through DoorDash, which blocks bots and bans scraping, so
+their prices are typed in from the admin (`pricewatch:v2:typed`, `POST /api/price-watch/typed`);
+Costco starts with what Kanna saw on 3 Nov 2026 ($14.79, members $12.99). Everything is worked out
+to 30 eggs and ranked against the 1 tray price. This is comparison only: nothing here may ever
+change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
+admin only.
+
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
 under `(pointer:coarse)`, 4.5:1 text contrast, dark mode that follows the system, 16px inputs on
