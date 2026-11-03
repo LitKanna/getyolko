@@ -1,6 +1,6 @@
 // Checks the news parser on small copies of each feed shape: node infra/news-feed-test.mjs
 import assert from "node:assert/strict";
-import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
+import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES, isGithubRelay, takeNewsRelay, newsView } from "./news-feed.mjs";
 
 const now = new Date().toISOString();
 const src = (id) => SOURCES.find((s) => s.id === id);
@@ -104,6 +104,17 @@ assert.equal(await isGithubRelay(fakeReq("Bearer abc.def.ghi")), false);
   assert.ok(store.sources["gn-eggs"].relayAt);
   assert.equal(store.sources["gn-birdflu"].ok, false);
   assert.equal((await takeNewsRelay(env, { feeds: [] })).error, "No relayed feeds in that");
+  // Between relays (GitHub runs them every few hours) a failed direct read doesn't show as a failure.
+  const later = JSON.parse(kv.get("news:v1"));
+  later.sources["gn-eggs"] = { ...later.sources["gn-eggs"], ok: false, error: "HTTP 503", checkedAt: new Date().toISOString() };
+  kv.set("news:v1", JSON.stringify(later));
+  const shown = (await newsView(env)).sources.find((x) => x.id === "gn-eggs");
+  assert.equal(shown.ok, true);
+  assert.equal(shown.checkedAt, later.sources["gn-eggs"].relayAt);
+  // A day after the last relay it shows as failed again.
+  later.sources["gn-eggs"].relayAt = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
+  kv.set("news:v1", JSON.stringify(later));
+  assert.equal((await newsView(env)).sources.find((x) => x.id === "gn-eggs").ok, false);
 }
 
 console.log("news feed tests passed");

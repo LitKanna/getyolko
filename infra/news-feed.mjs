@@ -7,7 +7,7 @@
  *   Google News     two searches: egg prices and supply, and bird flu in Australia. Google
  *                   answers Cloudflare with 503, so a GitHub Actions job (news-relay.yml) reads
  *                   these two and posts them to /api/news/relay; the Worker only tries Google
- *                   itself when that relay has gone quiet
+ *                   itself when that relay has been quiet for a day
  *   ABC News        the "Poultry and egg production" and "Bird flu" topic feeds
  *   NSW Government  the bird flu page's "Latest advice" box (no feed, so the Worker reads it)
  *   NSW DPIRD       bird flu updates for poultry farmers (on the extensionAUS site)
@@ -25,7 +25,9 @@ const CUSTOM_KEY = "news:v1:custom";
 const MAX_ITEMS = 500;
 const MAX_AGE_MS = 90 * 864e5;
 const PER_TICK = 12;
-const RELAY_FRESH_MS = 90 * 60 * 1000;
+// GitHub runs scheduled jobs on this repo every few hours, not every 15 minutes, so a relay is
+// counted as current for a day. Only after that does the Worker try Google itself.
+const RELAY_FRESH_MS = 24 * 3600 * 1000;
 const MAX_RELAY_BYTES = 3_000_000;
 const MIN_GAP_MS = 60 * 1000;
 const WRITE_EVERY_MS = 30 * 60 * 1000;
@@ -472,17 +474,22 @@ async function readAndSave(env, store, sources, { force = false, read = null, re
 
 /* ------------------------------ public API ------------------------------ */
 
-function sourceList(store, custom) {
-  return SOURCES.concat(customSources(custom)).map((s) => ({
-    id: s.id,
-    name: s.name,
-    group: s.group,
-    about: s.about,
-    url: s.custom ? s.url : s.kind === "nsw" ? s.url : null,
-    custom: !!s.custom,
-    every: s.every,
-    ...(store.sources?.[s.id] || { ok: null, checkedAt: null, count: 0 }),
-  }));
+function sourceList(store, custom, now = Date.now()) {
+  return SOURCES.concat(customSources(custom)).map((s) => {
+    let state = store.sources?.[s.id] || { ok: null, checkedAt: null, count: 0 };
+    // A relayed source shows how the last relay went while it is current, not a failed direct read.
+    if (!relayQuiet(s, state, now) && state.ok === false) state = { ...state, ok: true, error: null, checkedAt: state.relayAt, okAt: state.relayAt };
+    return {
+      id: s.id,
+      name: s.name,
+      group: s.group,
+      about: s.about,
+      url: s.custom ? s.url : s.kind === "nsw" ? s.url : null,
+      custom: !!s.custom,
+      every: s.every,
+      ...state,
+    };
+  });
 }
 
 /** Everything the News page shows, in one answer. */
