@@ -116,6 +116,11 @@ who already ordered for that Saturday, and everything while `remind:off` is set 
 visit log or Meta pixel can read it, and `app.js` fills the form from `GET /api/reorder?t=`.
 Unsubscribe is `/api/reminders/stop?t=` (GET asks, POST stops, so mail scanners can't unsubscribe).
 
+Tray prices are fixed (Kanna, Nov 2026: $13 one tray, $25 two trays, $72 full box). Admin > Stock &
+prices saves exactly what is typed in each field. Nothing derives one tray price from another or from
+"A box of 6 costs you" (that field only changes the profit lines), and the Worker has no special cases
+that rewrite them. Shop, checkout, Stripe and emails all read `settings.prices` from KV.
+
 Free delivery (referrals and same building, Kanna's choice Oct 2026): each customer's share link
 is `/r/<CODE>` (6 characters, `ref:code:<CODE>` -> phone and first name, `ref:mine:<phone>` -> code),
 made on the paid screen (`/api/confirm-payment` returns `share`) and in reminder emails. It lands on

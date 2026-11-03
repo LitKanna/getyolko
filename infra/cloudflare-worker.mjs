@@ -2232,9 +2232,9 @@ function suggestDozenSell(caseCost) {
 
 async function getSettings(env) {
   const stored = (await env.DATA.get("settings", "json")) || {};
+  // Tray prices are exactly what the owner saved in Admin. Nothing here derives them from
+  // each other or from the box cost.
   const prices = { ...DEFAULT_SETTINGS.prices, ...(stored.prices || {}) };
-  // When single tray is $13, full box is $72
-  if (Number(prices.tray1) === 13) prices.box = 72;
   // Fill missing case sell prices from matching dozen × 15
   for (const caseKey of CASE_KEYS) {
     const unitKey = CASE_UNIT[caseKey];
@@ -2277,8 +2277,6 @@ async function handleApi(request, env, url, ctx) {
       const n = Number(body?.prices?.[key]);
       if (Number.isFinite(n) && n > 0) prices[key] = Math.round(n);
     }
-    // When single tray is $13, full box is $72
-    if (Number(prices.tray1) === 13) prices.box = 72;
     const dozenCosts = { ...current.dozenCosts };
     if (body?.dozenCosts && typeof body.dozenCosts === "object") {
       for (const key of DOZEN_KEYS) {
@@ -4050,7 +4048,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "216",
+      "X-Yolko-Build": "217",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
