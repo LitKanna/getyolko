@@ -64,15 +64,22 @@ needs a KV namespace bound as `DATA` (wrangler dev provides a local simulation) 
 `ADMIN_KEY` and `STRIPE_KEY` secrets; Stripe endpoints return 503 when `STRIPE_KEY` is unset.
 `wrangler` is intentionally not a declared dependency. invoke via `npx`.
 
-Order payments and emails: `POST /api/stripe-webhook` (Stripe events `checkout.session.completed`
-and `checkout.session.async_payment_succeeded`) marks orders paid and sends the confirmation
+Order payments and emails: `POST /api/stripe-webhook` (Stripe events `checkout.session.completed`,
+`checkout.session.async_payment_succeeded` and `charge.refunded`) marks orders paid and sends the confirmation
 email through Zoho ZeptoMail. Secrets: `STRIPE_WEBHOOK_SECRET`, `ZEPTOMAIL_TOKEN`,
 `ORDER_EMAIL_FROM`; optional `ORDER_NOTIFY_EMAIL` (shop copy) and `ZEPTOMAIL_API_URL`
 (defaults to Zoho CPaaS `https://cpaas.zoho.com/v1.1/email`; same API as ZeptoMail). Without them the webhook
 returns 503 and emails are skipped; `/api/confirm-payment` still marks orders paid and also
 sends the email if the webhook has not. Admins can resend with `POST /api/admin/order-email {id}`.
+Refunds email the customer once per refund (`email:refund:<refundId>` marker). The admin Refund
+button sends for refunds it creates (tagged `metadata.orderId`); the webhook's `charge.refunded`
+event (also on the live endpoint) records and emails refunds made in the Stripe dashboard after
+`REFUND_EMAIL_LAUNCH`. A failed admin refund email is retried by the cron; a failed dashboard one
+answers 502 so Stripe redelivers. For `WEBHOOK_GRACE_SEC` after a dashboard full refund,
+`/api/refund` and `/api/order-status` leave the order to the webhook, so a stale KV copy never
+returns stock twice. The confirmation and refund emails share `emailFrame()`.
 The admin Emails page uses `GET /api/admin/emails`, `GET /api/admin/email-preview?id=` and
-`POST /api/admin/test-email {to}`. All shop email is orders@getyolko.com on Zoho (order emails
+`POST /api/admin/test-email {to, kind?}` (`kind: "refund"` sends the refund sample). All shop email is orders@getyolko.com on Zoho (order emails
 reply to it too); getyolkonow@gmail.com is only for Google sign-ins, never for mail.
 
 An order row is written when the customer opens Stripe Checkout, so a row with status `new`, a

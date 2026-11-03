@@ -2384,14 +2384,16 @@ async function refundOrder(id) {
   if (!o) return;
   const amt = amountOf(o);
   const who = o.name || "the customer";
-  const ok = await confirmBox("Refund " + money(amt) + " to " + who + "?", "<p>The money goes back to their card through Stripe" + (orderEmail(o) ? " (" + esc(orderEmail(o)) + ")" : "") + ". This can't be undone.</p>", "Refund " + money(amt), true);
+  const ok = await confirmBox("Refund " + money(amt) + " to " + who + "?", "<p>The money goes back to their card through Stripe" + (orderEmail(o) ? ", and we email " + esc(orderEmail(o)) + " to say it's on its way" : "") + ". This can't be undone.</p>", "Refund " + money(amt), true);
   if (!ok) return;
   toast("Refunding through Stripe…");
   const r = await api("/api/refund", { method: "POST", body: { id: id } });
   if (!r.ok) { toast(r.data.error || "Refund failed"); return; }
   applyTrays(r.data.traysAvailable);
   const back = money(r.data.amount != null ? r.data.amount : amt);
-  toast(r.data.already ? "Already refunded · " + back : "Refunded " + back + " to " + who);
+  const mail = r.data.refundEmail && !r.data.refundEmail.skipped ? (r.data.refundEmail.ok ? ". Email sent" : ". Email didn't send, retrying soon") : "";
+  if (r.data.syncing) toast("Refunded in Stripe a moment ago. It shows here in a minute");
+  else toast(r.data.already ? "Already refunded · " + back : "Refunded " + back + " to " + who + mail);
   await loadOrders(true);
 }
 async function fetchStripeDetails(id) {
@@ -3768,15 +3770,15 @@ async function testEmail() {
   try { last = localStorage.getItem("yolko_test_email") || ""; } catch (e) {}
   const to = await openModal({
     title: "Send a test email",
-    html: "<p>We’ll send a sample order confirmation from orders@getyolko.com through Zoho, marked [Test].</p><label class=\"field\"><span>Send it to</span><input class=\"inp\" id=\"test-to\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" value=\"" + esc(last) + "\" placeholder=\"you@example.com\"></label>",
+    html: "<p>We’ll send a sample from orders@getyolko.com through Zoho, marked [Test].</p><label class=\"field\"><span>Which email</span><select class=\"dd\" id=\"test-kind\"><option value=\"confirmation\">Order confirmation</option><option value=\"refund\">Refund</option></select></label><label class=\"field\"><span>Send it to</span><input class=\"inp\" id=\"test-to\" type=\"email\" inputmode=\"email\" autocomplete=\"email\" value=\"" + esc(last) + "\" placeholder=\"you@example.com\"></label>",
     actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Send test", kind: "primary", value: true }],
     validate: function (w) { const v = w.querySelector("#test-to").value.trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Enter an email address"; },
-    collect: function (w) { return w.querySelector("#test-to").value.trim(); },
+    collect: function (w) { return { to: w.querySelector("#test-to").value.trim(), kind: w.querySelector("#test-kind").value }; },
     submit: async function (v) {
-      try { localStorage.setItem("yolko_test_email", v); } catch (e) {}
-      const r = await api("/api/admin/test-email", { method: "POST", body: { to: v } });
+      try { localStorage.setItem("yolko_test_email", v.to); } catch (e) {}
+      const r = await api("/api/admin/test-email", { method: "POST", body: { to: v.to, kind: v.kind } });
       if (!r.ok) return "Not sent: " + (r.data.error || r.data.reason || "Zoho said no");
-      toast("Test sent. Check " + v);
+      toast("Test sent. Check " + v.to);
       return "";
     },
   });
