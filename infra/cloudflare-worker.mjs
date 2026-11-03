@@ -1,6 +1,10 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
 import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed } from "./news-feed.mjs";
+import {
+  MAIN, DOZENS_PER_CASE, VARIETIES, BUNDLES, BUNDLE_KEYS, isBundle, bundleLabel,
+  stockOf, addStock, holdFor, heldBy, traysIn, stockProblem, catalogueView, shopView,
+} from "./catalogue.mjs";
 import { qrcode } from "qrcode-generator";
 // The admin page lives in its own file; wrangler bundles .html as a text module.
 import ADMIN_HTML from "./admin.html";
@@ -46,19 +50,11 @@ const MIME = {
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-const DOZENS_PER_CASE = 15;
-const BUNDLE_KEYS = [
-  "tray1", "tray2", "box",
-  "cage600", "cage700", "cage800", "fr600", "fr700", "fr800",
-  "cage600case", "cage700case", "cage800case", "fr600case", "fr700case", "fr800case",
-];
-const DOZEN_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "fr800"];
-const CASE_KEYS = ["cage600case", "cage700case", "cage800case", "fr600case", "fr700case", "fr800case"];
-const TRAY_KEYS = ["tray1", "tray2", "box"];
-const CASE_UNIT = {
-  cage600case: "cage600", cage700case: "cage700", cage800case: "cage800",
-  fr600case: "fr600", fr700case: "fr700", fr800case: "fr800",
-};
+// Dozen varieties (each sold as 1 dozen or a case of 15) and the tray varieties other than the
+// main cage 1.75kg tray, whose stock is still traysAvailable. See catalogue.mjs.
+const DOZEN_KEYS = VARIETIES.filter((v) => v.format === "dozen").map((v) => v.id);
+const OTHER_VARIETIES = VARIETIES.filter((v) => !v.main).map((v) => v.id);
+const TRAY_VARIETIES = VARIETIES.filter((v) => v.format === "tray" && !v.main).map((v) => v.id);
 
 const DEFAULT_SETTINGS = {
   prices: {
@@ -68,11 +64,12 @@ const DEFAULT_SETTINGS = {
     cage600case: 90, cage700case: 105, cage800case: 120,
     fr600case: 120, fr700case: 135, fr800case: 150,
   },
-  traysAvailable: 24,
-  dozensAvailable: 0, // 0 = hide dozen packs on the public website
+  traysAvailable: 24, // the main cage 1.75kg tray
+  stock: {}, // every other variety: { fr1500: 12, cage600: 30 }. 0 or missing = not on the shop
   trayWeight: "1.75",
-  boxCost: 55,
-  // Wholesale case cost (15 dozen packs) per product. each SKU is independent
+  boxCost: 55, // what a box of 6 main trays costs
+  trayCosts: {}, // what a box of 6 costs, for each other tray variety
+  // Wholesale case cost (15 dozen packs) per dozen variety. Each one is independent.
   dozenCosts: {
     cage600: 75, cage700: 75, cage800: 75,
     fr600: 90, fr700: 90, fr800: 90,
@@ -476,31 +473,16 @@ async function maybeEnsureStripeBranding(env, ctx) {
   if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
 }
 
-const BUNDLE_CHECKOUT_LABELS = {
-  tray1: "Egg tray (30 eggs)",
-  tray2: "2 egg trays (60 eggs)",
-  box: "Full box (180 eggs)",
-  cage600: "Cage dozen 600g (12 eggs)",
-  cage700: "Cage dozen 700g (12 eggs)",
-  cage800: "Cage dozen 800g (12 eggs)",
-  fr600: "Free range dozen 600g (12 eggs)",
-  fr700: "Free range dozen 700g (12 eggs)",
-  fr800: "Free range dozen 800g (12 eggs)",
-  cage600case: "Cage case 600g (15 dozens)",
-  cage700case: "Cage case 700g (15 dozens)",
-  cage800case: "Cage case 800g (15 dozens)",
-  fr600case: "Free range case 600g (15 dozens)",
-  fr700case: "Free range case 700g (15 dozens)",
-  fr800case: "Free range case 800g (15 dozens)",
-};
-
 /** Build Stripe Checkout Session for an order using live admin prices. */
 async function createCheckoutForOrder(env, order, settings, ctx) {
   const quantity = Math.min(20, Math.max(1, Math.floor(Number(order.quantity)) || 1));
-  const bundle = BUNDLE_KEYS.includes(order.bundle) ? order.bundle : null;
-  if (!bundle || !Number.isFinite(Number(settings.prices[bundle]))) {
+  const bundle = isBundle(order.bundle) ? order.bundle : null;
+  if (!bundle || !(Number(settings.prices[bundle]) > 0)) {
     return { error: "invalid order bundle", status: 400 };
   }
+  // A variety can sell out between making the order and paying for it.
+  const problem = stockProblem(settings, bundle, quantity);
+  if (problem) return { error: problem.error, code: problem.code, status: 400 };
 
   const unitPrice = Number(settings.prices[bundle]);
   const subtotal = unitPrice * quantity;
@@ -524,7 +506,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   const params = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": "aud",
-    "line_items[0][price_data][product_data][name]": BUNDLE_CHECKOUT_LABELS[bundle] || "Eggs",
+    "line_items[0][price_data][product_data][name]": bundleLabel(bundle),
     "line_items[0][price_data][product_data][description]": fulfillDesc,
     "line_items[0][price_data][unit_amount]": String(unitAmount),
     "line_items[0][quantity]": String(quantity),
@@ -653,7 +635,7 @@ function alignOrderWithSession(order, session) {
   if (session?.id) order.sessionId = session.id;
   // Sessions created before metadata[quantity] existed can't be aligned safely.
   const qty = Math.floor(Number(md.quantity));
-  if (!(qty >= 1) || !BUNDLE_KEYS.includes(md.bundle)) return order;
+  if (!(qty >= 1) || !isBundle(md.bundle)) return order;
   order.bundle = md.bundle;
   order.quantity = qty;
   if (md.subtotal !== undefined && Number.isFinite(Number(md.subtotal))) order.subtotal = Number(md.subtotal);
@@ -702,15 +684,16 @@ function paidView(order, session) {
 async function markOrderPaid(env, order, session) {
   if (isRefunded(order, session)) return { order, newlyPaid: false, refunded: true };
   if (order.paymentStatus !== "paid") {
-    const held = order.stockHeld || { trays: traysFor(order), dozens: dozensFor(order) };
+    const held = heldBy(order);
     alignOrderWithSession(order, session);
     // Stock already held (admin confirmed first) for other items: move it.
-    if (order.stockTaken && (held.trays !== traysFor(order) || held.dozens !== dozensFor(order))) {
+    const now = holdFor(order);
+    if (order.stockTaken && (held.variety !== now.variety || held.units !== now.units)) {
       const settings = await getSettings(env);
-      settings.traysAvailable = Math.max(0, settings.traysAvailable + held.trays - traysFor(order));
-      settings.dozensAvailable = Math.max(0, (settings.dozensAvailable || 0) + held.dozens - dozensFor(order));
-      await env.DATA.put("settings", JSON.stringify(settings));
-      order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
+      if (held.variety) addStock(settings, held.variety, held.units);
+      if (now.variety) addStock(settings, now.variety, -now.units);
+      await putStock(env, settings);
+      order.stockHeld = now;
     }
     order.paymentStatus = "paid";
     order.stripe = { ...(order.stripe || {}), ...stripeDetailsFromSession(session) };
@@ -786,7 +769,7 @@ ${rows}
 
 function buildOrderEmail(order) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
-  const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
+  const item = bundleLabel(order.bundle);
   const qty = Math.max(1, Number(order.quantity) || 1);
   const total = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
   const when = `Saturday${order.pickupDate ? " " + order.pickupDate : ""}`;
@@ -838,7 +821,7 @@ ${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" s
 
 function buildRefundEmail(order, refund) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
-  const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
+  const item = bundleLabel(order.bundle);
   const qty = Math.max(1, Number(order.quantity) || 1);
   const ref = orderRef(order);
   const amount = money(refund.amount);
@@ -1984,12 +1967,11 @@ async function setRemindIndex(env, list) {
   await env.DATA.put(REMIND_INDEX, JSON.stringify(list.slice(0, REMIND_MAX)));
 }
 
-/** What a reminder offers: their last order, or one tray when dozen packs are off this week. */
+/** What a reminder offers: their last order, or one main tray when that isn't on sale this week. */
 function reminderItem(rec, settings, freeDelivery = false) {
-  let bundle = BUNDLE_KEYS.includes(rec.bundle) ? rec.bundle : "tray1";
+  let bundle = isBundle(rec.bundle) ? rec.bundle : "tray1";
   let quantity = Math.min(10, Math.max(1, Math.floor(Number(rec.quantity)) || 1));
-  const dozenItem = DOZEN_KEYS.includes(bundle) || CASE_KEYS.includes(bundle);
-  if (dozenItem && !(Number(settings.dozensAvailable) > 0)) {
+  if (stockProblem(settings, bundle, quantity)) {
     bundle = "tray1";
     quantity = 1;
   }
@@ -2059,7 +2041,7 @@ function buildReminderEmail(rec, settings, sat, ref = null) {
   const first = String(rec.name || "").split(/\s+/)[0] || "there";
   const free = Number(ref?.credits) > 0;
   const item = reminderItem(rec, settings, free);
-  const label = BUNDLE_CHECKOUT_LABELS[item.bundle] || "Eggs";
+  const label = bundleLabel(item.bundle);
   const links = reminderLinks(rec.token);
   const cutoff = sat.cutoff || "Thursday night";
   const subject = `Eggs this Saturday, ${sat.label}? Order by ${cutoff}`;
@@ -2583,69 +2565,62 @@ async function reconcileOrders(env) {
   await retryRefundEmails(env, now);
 }
 
-// How many physical trays an order consumes (dozen packs do not use tray stock)
-function traysFor(order) {
-  const b = order.bundle;
-  if (DOZEN_KEYS.includes(b) || CASE_KEYS.includes(b)) return 0;
-  const perUnit = b === "box" ? 6 : b === "tray2" ? 2 : 1;
-  return perUnit * (order.quantity || 1);
-}
+// How many trays (any tray variety) an order takes. See catalogue.mjs.
+const traysFor = traysIn;
 
-// How many dozen cartons an order consumes
-function dozensFor(order) {
-  const b = order.bundle;
-  if (CASE_KEYS.includes(b)) return DOZENS_PER_CASE * (order.quantity || 1);
-  if (DOZEN_KEYS.includes(b)) return order.quantity || 1;
-  return 0;
+const STORED_SETTINGS = ["prices", "traysAvailable", "stock", "trayWeight", "boxCost", "trayCosts", "dozenCosts", "pickup"];
+
+/** Save settings without the fields getSettings works out on read. */
+async function putStock(env, settings) {
+  const out = {};
+  for (const k of STORED_SETTINGS) if (settings[k] !== undefined) out[k] = settings[k];
+  await env.DATA.put("settings", JSON.stringify(out));
 }
 
 // Reserve or release stock as an order moves through statuses.
-// Paid customers always hold trays (unless cancelled). Confirmed/done also hold.
+// Paid customers always hold their eggs (unless cancelled). Confirmed/done also hold.
 async function syncStock(env, order, newStatus) {
   const paid = order.paymentStatus === "paid";
   const holds = newStatus !== "cancelled" && (paid || ["confirmed", "done"].includes(newStatus));
-  let trayDelta = 0;
-  let dozenDelta = 0;
+  let move = null;
 
   if (holds && !order.stockTaken) {
-    trayDelta = -traysFor(order);
-    dozenDelta = -dozensFor(order);
+    const now = holdFor(order);
+    move = { variety: now.variety, delta: -now.units };
     order.stockTaken = true;
-    order.stockHeld = { trays: traysFor(order), dozens: dozensFor(order) };
+    order.stockHeld = now;
   } else if (!holds && order.stockTaken) {
     // Release what was taken, even if the order's items were edited since.
-    trayDelta = order.stockHeld ? order.stockHeld.trays : traysFor(order);
-    dozenDelta = order.stockHeld ? order.stockHeld.dozens : dozensFor(order);
+    const held = heldBy(order);
+    move = { variety: held.variety, delta: held.units };
     order.stockTaken = false;
     delete order.stockHeld;
   }
 
-  if (trayDelta !== 0 || dozenDelta !== 0) {
+  const variety = move?.variety || holdFor(order).variety;
+  if (move && move.variety && move.delta !== 0) {
     const settings = await getSettings(env);
-    if (trayDelta !== 0) {
-      settings.traysAvailable = Math.max(0, settings.traysAvailable + trayDelta);
-    }
-    if (dozenDelta !== 0) {
-      settings.dozensAvailable = Math.max(0, (settings.dozensAvailable || 0) + dozenDelta);
-    }
-    await env.DATA.put("settings", JSON.stringify(settings));
-    if (trayDelta !== 0) {
+    const left = addStock(settings, move.variety, move.delta);
+    await putStock(env, settings);
+    if (move.variety === MAIN) {
       // Fire-and-forget: pause Meta ads at 0 trays, resume when restocked.
       syncMetaAdsForStock(env, settings.traysAvailable).catch(() => {});
     }
     return {
-      delta: trayDelta,
-      dozenDelta,
+      variety: move.variety,
+      units: move.delta,
+      left,
+      delta: move.variety === MAIN ? move.delta : 0,
       traysAvailable: settings.traysAvailable,
-      dozensAvailable: settings.dozensAvailable,
     };
   }
   const s = await getSettings(env);
   return {
+    variety,
+    units: 0,
+    left: variety ? stockOf(s, variety) : 0,
     delta: 0,
-    dozenDelta: 0,
     traysAvailable: s.traysAvailable,
-    dozensAvailable: s.dozensAvailable || 0,
   };
 }
 
@@ -2777,10 +2752,7 @@ async function sendMetaPurchase(env, order, opts = {}) {
 
   const value = Number(order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price) || 0;
   const contentName =
-    order.bundle === "tray2" ? "2 egg trays (60 eggs)"
-      : order.bundle === "box" ? "Full box (180 eggs)"
-      : order.bundle === "tray1" ? "Egg tray (30 eggs)"
-      : String(order.bundle || "eggs");
+    isBundle(order.bundle) ? bundleLabel(order.bundle) : String(order.bundle || "eggs");
 
   const event = {
     event_name: "Purchase",
@@ -2858,45 +2830,66 @@ function normalizeDozenCosts(stored) {
       out[key] = Math.round(n * 100) / 100;
     } else if (Number.isFinite(legacy) && legacy >= 0) {
       out[key] = legacy;
-    } else {
+    } else if (defaults[key] !== undefined) {
       out[key] = defaults[key];
     }
   }
   return out;
 }
 
-/** Suggested whole-dollar sell for one dozen from its case cost (15 packs). */
-function suggestDozenSell(caseCost) {
-  const per = Number(caseCost) / DOZENS_PER_CASE;
-  if (!Number.isFinite(per) || per < 0) return 1;
-  return Math.max(1, Math.round(per + 1));
+/** YOLKO's own prices, for setting competitors against them (never changed from there). */
+async function myPrices(env) {
+  const settings = await getSettings(env);
+  const prices = {};
+  for (const k of BUNDLE_KEYS) if (Number(settings.prices[k]) > 0) prices[k] = Number(settings.prices[k]);
+  const stock = Object.fromEntries(VARIETIES.map((v) => [v.id, stockOf(settings, v.id)]));
+  return { tray1: prices.tray1, tray2: prices.tray2, box: prices.box, prices, stock };
 }
 
-/** YOLKO's own tray prices, for setting competitors against them (never changed from there). */
-async function myTrayPrices(env) {
-  const { prices } = await getSettings(env);
-  return { tray1: Number(prices.tray1), tray2: Number(prices.tray2), box: Number(prices.box) };
+function cleanCosts(map, keys) {
+  const out = {};
+  for (const k of keys) {
+    const n = Number(map?.[k]);
+    if (Number.isFinite(n) && n >= 0) out[k] = Math.round(n * 100) / 100;
+  }
+  return out;
 }
 
 async function getSettings(env) {
-  const stored = (await env.DATA.get("settings", "json")) || {};
-  // Tray prices are exactly what the owner saved in Admin. Nothing here derives them from
-  // each other or from the box cost.
-  const prices = { ...DEFAULT_SETTINGS.prices, ...(stored.prices || {}) };
-  // Fill missing case sell prices from matching dozen × 15
-  for (const caseKey of CASE_KEYS) {
-    const unitKey = CASE_UNIT[caseKey];
-    if (!Number.isFinite(Number(prices[caseKey])) || Number(prices[caseKey]) <= 0) {
-      const unit = Number(prices[unitKey]);
-      if (Number.isFinite(unit) && unit > 0) prices[caseKey] = Math.round(unit * DOZENS_PER_CASE);
+  return settingsFrom((await env.DATA.get("settings", "json")) || {});
+}
+
+/** Settings as every page reads them, from what is stored in KV. */
+function settingsFrom(stored) {
+  // Prices are exactly what the owner saved in Admin. Nothing here derives them from
+  // each other or from a cost. 0 or missing = that option isn't sold.
+  const prices = { ...DEFAULT_SETTINGS.prices };
+  for (const [k, v] of Object.entries(stored.prices || {})) {
+    if (isBundle(k) && Number.isFinite(Number(v)) && Number(v) >= 0) prices[k] = Number(v);
+  }
+  // A case of 15 that was never priced follows its dozen (as it always has). Once the owner
+  // saves a case price, even 0, that is what it is.
+  for (const id of DOZEN_KEYS) {
+    const caseKey = `${id}case`;
+    if (stored.prices?.[caseKey] === undefined && prices[caseKey] === undefined && Number(prices[id]) > 0) {
+      prices[caseKey] = Math.round(Number(prices[id]) * DOZENS_PER_CASE);
     }
+  }
+  const stock = {};
+  for (const id of OTHER_VARIETIES) {
+    const n = Math.max(0, Math.floor(Number(stored.stock?.[id]) || 0));
+    if (n > 0) stock[id] = n;
   }
   const dozenCosts = normalizeDozenCosts(stored);
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
     prices,
+    stock,
+    trayCosts: cleanCosts(stored.trayCosts, TRAY_VARIETIES),
     dozenCosts,
+    // Older pages read one shared dozen count. It is now the sum of every dozen variety.
+    dozensAvailable: DOZEN_KEYS.reduce((sum, id) => sum + (stock[id] || 0), 0),
     pickup: Object.fromEntries(
       WEEK_DAYS.map((d) => [d, cleanPickupDay((stored.pickup || {})[d], DEFAULT_SETTINGS.pickup[d])])
     ),
@@ -2908,9 +2901,13 @@ async function handleApi(request, env, url, ctx) {
     return new Response(null, { status: 204, headers: CORS });
   }
 
-  // Public: current prices and stock
+  // Public: current prices and stock. `shop` is what the shop can sell this week; Admin also
+  // gets the whole catalogue to draw Stock & prices and name any order.
   if (url.pathname === "/api/settings" && request.method === "GET") {
-    return json(await getSettings(env));
+    const settings = await getSettings(env);
+    const out = { ...settings, shop: shopView(settings) };
+    if (isAdmin(request, env)) out.catalogue = catalogueView();
+    return json(out);
   }
 
   // Admin: update prices and stock
@@ -2922,40 +2919,50 @@ async function handleApi(request, env, url, ctx) {
     const current = await getSettings(env);
     const prices = { ...current.prices };
     for (const key of BUNDLE_KEYS) {
-      const n = Number(body?.prices?.[key]);
-      if (Number.isFinite(n) && n > 0) prices[key] = Math.round(n);
+      const raw = body?.prices?.[key];
+      if (raw === undefined || raw === null || raw === "") continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) continue;
+      // The main tray always has a price. Anything else can be set to 0 to take it off the shop.
+      if (BUNDLES[key].variety === MAIN && n <= 0) continue;
+      prices[key] = Math.round(n);
     }
-    const dozenCosts = { ...current.dozenCosts };
-    if (body?.dozenCosts && typeof body.dozenCosts === "object") {
-      for (const key of DOZEN_KEYS) {
-        const n = Number(body.dozenCosts[key]);
-        if (Number.isFinite(n) && n >= 0) dozenCosts[key] = Math.round(n * 100) / 100;
+    const dozenCosts = { ...current.dozenCosts, ...cleanCosts(body?.dozenCosts, DOZEN_KEYS) };
+    const trayCosts = { ...current.trayCosts, ...cleanCosts(body?.trayCosts, TRAY_VARIETIES) };
+    // Stock moves on its own as orders are paid, so only the varieties sent here change.
+    const stock = { ...current.stock };
+    if (body?.stock && typeof body.stock === "object") {
+      for (const id of OTHER_VARIETIES) {
+        if (body.stock[id] === undefined) continue;
+        const n = Number(body.stock[id]);
+        if (Number.isFinite(n)) stock[id] = Math.max(0, Math.floor(n));
       }
     }
+    for (const id of Object.keys(stock)) if (!(stock[id] > 0)) delete stock[id];
     const next = {
       prices,
       traysAvailable: Number.isFinite(Number(body?.traysAvailable))
         ? Math.max(0, Math.floor(Number(body.traysAvailable)))
         : current.traysAvailable,
-      dozensAvailable: Number.isFinite(Number(body?.dozensAvailable))
-        ? Math.max(0, Math.floor(Number(body.dozensAvailable)))
-        : (current.dozensAvailable ?? 0),
+      stock,
       trayWeight: ["1.5", "1.75", "fr-700", "fr-600"].includes(body?.trayWeight)
         ? body.trayWeight
         : current.trayWeight,
       boxCost: Number.isFinite(Number(body?.boxCost))
         ? Math.max(0, Number(body.boxCost))
         : (current.boxCost ?? 55),
+      trayCosts,
       dozenCosts,
       pickup: Object.fromEntries(
         WEEK_DAYS.map((d) => [d, cleanPickupDay((body?.pickup || {})[d], current.pickup[d])])
       ),
     };
-    await env.DATA.put("settings", JSON.stringify(next));
+    await putStock(env, next);
     if (next.traysAvailable !== current.traysAvailable) {
       syncMetaAdsForStock(env, next.traysAvailable).catch(() => {});
     }
-    return json(next);
+    const saved = settingsFrom(next);
+    return json({ ...saved, shop: shopView(saved), catalogue: catalogueView() });
   }
 
   // Admin: sync Meta ad pause/resume from current tray stock (sold out = pause)
@@ -3149,17 +3156,9 @@ async function handleApi(request, env, url, ctx) {
       return json({ error: "pickup day unavailable" }, 400);
     }
 
-    // Dozen / case products only when admin has stocked them (dozensAvailable > 0)
-    const needDozens = dozensFor({ bundle, quantity });
-    if (needDozens > 0) {
-      const left = Number(settings.dozensAvailable) || 0;
-      if (left <= 0) {
-        return json({ error: "dozen packs not available this week", code: "dozen_off" }, 400);
-      }
-      if (needDozens > left) {
-        return json({ error: "not enough dozen packs left", code: "dozen_stock" }, 400);
-      }
-    }
+    // Every variety but the main tray needs a price and enough stock (catalogue.mjs).
+    const problem = stockProblem(settings, bundle, quantity);
+    if (problem) return json({ error: problem.error, code: problem.code }, 400);
 
     // Record country on the order; do not hard-block (iCloud Private Relay / VPN
     // can make real Sydney customers look non-AU and break Buy now).
@@ -3301,7 +3300,7 @@ async function handleApi(request, env, url, ctx) {
     await rollDeliveryDate(env, order);
     const settings = await getSettings(env);
     const result = await createCheckoutForOrder(env, order, settings, ctx);
-    if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
+    if (result.error) return json({ error: result.error, code: result.code || null, detail: result.detail || null }, result.status || 502);
     return json(result);
   }
 
@@ -3392,6 +3391,8 @@ async function handleApi(request, env, url, ctx) {
     } else if (!settings.pickup[pickupDay]?.enabled) {
       return json({ error: "pickup day unavailable" }, 400);
     }
+    const problem = stockProblem(settings, bundle, quantity);
+    if (problem) return json({ error: problem.error, code: problem.code }, 400);
 
     const meta = clientMeta(request);
     // AU mobile is required already. do not hard-block on CF country
@@ -3483,7 +3484,7 @@ async function handleApi(request, env, url, ctx) {
     }
     // One write, with the final order id (KV allows one write per key per second).
     await rememberOpenOrder(env, phone, order.id);
-    if (result.error) return json({ error: result.error, detail: result.detail || null }, result.status || 502);
+    if (result.error) return json({ error: result.error, code: result.code || null, detail: result.detail || null }, result.status || 502);
     return json({ ok: true, ...result });
   }
 
@@ -4156,11 +4157,7 @@ async function handleApi(request, env, url, ctx) {
           eventId: order.id,
           value: Number(order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price) || 0,
           currency: "AUD",
-          contentName:
-            order.bundle === "tray2" ? "2 egg trays (60 eggs)"
-              : order.bundle === "box" ? "Full box (180 eggs)"
-              : order.bundle === "tray1" ? "Egg tray (30 eggs)"
-              : String(order.bundle || "eggs"),
+          contentName: isBundle(order.bundle) ? bundleLabel(order.bundle) : String(order.bundle || "eggs"),
           numItems: Math.max(1, Number(order.quantity) || 1),
         };
         const code = await ensureRefCode(env, order.phone, order.name).catch(() => null);
@@ -4381,6 +4378,7 @@ async function handleApi(request, env, url, ctx) {
           refundEmail: refundEmail && { ok: Boolean(refundEmail.ok), skipped: Boolean(refundEmail.skipped), error: refundEmail.error || null },
           traysAvailable: stock.traysAvailable,
           stockDelta: stock.delta,
+          stock,
           stripe: order.stripe || null,
         });
       }
@@ -4418,6 +4416,7 @@ async function handleApi(request, env, url, ctx) {
       refundEmail: { ok: Boolean(refundEmail.ok), skipped: Boolean(refundEmail.skipped), error: refundEmail.error || null },
       traysAvailable: stock.traysAvailable,
       stockDelta: stock.delta,
+      stock,
       stripe: order.stripe,
     });
   }
@@ -4441,7 +4440,7 @@ async function handleApi(request, env, url, ctx) {
     const stock = await syncStock(env, order, status);
     order.status = status;
     await env.DATA.put(id, JSON.stringify(order));
-    return json({ ok: true, trays: traysFor(order), stockDelta: stock.delta, traysAvailable: stock.traysAvailable });
+    return json({ ok: true, trays: traysFor(order), stockDelta: stock.delta, traysAvailable: stock.traysAvailable, stock });
   }
 
 
@@ -4689,14 +4688,14 @@ async function handleApi(request, env, url, ctx) {
   // Admin > Competitors: competitor egg prices, typed-in prices and recent changes, in one answer.
   if (url.pathname === "/api/price-watch" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    return json({ ...(await priceWatchView(env)), mine: await myTrayPrices(env) });
+    return json({ ...(await priceWatchView(env)), mine: await myPrices(env) });
   }
 
   // Admin: check every shop now (the Check now button). A second tap within a minute is free.
   if (url.pathname === "/api/price-watch/poll" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
     const result = await runPoll(env);
-    return json({ ...(await priceWatchView(env)), mine: await myTrayPrices(env), ran: result.ran, changeCount: result.changeCount || 0 });
+    return json({ ...(await priceWatchView(env)), mine: await myPrices(env), ran: result.ran, changeCount: result.changeCount || 0 });
   }
 
   // Admin: add, change or remove a typed-in price (Costco and Woolworths block automatic checks).
@@ -4868,7 +4867,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "220",
+      "X-Yolko-Build": "221",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

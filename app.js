@@ -457,6 +457,8 @@ function eggCount(bundleKey) {
 // Human-clear order description
 function describeOrder(bundleKey, qty) {
   const b = BUNDLES[bundleKey] || BUNDLES.tray1;
+  // Varieties the shop learned from the Worker carry their own name (e.g. "Free range egg tray 1.5kg (30 eggs)").
+  if (b.fromShop) return qty === 1 ? b.label : `${qty}× ${b.label}`;
   const eggs = (eggCount(bundleKey) * qty).toLocaleString("en-AU");
   if (b.kind === "dozen") {
     const unit = `${b.housing === "cage" ? "Cage" : "Free range"} dozen ${b.weight}`;
@@ -728,25 +730,184 @@ applyPublishedAssets(API_BASE);
 
 
 
-const DOZEN_PUBLIC_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "fr800"];
+/* ---------- Every variety the shop sells this week ---------- */
+// The Worker sends `shop`: the main cage 1.75kg tray, plus every other tray or dozen that has a
+// price and stock (infra/catalogue.mjs). Nothing else is shown. With only the main tray in stock
+// the order form looks exactly as it always has.
+let SHOP = [];
+let trayVariety = "cage1750";
+let mainTraysLeft = null;
+const KIND_WORD = { cage: "cage", fr: "free range", cf: "cage free" };
+const KIND_TITLE = { cage: "Cage", fr: "Free range", cf: "Cage free" };
+const MAIN_TRAY_KEYS = { one: "tray1", two: "tray2", box: "box" };
+const MAIN_TRAY_TEXT = {
+  one: { name: "1 tray", eggs: "30 eggs" },
+  two: { name: "2 trays", eggs: "60 eggs" },
+  box: { name: "Full box", eggs: "180 eggs" },
+};
 
-/** Dozen packs stay off the public site until admin sets stock > 0. */
-function applyDozenVisibility(settings) {
-  const live = Number(settings.dozensAvailable) > 0;
-  document.querySelectorAll("[data-dozen-picker]").forEach((el) => {
-    el.hidden = !live;
+function escHtml(t) {
+  return String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function perEggText(price, eggs) {
+  return Math.round((price / eggs) * 100) + "¢";
+}
+
+/** Learn this week's varieties: prices, names and egg counts for checkout. */
+function learnShop(shop) {
+  SHOP = Array.isArray(shop) ? shop.filter((v) => v && Array.isArray(v.options) && v.options.length) : [];
+  SHOP.forEach((v) => {
+    if (v.main) return;
+    v.options.forEach((o) => {
+      BUNDLES[o.key] = { label: o.label, price: o.price, eggs: o.eggs, kind: v.format, variety: v.id, fromShop: true };
+    });
   });
-  // If dozens were selected but are now hidden, fall back to tray1
-  if (!live) {
-    const selected = form?.querySelector('input[name="bundle"]:checked');
-    if (selected && DOZEN_PUBLIC_KEYS.includes(selected.value)) {
-      const tray1 = form.querySelector('input[name="bundle"][value="tray1"]');
-      if (tray1) {
-        tray1.checked = true;
-        tray1.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+}
+
+function shopVariety(id) {
+  return SHOP.find((v) => v.id === id) || null;
+}
+
+function varietyOfKey(key) {
+  return SHOP.find((v) => v.options.some((o) => o.key === key)) || null;
+}
+
+/** Point the three tray cards at one tray variety: its keys, prices and egg counts. */
+function setTrayVariety(id) {
+  const picker = document.getElementById("tray-picker");
+  if (!picker) return;
+  const v = shopVariety(id);
+  const main = !v || v.main;
+  trayVariety = main ? "cage1750" : v.id;
+  const checked = form?.querySelector('input[name="bundle"]:checked');
+  const wasTray = Boolean(checked && picker.contains(checked));
+  const wasOpt = wasTray ? checked.closest("[data-opt]")?.dataset.opt : null;
+  picker.querySelectorAll("[data-opt]").forEach((label) => {
+    const opt = label.dataset.opt;
+    const input = label.querySelector("input");
+    const o = main ? null : v.options.find((x) => x.option === opt);
+    const key = main ? MAIN_TRAY_KEYS[opt] : o ? o.key : "";
+    label.hidden = !main && !o;
+    input.disabled = label.hidden;
+    if (label.hidden) return;
+    input.value = key;
+    const b = BUNDLES[key];
+    const unit = !main && v.eggs !== 30 ? `${v.eggs} pack` : "tray";
+    label.querySelector(".bo-name").textContent = main
+      ? MAIN_TRAY_TEXT[opt].name
+      : opt === "one" ? `1 ${unit}` : opt === "two" ? `2 ${unit}s` : "Full box";
+    label.querySelector(".bo-eggs").textContent = main ? MAIN_TRAY_TEXT[opt].eggs : `${b.eggs} eggs`;
+    const price = label.querySelector(".bo-price");
+    price.id = "bp-" + key;
+    price.textContent = "$" + b.price;
+    const each = label.querySelector("[data-per-egg]");
+    if (each) {
+      each.dataset.perEgg = key;
+      each.textContent = perEggText(b.price, b.eggs);
+    }
+  });
+  // Keep the same size picked when the kind changes, or the nearest one this kind sells.
+  if (wasTray) {
+    const pick = [wasOpt, "two", "one", "box"]
+      .map((opt) => picker.querySelector(`[data-opt="${opt}"]:not([hidden]) input`))
+      .find(Boolean);
+    if (pick) {
+      pick.checked = true;
+      pick.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
+  document.querySelectorAll('#tray-kinds input[name="trayVariety"]').forEach((r) => {
+    r.checked = r.value === trayVariety;
+  });
+  refreshStockNote();
+}
+
+/** Kind-of-tray chips, only when more than one tray is on sale. */
+function renderTrayKinds() {
+  const box = document.getElementById("tray-kinds");
+  if (!box) return;
+  const trays = SHOP.filter((v) => v.format === "tray");
+  if (trays.length < 2) {
+    box.hidden = true;
+    box.innerHTML = "";
+    setTrayVariety("cage1750");
+    return;
+  }
+  if (!trays.some((v) => v.id === trayVariety)) trayVariety = "cage1750";
+  box.innerHTML = trays.map((v) => `<label class="kind-chip">
+      <input type="radio" name="trayVariety" value="${escHtml(v.id)}"${v.id === trayVariety ? " checked" : ""}>
+      <span>${escHtml(v.name)}</span>
+    </label>`).join("");
+  box.hidden = false;
+  setTrayVariety(trayVariety);
+}
+
+/** One row of dozens for each kind that has any on sale. */
+function renderDozens() {
+  const box = document.getElementById("dozen-pickers");
+  if (!box) return;
+  const checked = form?.querySelector('input[name="bundle"]:checked');
+  const keep = checked && box.contains(checked) ? checked.value : null;
+  box.innerHTML = ["cage", "fr", "cf"].map((kind) => {
+    const list = SHOP
+      .filter((v) => v.format === "dozen" && v.kind === kind)
+      .map((v) => ({ v, o: v.options.find((o) => o.option === "dozen") }))
+      .filter((x) => x.o);
+    if (!list.length) return "";
+    return `<fieldset class="picker-dozen">
+      <legend>${KIND_TITLE[kind]} eggs, a dozen</legend>
+      <div class="picker">${list.map(({ v, o }) => `<label class="bundle-opt">
+        <input type="radio" name="bundle" value="${escHtml(o.key)}"${o.key === keep ? " checked" : ""}>
+        <span class="bo-name">${escHtml(v.weight)}</span>
+        <span class="bo-eggs">12 ${KIND_WORD[kind]} eggs</span>
+        <span class="bo-price-row"><span class="bo-price" id="bp-${escHtml(o.key)}">$${o.price}</span></span>
+      </label>`).join("")}</div>
+    </fieldset>`;
+  }).join("");
+  // A dozen that sold out since the page loaded: go back to the trays.
+  if (keep && !form.querySelector('input[name="bundle"]:checked')) {
+    const tray = form.querySelector('#tray-picker [data-opt="two"]:not([hidden]) input') || form.querySelector('#tray-picker input:not(:disabled)');
+    if (tray) {
+      tray.checked = true;
+      tray.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+}
+
+/** "24 trays left this week." for whatever is picked: the main tray, another tray or a dozen. */
+function refreshStockNote() {
+  if (!stockNote) return;
+  const v = varietyOfKey(currentBundle());
+  if (!v || v.main) {
+    if (!Number.isFinite(mainTraysLeft)) return;
+    stockNote.textContent = mainTraysLeft > 0
+      ? `${mainTraysLeft} ${mainTraysLeft === 1 ? "tray" : "trays"} left this week.`
+      : "Sold out this week. Check back Wednesday.";
+    stockNote.hidden = false;
+    return;
+  }
+  const unit = v.format === "dozen" ? ["dozen", "dozens"] : v.eggs === 30 ? ["tray", "trays"] : ["pack", "packs"];
+  stockNote.textContent = `${v.left} ${v.left === 1 ? unit[0] : unit[1]} left this week.`;
+  stockNote.hidden = false;
+}
+
+document.getElementById("tray-kinds")?.addEventListener("change", (e) => {
+  if (e.target && e.target.name === "trayVariety") setTrayVariety(e.target.value);
+});
+form?.addEventListener("change", (e) => {
+  if (e.target && e.target.name === "bundle") refreshStockNote();
+});
+
+/** Pick an option by its key, switching the tray kind first when it belongs to another tray. */
+function selectBundle(key) {
+  const v = varietyOfKey(key);
+  if (v && v.format === "tray" && v.id !== trayVariety) setTrayVariety(v.id);
+  const input = [...(form?.querySelectorAll('input[name="bundle"]') || [])].find((i) => i.value === String(key));
+  if (!input || input.disabled || input.closest("[hidden]")) return false;
+  input.checked = true;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
 }
 
 function applySettings(settings) {
@@ -778,20 +939,13 @@ function applySettings(settings) {
   applyPriceLabels();
   refreshSubmitPrice();
 
-  // Stock note
+  // Every other tray and dozen the shop sells this week, then the stock note for what's picked
   const stock = Number(settings.traysAvailable);
-  if (Number.isFinite(stock)) {
-    if (stock > 0) {
-      stockNote.textContent = `${stock} ${stock === 1 ? "tray" : "trays"} left this week.`;
-      stockNote.hidden = false;
-    } else {
-      stockNote.textContent = "Sold out this week. Check back Wednesday.";
-      stockNote.hidden = false;
-    }
-  }
-
-  // Dozen packs: only on the public site when admin has stocked them
-  applyDozenVisibility(settings);
+  if (Number.isFinite(stock)) mainTraysLeft = stock;
+  learnShop(settings.shop);
+  renderTrayKinds();
+  renderDozens();
+  refreshStockNote();
 
   // Product type from admin (cage trays or free-range packs)
   applyProductType(settings.trayWeight);
@@ -1456,11 +1610,7 @@ againButton.addEventListener("click", () => {
 // <head> lifted the token out of the URL. Fill the form once live settings are in,
 // so the stock and dozen-pack rules don't undo the customer's last order.
 function applyReorder(d) {
-  const bundleInput = form.querySelector(`input[name="bundle"][value="${d.bundle}"]`);
-  if (bundleInput && !bundleInput.closest("[hidden]")) {
-    bundleInput.checked = true;
-    bundleInput.dispatchEvent(new Event("change", { bubbles: true }));
-  }
+  selectBundle(d.bundle);
   setQuantity(Number(d.quantity) || 1);
   const fill = (id, value) => {
     const el = document.getElementById(id);

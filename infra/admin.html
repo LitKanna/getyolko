@@ -827,6 +827,32 @@ button.stop-h:active { background:var(--hover); }
 .dz td { padding:7px 0; box-shadow:inset 0 -.5px 0 var(--line); }
 .dz tr:last-child td { box-shadow:none; }
 .dz td.n { font-weight:400; }
+/* Stock & prices: one row per variety, its prices behind the row, its stock in the stepper. */
+.st-bar { margin:0 0 16px; }
+.vr-grid { align-items:start; }
+@media (min-width:1180px) { .vr-grid.vr-tray > .vr-card:first-child { grid-row:span 2; } }
+.vr-card .chead { align-items:center; margin-bottom:4px; }
+.vr-card h2 .h2x { color:var(--muted); font-weight:400; }
+.vr-count { color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; }
+.vr-list { display:flex; flex-direction:column; }
+.vr-row { display:flex; align-items:center; gap:12px; padding:8px 0; box-shadow:inset 0 .5px 0 var(--line); }
+.vr-row:first-child { box-shadow:none; }
+.vr-main { flex:1; min-width:0; display:flex; align-items:center; gap:6px; min-height:52px; margin:0 0 0 -10px; padding:4px 4px 4px 10px; border-radius:14px; text-align:left; color:inherit; transition:background .12s; }
+.vr-main:hover { background:var(--hover); }
+.vr-main:active { background:var(--press); }
+.vr-main:focus-visible { outline:3px solid var(--focus); outline-offset:-1px; }
+.vr-t { flex:1; min-width:0; }
+.vr-t b { display:flex; align-items:center; gap:8px; font-size:17px; line-height:22px; font-weight:400; letter-spacing:-.012em; }
+.vr-t .vr-s { display:block; margin-top:1px; color:var(--muted); font-size:15px; line-height:20px; }
+.vr-t .vr-s.warn { color:var(--ink); font-weight:600; }
+.vr-row.off .vr-t b, .vr-row.off .vr-t .vr-s:not(.warn) { color:var(--muted); }
+.vr-go { flex:none; display:grid; place-items:center; color:var(--muted); }
+.tagm { font-style:normal; font-size:12px; line-height:16px; font-weight:600; padding:1px 7px; border-radius:8px; background:var(--subtle); color:var(--ink2); }
+.vsheet { margin-top:4px; }
+.vsheet .srow:first-of-type { padding-top:14px; box-shadow:inset 0 .5px 0 var(--line); }
+.vsheet .vs-left + .srow { box-shadow:none; padding-top:6px; }
+.vs-left { margin:0 0 4px; color:var(--muted); font-size:15px; line-height:20px; }
+.vs-note { margin-top:10px; }
 .dz .money { width:110px; }
 .dz .inp { height:36px; font-size:15px; border-radius:10px; }
 .dz .pf { font-weight:700; color:var(--green); }
@@ -887,6 +913,13 @@ body:has(#savebar) .toasts { bottom:84px; }
 /* One ranked list, cheapest 30 eggs first. Your own tray is the solid row, so where you stand
    reads at a glance; rank numbers sit where order lists show initials. */
 .pw-head { flex-wrap:wrap; }
+/* One group per size and kind (Cage 1.5kg, Free range 600g): a small heading, then the shops. */
+.pwg + .pwg { margin-top:18px; }
+.pwg-h { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:0 0 6px; }
+.pwg-h b { font-size:15px; line-height:20px; font-weight:600; }
+.pwg-h .min0 span { margin-left:8px; color:var(--muted); font-size:13px; line-height:18px; }
+.pwg-rk { flex:none; color:var(--muted); font-size:13px; line-height:18px; }
+.pwg-none { margin:8px 0 0; }
 .pwl { display:flex; flex-direction:column; margin:0 -12px; }
 .pwl .row { min-height:68px; color:inherit; text-decoration:none; }
 .pwl .av { font-variant-numeric:tabular-nums; }
@@ -1873,28 +1906,56 @@ async function copyText(text, msg) {
 }
 
 /* ============================== orders: model ============================== */
-const BUNDLE_META = {
-  tray1: { eggs: 30, kind: "tray" }, tray2: { eggs: 60, kind: "tray" }, box: { eggs: 180, kind: "tray" },
-  cage600: { eggs: 12, kind: "dozen", label: "Cage dozen 600g" }, cage700: { eggs: 12, kind: "dozen", label: "Cage dozen 700g" },
-  cage800: { eggs: 12, kind: "dozen", label: "Cage dozen 800g" }, fr600: { eggs: 12, kind: "dozen", label: "Free range dozen 600g" },
-  fr700: { eggs: 12, kind: "dozen", label: "Free range dozen 700g" }, fr800: { eggs: 12, kind: "dozen", label: "Free range dozen 800g" },
-  cage600case: { eggs: 180, kind: "case", label: "Cage case 600g" }, cage700case: { eggs: 180, kind: "case", label: "Cage case 700g" },
-  cage800case: { eggs: 180, kind: "case", label: "Cage case 800g" }, fr600case: { eggs: 180, kind: "case", label: "Free range case 600g" },
-  fr700case: { eggs: 180, kind: "case", label: "Free range case 700g" }, fr800case: { eggs: 180, kind: "case", label: "Free range case 800g" },
-};
-function traysFor(o) {
-  const m = BUNDLE_META[o.bundle];
-  if (m && (m.kind === "dozen" || m.kind === "case")) return 0;
-  return (o.bundle === "box" ? 6 : o.bundle === "tray2" ? 2 : 1) * (o.quantity || 1);
+/* Every egg the shop sells: dozens and trays, then kind, then weight (the Worker's catalogue.mjs).
+   A key names its variety, so any order can be read before the catalogue has loaded. */
+const MAIN_V = "cage1750";
+const KIND_NAME = { cage: "Cage", fr: "Free range", cf: "Cage free" };
+const KIND_ORDER = ["cage", "fr", "cf"];
+function weightText(g) { return g >= 1000 ? String(g / 1000).replace(/\.?0+$/, "") + "kg" : g + "g"; }
+function varietyOf(id) {
+  const m = /^(cage|fr|cf)(\d+)(?:x(\d+))?$/.exec(String(id || ""));
+  if (!m) return null;
+  const g = Number(m[2]);
+  const format = g >= 1000 ? "tray" : "dozen";
+  const eggs = m[3] ? Number(m[3]) : format === "tray" ? 30 : 12;
+  return { id: id, kind: m[1], grams: g, format: format, eggs: eggs, main: id === MAIN_V, weight: weightText(g),
+    name: KIND_NAME[m[1]] + " " + weightText(g) + (format === "tray" && eggs !== 30 ? " " + eggs + " pack" : "") };
 }
-function eggsFor(o) { return ((BUNDLE_META[o.bundle] || BUNDLE_META.tray1).eggs) * (o.quantity || 1); }
+/** One unit of stock: tray, pack (an 18 pack), dozen. */
+function unitWord(v, n) {
+  const one = v.format === "dozen" ? "dozen" : v.eggs === 30 ? "tray" : "pack";
+  return n === 1 ? one : v.format === "dozen" ? "dozens" : one + "s";
+}
+function bundleInfo(key) {
+  key = String(key || "");
+  let v = null, option = "", packs = 1;
+  if (key === "tray1" || key === "tray2" || key === "box") { v = varietyOf(MAIN_V); option = key === "box" ? "box" : key === "tray2" ? "two" : "one"; }
+  else {
+    let m = /^(.+)-(1|2|box)$/.exec(key);
+    if (m && varietyOf(m[1]) && varietyOf(m[1]).format === "tray") { v = varietyOf(m[1]); option = m[2] === "box" ? "box" : m[2] === "2" ? "two" : "one"; }
+    else if ((m = /^(.+)case$/.exec(key)) && varietyOf(m[1]) && varietyOf(m[1]).format === "dozen") { v = varietyOf(m[1]); option = "case"; }
+    else if (varietyOf(key) && varietyOf(key).format === "dozen") { v = varietyOf(key); option = "dozen"; }
+  }
+  if (!v) return null;
+  packs = option === "box" ? 6 : option === "two" ? 2 : option === "case" ? 15 : 1;
+  return { key: key, v: v, option: option, packs: packs, eggs: packs * v.eggs, kind: option === "case" ? "case" : v.format };
+}
+function infoOf(o) { return bundleInfo(o && o.bundle) || bundleInfo("tray1"); }
+/** Units of stock an order takes: trays or 18 packs (any tray), or dozens. */
+function unitsFor(o) { return infoOf(o).packs * (o.quantity || 1); }
+function traysFor(o) { return infoOf(o).v.format === "tray" ? unitsFor(o) : 0; }
+function mainTraysFor(o) { return infoOf(o).v.main ? unitsFor(o) : 0; }
+function eggsFor(o) { return infoOf(o).eggs * (o.quantity || 1); }
 function shortItem(o) {
-  const m = BUNDLE_META[o.bundle] || BUNDLE_META.tray1;
+  const b = infoOf(o);
   const q = o.quantity || 1;
-  if (m.kind === "dozen") return (q > 1 ? q + "× " : "") + m.label;
-  if (m.kind === "case") return (q > 1 ? q + "× " : "") + m.label + " (15 dozens)";
-  if (o.bundle === "box") return q === 1 ? "Full box (6 trays)" : q + " boxes (" + q * 6 + " trays)";
-  return plural(traysFor(o), "tray");
+  const n = unitsFor(o);
+  if (b.v.format === "dozen") {
+    const label = KIND_NAME[b.v.kind] + (b.option === "case" ? " case " : " dozen ") + b.v.weight;
+    return (q > 1 ? q + "× " : "") + label + (b.option === "case" ? " (15 dozens)" : "");
+  }
+  const count = b.option === "box" ? (q === 1 ? "Full box (6 " + unitWord(b.v, 2) + ")" : q + " boxes (" + n + " " + unitWord(b.v, 2) + ")") : plural(n, unitWord(b.v, 1), unitWord(b.v, 2));
+  return b.v.main ? count : count + ", " + b.v.name;
 }
 function itemLine(o) { return shortItem(o) + " · " + eggsFor(o).toLocaleString() + " eggs"; }
 function isPaid(o) { return o.paymentStatus === "paid" && o.status !== "cancelled"; }
@@ -2146,9 +2207,9 @@ function renderOrdersMeta() {
     const active = ORDERS.filter(function (o) { return o.status !== "cancelled"; });
     const confirmed = active.filter(function (o) { return o.status !== "new"; }).reduce(function (s, o) { return s + (Number(o.price) || 0); }, 0);
     const paid = active.filter(function (o) { return o.paymentStatus === "paid"; }).reduce(function (s, o) { return s + (Number(o.price) || 0); }, 0);
-    const trays = SAVED ? SAVED.traysAvailable : null;
+    const trays = SAVED ? SAVED.stock[MAIN_V] : null;
     const left = Math.max(0, Number(trays) || 0);
-    const booked = ORDERS.filter(function (o) { return o.status === "confirmed"; }).reduce(function (s, o) { return s + traysFor(o); }, 0);
+    const booked = ORDERS.filter(function (o) { return o.status === "confirmed"; }).reduce(function (s, o) { return s + mainTraysFor(o); }, 0);
     const before = qsa(".kpi", kp).map(function (k) { return k.textContent; });
     kp.innerHTML =
       kpi("Waiting", String(waiting), waiting ? "to confirm" : "all confirmed", "kpi-waiting", waiting ? "amber" : "", "inbox") +
@@ -2406,11 +2467,17 @@ window.addEventListener("popstate", function () {
 });
 
 /* ============================== orders: actions ============================== */
-function applyTrays(n) {
-  if (typeof n !== "number" || !SAVED) return;
-  const wasClean = DRAFT && DRAFT.traysAvailable === SAVED.traysAvailable;
-  SAVED.traysAvailable = n;
-  if (wasClean) { DRAFT.traysAvailable = n; const el = $("st-trays"); if (el && document.activeElement !== el) el.value = n; updateStockDerived(); }
+/** An order moved stock: show the new count for that variety (and the main trays). */
+function applyStock(d) {
+  if (!d || !SAVED) return;
+  const set = function (id, n) {
+    if (typeof n !== "number" || !id || SAVED.stock[id] === undefined) return;
+    const wasClean = DRAFT && DRAFT.stock[id] === SAVED.stock[id];
+    SAVED.stock[id] = n;
+    if (wasClean) { DRAFT.stock[id] = n; const el = $("st-n-" + id); if (el && document.activeElement !== el) el.value = n; updateStockDerived(); }
+  };
+  set(MAIN_V, d.traysAvailable);
+  if (d.stock && d.stock.variety) set(d.stock.variety, d.stock.left);
   renderOrdersMeta();
   renderWeek();
 }
@@ -2434,11 +2501,16 @@ async function setStatus(id, status, opts) {
     return;
   }
   const d = r.data;
-  applyTrays(d.traysAvailable);
+  applyStock(d);
   const label = { confirmed: prev === "done" ? "Moved back to confirmed" : "Order confirmed", done: "Marked delivered", cancelled: "Order cancelled", new: "Order reopened" }[status];
   let stock = "";
-  if (d.stockDelta < 0) stock = ". " + plural(d.trays, "tray") + " set aside, " + d.traysAvailable + " left";
-  if (d.stockDelta > 0) stock = ". " + plural(d.stockDelta, "tray") + " back in stock";
+  const mv = d.stock || {};
+  const v = varietyOf(mv.variety);
+  if (v && mv.units) {
+    const what = plural(Math.abs(mv.units), unitWord(v, 1), unitWord(v, 2)) + (v.main ? "" : " of " + v.name);
+    stock = mv.units < 0 ? ". " + what + " set aside, " + mv.left + " left" : ". " + what + " back in stock";
+  } else if (d.stockDelta < 0) stock = ". " + plural(d.trays, "tray") + " set aside, " + d.traysAvailable + " left";
+  else if (d.stockDelta > 0) stock = ". " + plural(d.stockDelta, "tray") + " back in stock";
   toast(label + stock, { label: "Undo", run: function () { setStatus(id, prev, { skipConfirm: true }); } });
   refreshSettingsQuiet();
   loadOrders(true);
@@ -2453,7 +2525,7 @@ async function refundOrder(id) {
   toast("Refunding through Stripe…");
   const r = await api("/api/refund", { method: "POST", body: { id: id } });
   if (!r.ok) { toast(r.data.error || "Refund failed"); return; }
-  applyTrays(r.data.traysAvailable);
+  applyStock(r.data);
   const back = money(r.data.amount != null ? r.data.amount : amt);
   const mail = r.data.refundEmail && !r.data.refundEmail.skipped ? (r.data.refundEmail.ok ? ". Email sent" : ". Email didn't send, retrying soon") : "";
   if (r.data.syncing) toast("Refunded in Stripe a moment ago. It shows here in a minute");
@@ -2576,16 +2648,18 @@ function resetRunOrder() {
   toast("Back to nearest first");
 }
 function loadList(stops) {
-  const lines = {};
-  let trays = 0;
+  // What to load: the main trays first, then every other variety in units (trays, packs, dozens).
+  const units = {};
   stops.forEach(function (o) {
-    const m = BUNDLE_META[o.bundle] || BUNDLE_META.tray1;
-    if (m.kind === "tray") { trays += traysFor(o); return; }
-    lines[m.label] = (lines[m.label] || 0) + (o.quantity || 1);
+    const b = infoOf(o);
+    units[b.v.id] = (units[b.v.id] || 0) + unitsFor(o);
   });
   const out = [];
-  if (trays) out.push([plural(trays, "tray"), ""]);
-  Object.keys(lines).forEach(function (k) { out.push([lines[k] + " × " + k, ""]); });
+  if (units[MAIN_V]) out.push([plural(units[MAIN_V], "tray"), ""]);
+  Object.keys(units).filter(function (id) { return id !== MAIN_V; }).forEach(function (id) {
+    const v = varietyOf(id);
+    out.push([plural(units[id], unitWord(v, 1), unitWord(v, 2)) + " · " + v.name, ""]);
+  });
   return out;
 }
 function smsHref(o) {
@@ -2915,48 +2989,42 @@ document.addEventListener("yolko-theme", function () { if ($("ep-frame") && type
 function renderWeek() {
   const el = $("week");
   if (!SAVED) { el.innerHTML = '<span class="k">This week</span><span class="sk" style="height:12px;margin-top:12px"></span><span class="sk" style="height:6px;margin-top:12px"></span>'; return; }
-  const left = SAVED.traysAvailable;
-  const booked = ORDERS.filter(function (o) { return o.status === "confirmed"; }).reduce(function (s, o) { return s + traysFor(o); }, 0);
+  const left = SAVED.stock[MAIN_V];
+  const booked = ORDERS.filter(function (o) { return o.status === "confirmed"; }).reduce(function (s, o) { return s + mainTraysFor(o); }, 0);
   const total = left + booked;
   const pct = total ? Math.round((left / total) * 100) : 0;
-  const dz = SAVED.dozensAvailable;
+  const more = CAT ? CAT.varieties.filter(function (v) { return !v.main && onShop(SAVED, v); }).length : 0;
   el.innerHTML = '<span class="k">This week</span>' +
     '<div class="r"><span>Trays left</span><b class="num">' + left + "</b></div>" +
     '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
     '<div class="cap">' + esc(booked ? plural(booked, "tray") + " booked for delivery" : "Nothing booked yet") + "</div>" +
-    '<div class="r"><span>Dozen packs</span>' + (dz > 0 ? chip("ok", dz + " on sale") : chip("plain", "Hidden")) + "</div>";
+    '<div class="r"><span>Other eggs</span>' + (more > 0 ? chip("ok", more + " on sale") : chip("plain", "None")) + "</div>";
 }
 
 /* ============================== stock & prices ============================== */
-const DOZEN_KEYS = ["cage600", "cage700", "cage800", "fr600", "fr700", "fr800"];
-const DOZEN_LABELS = { cage600: "Cage 600g", cage700: "Cage 700g", cage800: "Cage 800g", fr600: "Free range 600g", fr700: "Free range 700g", fr800: "Free range 800g" };
-const DOZEN_COST_DEFAULTS = { cage600: 75, cage700: 75, cage800: 75, fr600: 90, fr700: 90, fr800: 90 };
-const BASE_BOX_COST = 55;
+/* Stock and prices for every variety, grouped as the shop and Competitors are: Trays or Dozens,
+   then kind, then weight. Stock is typed in the list (Save in the bar); a variety's prices open in
+   a sheet and save from there. Nothing here moves a price by itself: it is what the owner typed. */
 const DOZENS_IN_CASE = 15;
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const WEIGHTS = [["1.75", "Cage 1.75 kg"], ["1.5", "Cage 1.5 kg"], ["fr-700", "Free range 700 g"], ["fr-600", "Free range 600 g"]];
-/** Suggested sell for one dozen from that product's case cost only. */
-function suggestDozenSell(caseCost) {
-  const per = Number(caseCost) / DOZENS_IN_CASE;
-  if (!Number.isFinite(per) || per < 0) return 1;
-  return Math.max(1, Math.round(per + 1));
-}
+let CAT = null; // the Worker's catalogue (catalogue.mjs), sent to Admin with the settings
+let ST_FORMAT = "tray";
+try { if (localStorage.getItem("yolko_stock_format") === "dozen") ST_FORMAT = "dozen"; } catch (e) {}
+function catList(format, kind) { return CAT ? CAT.varieties.filter(function (v) { return (!format || v.format === format) && (!kind || v.kind === kind); }) : []; }
+function catVar(id) { return CAT ? CAT.varieties.filter(function (v) { return v.id === id; })[0] || null : null; }
+/** "Free range 1.5kg trays", "Cage 1kg 18 packs", "Cage 600g dozens". */
+function varTitle(v) { return v.format === "dozen" ? v.name + " dozens" : v.eggs === 30 ? v.name + " trays" : v.name + "s"; }
 function normalizeSettings(s) {
   s = s || {};
+  if (s.catalogue && Array.isArray(s.catalogue.varieties)) CAT = s.catalogue;
+  if (!CAT) throw new Error("no catalogue");
   const p = s.prices || {};
-  const out = {
-    traysAvailable: Math.max(0, Math.floor(Number(s.traysAvailable) || 0)),
-    dozensAvailable: Math.max(0, Math.floor(Number(s.dozensAvailable) || 0)),
-    trayWeight: s.trayWeight || "1.75",
-    boxCost: s.boxCost != null ? Number(s.boxCost) : BASE_BOX_COST,
-    prices: { tray1: Number(p.tray1) || 0, tray2: Number(p.tray2) || 0, box: Number(p.box) || 0 },
-    dozenCosts: {},
-    pickup: {},
-  };
-  DOZEN_KEYS.forEach(function (k) {
-    const cost = s.dozenCosts && s.dozenCosts[k] != null ? Number(s.dozenCosts[k]) : (DOZEN_COST_DEFAULTS[k] || 75);
-    out.dozenCosts[k] = cost;
-    out.prices[k] = Number(p[k]) > 0 ? Number(p[k]) : suggestDozenSell(cost);
+  const out = { stock: {}, prices: {}, costs: {}, trayWeight: s.trayWeight || "1.75", pickup: {} };
+  CAT.varieties.forEach(function (v) {
+    out.stock[v.id] = Math.max(0, Math.floor(Number(v.main ? s.traysAvailable : (s.stock || {})[v.id]) || 0));
+    const c = v.main ? s.boxCost : v.format === "tray" ? (s.trayCosts || {})[v.id] : (s.dozenCosts || {})[v.id];
+    out.costs[v.id] = c != null && c !== "" && Number.isFinite(Number(c)) ? Number(c) : null;
+    v.bundles.forEach(function (k) { out.prices[k] = Number(p[k]) > 0 ? Number(p[k]) : 0; });
   });
   WEEK_DAYS.forEach(function (d) {
     const x = (s.pickup || {})[d] || {};
@@ -2966,32 +3034,48 @@ function normalizeSettings(s) {
 }
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
 function settingsBody(d) {
-  const prices = { tray1: d.prices.tray1, tray2: d.prices.tray2, box: d.prices.box };
-  DOZEN_KEYS.forEach(function (k) {
-    prices[k] = d.prices[k];
-    if (d.prices[k] > 0) prices[k + "case"] = Math.round(d.prices[k] * DOZENS_IN_CASE);
+  const body = { prices: clone(d.prices), trayCosts: {}, dozenCosts: {}, trayWeight: d.trayWeight, pickup: d.pickup };
+  CAT.varieties.forEach(function (v) {
+    const c = d.costs[v.id];
+    if (c != null) { if (v.main) body.boxCost = c; else if (v.format === "tray") body.trayCosts[v.id] = c; else body.dozenCosts[v.id] = c; }
+    // Stock moves on its own as orders come in. Only send what was edited here,
+    // so saving never puts back an older count.
+    if (d.stock[v.id] !== SAVED.stock[v.id]) {
+      if (v.main) body.traysAvailable = d.stock[v.id];
+      else (body.stock = body.stock || {})[v.id] = d.stock[v.id];
+    }
   });
-  const body = { prices: prices, trayWeight: d.trayWeight, boxCost: d.boxCost, dozenCosts: d.dozenCosts, pickup: d.pickup };
-  // Stock moves on its own as orders come in. Only send it when it was edited here,
-  // so saving a price never puts back an older tray count.
-  if (d.traysAvailable !== SAVED.traysAvailable) body.traysAvailable = d.traysAvailable;
-  if (d.dozensAvailable !== SAVED.dozensAvailable) body.dozensAvailable = d.dozensAvailable;
   return body;
 }
 function changedGroups() {
-  if (!SAVED || !DRAFT) return [];
+  if (!SAVED || !DRAFT || !CAT) return [];
   const out = [];
-  const same = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
-  if (DRAFT.traysAvailable !== SAVED.traysAvailable) out.push("trays left");
-  if (DRAFT.dozensAvailable !== SAVED.dozensAvailable) out.push("dozen packs");
+  CAT.varieties.forEach(function (v) {
+    const stock = DRAFT.stock[v.id] !== SAVED.stock[v.id];
+    const price = v.bundles.some(function (k) { return DRAFT.prices[k] !== SAVED.prices[k]; }) || DRAFT.costs[v.id] !== SAVED.costs[v.id];
+    const name = v.main ? "trays" : v.name + (v.format === "dozen" ? " dozens" : "");
+    if (stock && price) out.push(name);
+    else if (stock) out.push(name + " left");
+    else if (price) out.push(name + " prices");
+  });
   if (DRAFT.trayWeight !== SAVED.trayWeight) out.push("featured tray");
-  if (DRAFT.prices.tray1 !== SAVED.prices.tray1 || DRAFT.prices.tray2 !== SAVED.prices.tray2 || DRAFT.prices.box !== SAVED.prices.box) out.push("tray prices");
-  if (DRAFT.boxCost !== SAVED.boxCost) out.push("box cost");
-  if (DOZEN_KEYS.some(function (k) { return DRAFT.prices[k] !== SAVED.prices[k] || DRAFT.dozenCosts[k] !== SAVED.dozenCosts[k]; })) out.push("dozen prices");
-  if (!same(DRAFT.pickup, SAVED.pickup)) out.push("pickup days");
+  if (JSON.stringify(DRAFT.pickup) !== JSON.stringify(SAVED.pickup)) out.push("pickup days");
   return out;
 }
 function isDirty() { return changedGroups().length > 0; }
+/** Take the server's settings and keep any edit the owner hasn't saved yet. */
+function takeSettings(next) {
+  const prev = SAVED;
+  SAVED = next;
+  if (!DRAFT || !prev) { DRAFT = clone(next); return; }
+  const draft = DRAFT;
+  DRAFT = clone(next);
+  ["stock", "prices", "costs"].forEach(function (g) {
+    Object.keys(draft[g]).forEach(function (k) { if (draft[g][k] !== prev[g][k]) DRAFT[g][k] = draft[g][k]; });
+  });
+  if (draft.trayWeight !== prev.trayWeight) DRAFT.trayWeight = draft.trayWeight;
+  if (JSON.stringify(draft.pickup) !== JSON.stringify(prev.pickup)) DRAFT.pickup = draft.pickup;
+}
 async function loadSettings() {
   try {
     const res = await fetch("/api/settings", { headers: authHeaders() });
@@ -3012,121 +3096,190 @@ async function refreshSettingsQuiet() {
     if (!res.ok) return;
     const next = normalizeSettings(await res.json());
     if (!SAVED) return;
-    // Keep the owner's unsaved edits; take the server's value for everything else.
-    Object.keys(next).forEach(function (k) {
-      if (JSON.stringify(DRAFT[k]) === JSON.stringify(SAVED[k])) DRAFT[k] = clone(next[k]);
-    });
-    SAVED = next;
+    takeSettings(next);
     const focused = document.activeElement && $("v-stock").contains(document.activeElement);
     if (!focused) renderStock();
     renderWeek();
     renderOrdersMeta();
   } catch (e) {}
 }
-function stepperHtml(id, value, unit, disabled) {
+function stepperHtml(id, value, unit, disabled, label) {
   return '<div class="stepper' + (disabled ? " dis" : "") + '"><button type="button" data-action="step" data-target="' + id + '" data-d="-1" aria-label="One less">' + ic("minus", 16) + '</button>' +
-    '<label><input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" value="' + value + '" aria-label="' + esc(unit) + '"><small>' + esc(unit) + '</small></label>' +
+    '<label><input id="' + id + '" type="number" inputmode="numeric" min="0" step="1" value="' + value + '" aria-label="' + esc(label || unit) + '"><small>' + esc(unit) + '</small></label>' +
     '<button type="button" data-action="step" data-target="' + id + '" data-d="1" aria-label="One more">' + ic("plus", 16) + "</button></div>";
 }
 function websiteStockText(n) { return n > 0 ? "Shop shows “" + plural(n, "tray") + " left this week.”" : "Shop shows “Sold out this week. Check back Wednesday.”"; }
+function hasPrice(d, v) { return v.bundles.some(function (k) { return d.prices[k] > 0; }); }
+/** On the shop: the main tray always is; anything else with stock and a price. */
+function onShop(d, v) { return v.main || (d.stock[v.id] > 0 && hasPrice(d, v)); }
+function priceLine(d, v) {
+  const p = function (i) { return d.prices[v.bundles[i]]; };
+  const parts = [];
+  if (v.format === "tray") {
+    if (p(0) > 0) parts.push("1 for " + money(p(0)));
+    if (p(1) > 0) parts.push("2 for " + money(p(1)));
+    if (p(2) > 0) parts.push("6 for " + money(p(2)));
+  } else {
+    if (p(0) > 0) parts.push(money(p(0)) + " a dozen");
+    if (p(1) > 0) parts.push(money(p(1)) + " a case");
+  }
+  return parts.join(" · ");
+}
+/** The one line under a variety: where it stands on the shop, then its prices. */
+function varSub(d, v) {
+  const pl = priceLine(d, v);
+  if (v.main) return d.stock[v.id] > 0 ? pl : "Sold out · " + pl;
+  if (!hasPrice(d, v)) return d.stock[v.id] > 0 ? "Needs a price to go on the shop" : "No prices yet";
+  return pl;
+}
+function varRow(d, v) {
+  const n = d.stock[v.id];
+  const live = onShop(d, v);
+  const warn = !v.main && n > 0 && !hasPrice(d, v);
+  const name = v.format === "tray" && v.eggs !== 30 ? v.weight + ", " + v.eggs + " pack" : v.weight;
+  return '<div class="vr-row' + (live ? "" : " off") + '" data-v="' + v.id + '">' +
+    '<button type="button" class="vr-main" data-action="st-edit" data-v="' + v.id + '" aria-label="' + esc(varTitle(v)) + ' prices">' +
+      '<span class="vr-t"><b>' + esc(name) + (v.main ? '<em class="tagm">Main</em>' : "") + "</b>" +
+      '<span class="vr-s' + (warn ? " warn" : "") + '" id="st-sub-' + v.id + '">' + esc(varSub(d, v)) + "</span></span>" +
+      '<span class="vr-go">' + ic("chevron", 16) + "</span>" +
+    "</button>" +
+    stepperHtml("st-n-" + v.id, n, unitWord(v, 2), false, varTitle(v) + " left") +
+  "</div>";
+}
+function kindCard(d, format, kind) {
+  const list = catList(format, kind);
+  if (!list.length) return "";
+  const live = list.filter(function (v) { return onShop(d, v); }).length;
+  return '<div class="card vr-card"><div class="chead"><div><h2>' + esc(KIND_NAME[kind]) + (kind === "cf" ? '<span class="h2x"> · barn laid</span>' : "") + "</h2></div>" +
+    '<span class="vr-count" id="st-live-' + format + kind + '">' + (live ? live + " on the shop" : "") + "</span></div>" +
+    '<div class="vr-list">' + list.map(function (v) { return varRow(d, v); }).join("") + "</div></div>";
+}
+function formatCount(d, format) { return catList(format).filter(function (v) { return onShop(d, v); }).length; }
 function renderStock() {
   const body = $("stock-body");
-  if (!DRAFT) {
+  if (!DRAFT || !CAT) {
     body.innerHTML = '<div class="stock-grid"><div class="card"><span class="sk" style="width:40%;height:16px"></span><span class="sk" style="height:120px;margin-top:16px"></span></div><div class="card"><span class="sk" style="width:40%;height:16px"></span><span class="sk" style="height:120px;margin-top:16px"></span></div></div>';
     return;
   }
   const d = DRAFT;
-  const dzOn = d.dozensAvailable > 0;
+  const seg = [["tray", "Trays"], ["dozen", "Dozens"]].map(function (f) {
+    const n = formatCount(d, f[0]);
+    return '<button type="button" role="tab" aria-selected="' + (ST_FORMAT === f[0]) + '" class="' + (ST_FORMAT === f[0] ? "on" : "") + '" data-action="st-format" data-f="' + f[0] + '">' + f[1] + ' <span class="c" id="st-c-' + f[0] + '">' + n + "</span></button>";
+  }).join("");
   body.innerHTML =
-    '<div class="stock-grid">' +
-      '<div class="card"><div class="chead"><div><h2>This week</h2></div></div>' +
-        '<div class="srow"><div class="t"><b>Trays left</b><span id="st-trays-note">' + esc(websiteStockText(d.traysAvailable)) + "</span></div>" + stepperHtml("st-trays", d.traysAvailable, "trays") + "</div>" +
-        '<div class="srow"><div class="t"><b>Sell dozen packs</b></div><label class="toggle"><input type="checkbox" id="st-dz-on"' + (dzOn ? " checked" : "") + ' aria-label="Sell dozen packs"><span></span></label></div>' +
-        '<div class="srow' + (dzOn ? "" : " off") + '" id="st-dz-row"><div class="t"><b>Dozen packs left</b></div>' + stepperHtml("st-dozens", d.dozensAvailable, "packs", !dzOn) + "</div>" +
-        '<div class="srow" style="display:block"><div class="t" style="margin-bottom:10px"><b>Featured tray on the homepage</b></div><div class="seg wide" role="radiogroup" aria-label="Featured tray">' +
-          WEIGHTS.map(function (w) { return '<label><input type="radio" name="st-weight" value="' + w[0] + '"' + (d.trayWeight === w[0] ? " checked" : "") + "><span>" + esc(w[1]) + "</span></label>"; }).join("") +
-        "</div></div>" +
-      "</div>" +
-      // Pickup days stay saved but aren't shown: the shop is Saturday delivery only (app.js).
-      '<div class="card"><div class="chead"><div><h2>Tray prices</h2><p class="csub">Customers pay exactly these. Your cost only changes the profit.</p></div></div>' +
-        [["tray1", "1 tray"], ["tray2", "2 trays"], ["box", "Full box"]].map(function (x) {
-          return '<div class="srow"><div class="t"><b>' + x[1] + '</b><span class="profit" id="st-pf-' + x[0] + '"></span></div><span class="money"><i>$</i><input class="inp num" id="st-' + x[0] + '" data-f="' + x[0] + '" type="number" inputmode="numeric" min="1" step="1" value="' + d.prices[x[0]] + '" aria-label="' + x[1] + ' price"></span></div>';
-        }).join("") +
-        '<div class="srow"><div class="t"><b>A box of 6 costs you</b></div><span class="money"><i>$</i><input class="inp num" id="st-boxcost" data-f="boxCost" type="number" inputmode="decimal" min="0" step="1" value="' + d.boxCost + '" aria-label="What you pay for a box of 6 trays"></span></div>' +
-      "</div>" +
-      '<div class="card st-wide"><div class="chead"><div><h2>Dozen packs</h2></div></div>' +
-        '<table class="dz"><thead><tr><th>Product</th><th>Case of 15 costs</th><th>Sell each</th><th>Profit</th></tr></thead><tbody>' +
-          DOZEN_KEYS.map(function (k) {
-            return '<tr><td class="n">' + DOZEN_LABELS[k] + '</td><td><span class="money"><i>$</i><input class="inp num" data-f="dcost" data-k="' + k + '" type="number" inputmode="decimal" min="0" step="1" value="' + d.dozenCosts[k] + '" aria-label="' + DOZEN_LABELS[k] + ' case cost"></span></td>' +
-              '<td><span class="money"><i>$</i><input class="inp num" data-f="dsell" data-k="' + k + '" id="st-dsell-' + k + '" type="number" inputmode="numeric" min="1" step="1" value="' + d.prices[k] + '" aria-label="' + DOZEN_LABELS[k] + ' sell price"></span></td>' +
-              '<td class="pf num" id="st-dpf-' + k + '"></td></tr>';
-          }).join("") +
-        '</tbody></table><div class="dz-hint" id="st-dz-hint"></div></div>' +
-    "</div>";
-  updateStockDerived();
+    '<div class="st-bar"><div class="seg" role="tablist" aria-label="Trays or dozens">' + seg + "</div></div>" +
+    '<div class="stock-grid vr-grid vr-' + ST_FORMAT + '">' + KIND_ORDER.map(function (k) { return kindCard(d, ST_FORMAT, k); }).join("") + "</div>";
   updateSaveBar();
 }
+/** After a stock change: the row's line, the kind's count and the tab counts, without redrawing. */
 function updateStockDerived() {
-  if (!DRAFT || !$("st-trays-note")) return;
+  if (!DRAFT || !CAT) return;
   const d = DRAFT;
-  $("st-trays-note").textContent = websiteStockText(d.traysAvailable);
-  const c1 = (Number(d.boxCost) || BASE_BOX_COST) / 6;
-  const pf = { tray1: d.prices.tray1 - c1, tray2: d.prices.tray2 - c1 * 2, box: d.prices.box - (Number(d.boxCost) || BASE_BOX_COST) };
-  ["tray1", "tray2", "box"].forEach(function (k) {
-    const el = $("st-pf-" + k);
-    if (!el) return;
-    el.textContent = d.prices[k] > 0 ? money(pf[k]) + " profit" : "";
-    el.classList.toggle("neg", pf[k] < 0);
+  CAT.varieties.forEach(function (v) {
+    const sub = $("st-sub-" + v.id);
+    if (!sub) return;
+    sub.textContent = varSub(d, v);
+    sub.classList.toggle("warn", !v.main && d.stock[v.id] > 0 && !hasPrice(d, v));
+    sub.closest(".vr-row").classList.toggle("off", !onShop(d, v));
   });
-  DOZEN_KEYS.forEach(function (k) {
-    const el = $("st-dpf-" + k);
+  KIND_ORDER.forEach(function (k) {
+    const el = $("st-live-" + ST_FORMAT + k);
     if (!el) return;
-    const per = (Number(d.dozenCosts[k]) || 0) / DOZENS_IN_CASE;
-    const p = (Number(d.prices[k]) || 0) - per;
-    el.textContent = (p >= 0 ? "+" : "") + money(p);
-    el.title = "Cost " + money(per) + " each";
-    el.classList.toggle("neg", p < 0);
+    const live = catList(ST_FORMAT, k).filter(function (v) { return onShop(d, v); }).length;
+    el.textContent = live ? live + " on the shop" : "";
   });
-  const on = d.dozensAvailable > 0;
-  const hint = $("st-dz-hint");
-  if (hint) hint.innerHTML = on ? chip("ok", "On the website · " + plural(d.dozensAvailable, "pack") + " left") : chip("plain", "Hidden on the website");
-  const row = $("st-dz-row");
-  if (row) row.classList.toggle("off", !on);
-  const tog = $("st-dz-on");
-  if (tog) tog.checked = on;
-  const stp = $("st-dozens");
-  if (stp) stp.closest(".stepper").classList.toggle("dis", !on);
+  ["tray", "dozen"].forEach(function (f) { const el = $("st-c-" + f); if (el) el.textContent = formatCount(d, f); });
 }
 function onStockInput(t) {
-  if (!DRAFT) return;
-  const f = t.getAttribute("data-f") || t.id;
+  if (!DRAFT || !CAT) return;
+  const m = /^st-n-(.+)$/.exec(t.id || "");
+  if (!m || !catVar(m[1])) return;
   const v = t.value === "" ? NaN : Number(t.value);
-  if (t.id === "st-trays") { if (Number.isFinite(v)) DRAFT.traysAvailable = Math.max(0, Math.floor(v)); }
-  else if (t.id === "st-dozens") {
-    if (Number.isFinite(v)) {
-      DRAFT.dozensAvailable = Math.max(0, Math.floor(v));
-      if (DRAFT.dozensAvailable > 0) rememberDozens(DRAFT.dozensAvailable);
-    }
-  }
-  // Tray prices are fixed: each one changes only when the owner types it. The box cost only moves the profit lines.
-  else if (f === "tray1" || f === "tray2" || f === "box") { if (v > 0) DRAFT.prices[f] = Math.round(v); }
-  else if (f === "boxCost") { if (Number.isFinite(v) && v >= 0) DRAFT.boxCost = v; }
-  else if (f === "dcost") {
-    const k = t.getAttribute("data-k");
-    if (Number.isFinite(v) && v >= 0) {
-      DRAFT.dozenCosts[k] = v;
-      const sug = suggestDozenSell(v);
-      DRAFT.prices[k] = sug;
-      const s = $("st-dsell-" + k);
-      if (s) s.value = sug;
-    }
-  }
-  else if (f === "dsell") { const k = t.getAttribute("data-k"); if (v > 0) DRAFT.prices[k] = Math.max(1, Math.round(v)); }
+  if (Number.isFinite(v)) DRAFT.stock[m[1]] = Math.max(0, Math.floor(v));
   updateStockDerived();
   updateSaveBar();
 }
-function rememberDozens(n) { try { localStorage.setItem("yolko_last_dozens", String(n)); } catch (e) {} }
-function lastDozens() { let n = 0; try { n = Number(localStorage.getItem("yolko_last_dozens")) || 0; } catch (e) {} return n > 0 ? n : 10; }
+function stFormat(t) {
+  ST_FORMAT = t.getAttribute("data-f") === "dozen" ? "dozen" : "tray";
+  try { localStorage.setItem("yolko_stock_format", ST_FORMAT); } catch (e) {}
+  renderStock();
+  const grid = document.querySelector("#stock-body .vr-grid");
+  if (grid) { grid.classList.remove("cascade"); void grid.offsetWidth; grid.classList.add("cascade"); }
+}
+/** Profit on one option: its price less what that many trays or dozens cost. */
+function optionProfit(v, i, price, cost) {
+  if (!(price > 0) || cost == null) return null;
+  const per = v.format === "tray" ? cost / 6 : cost / DOZENS_IN_CASE;
+  const n = v.format === "tray" ? [1, 2, 6][i] : [1, DOZENS_IN_CASE][i];
+  return price - per * n;
+}
+/** A variety's prices and cost, in a sheet that saves straight to the shop. */
+function editVariety(id) {
+  const v = catVar(id);
+  if (!v || !DRAFT) return;
+  const d = DRAFT;
+  const unit = unitWord(v, 1), units = unitWord(v, 2);
+  const names = v.format === "tray" ? ["1 " + unit, "2 " + units, "Box of 6"] : ["1 dozen", "Case of 15"];
+  const costName = v.format === "tray" ? "A box of 6 costs you" : "A case of 15 costs you";
+  const html = '<div class="vsheet">' +
+    (v.main ? "" : '<p class="vs-left">' + esc(plural(d.stock[v.id], unitWord(v, 1), unitWord(v, 2)) + " left" + (d.stock[v.id] > 0 ? "" : ". Add stock in the list to put these on the shop")) + "</p>") +
+    v.bundles.map(function (k, i) {
+      return '<label class="srow"><span class="t"><b>' + esc(names[i]) + '</b><span class="profit" id="vs-pf-' + i + '"></span></span>' +
+        '<span class="money"><i>$</i><input class="inp num" data-vi="' + i + '" type="number" inputmode="numeric" min="0" step="1" value="' + (d.prices[k] > 0 ? d.prices[k] : "") + '" placeholder="' + (v.main ? "" : "Not sold") + '" aria-label="' + esc(names[i]) + ' price"></span></label>';
+    }).join("") +
+    '<label class="srow"><span class="t"><b>' + costName + '</b></span><span class="money"><i>$</i><input class="inp num" data-vc="1" type="number" inputmode="decimal" min="0" step="1" value="' + (d.costs[v.id] != null ? d.costs[v.id] : "") + '" aria-label="' + costName + '"></span></label>' +
+    '<p class="csub vs-note">' + (v.main ? "Customers pay exactly these. Your cost only changes the profit." : "Leave a price empty to not sell that option.") + "</p></div>";
+  const read = function (wrap) {
+    const prices = v.bundles.map(function (k, i) { const x = wrap.querySelector('[data-vi="' + i + '"]').value; return x === "" ? 0 : Math.round(Number(x)); });
+    const cx = wrap.querySelector("[data-vc]").value;
+    return { prices: prices, cost: cx === "" ? null : Math.max(0, Number(cx)) };
+  };
+  const paint = function (wrap) {
+    const val = read(wrap);
+    val.prices.forEach(function (p, i) {
+      const el = wrap.querySelector("#vs-pf-" + i);
+      const pf = optionProfit(v, i, p, val.cost);
+      el.textContent = pf == null ? "" : money(pf) + " profit";
+      el.classList.toggle("neg", pf != null && pf < 0);
+    });
+  };
+  openModal({
+    title: varTitle(v),
+    cls: "vs-modal",
+    html: html,
+    actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Save", kind: "primary", value: true }],
+    onOpen: function (wrap) { paint(wrap); wrap.addEventListener("input", function () { paint(wrap); }); },
+    validate: function (wrap) {
+      const val = read(wrap);
+      if (val.prices.some(function (p) { return !Number.isFinite(p) || p < 0; })) return "Prices are whole dollars";
+      if (v.main && val.prices.some(function (p) { return !(p > 0); })) return "The main tray needs all three prices";
+      if (val.cost != null && !Number.isFinite(val.cost)) return "Type the cost in dollars";
+      return "";
+    },
+    collect: read,
+    submit: async function (val) {
+      const body = { prices: {} };
+      v.bundles.forEach(function (k, i) { body.prices[k] = val.prices[i]; });
+      if (val.cost != null) {
+        if (v.main) body.boxCost = val.cost;
+        else if (v.format === "tray") body.trayCosts = { [v.id]: val.cost };
+        else body.dozenCosts = { [v.id]: val.cost };
+      }
+      const r = await api("/api/settings", { method: "PUT", body: body });
+      if (!r.ok) return "Could not save" + (r.data.error ? ": " + r.data.error : ". Try again");
+      const before = SAVED;
+      takeSettings(normalizeSettings(r.data));
+      // What was just saved is what the owner sees, not an older unsaved edit.
+      v.bundles.forEach(function (k) { DRAFT.prices[k] = SAVED.prices[k]; });
+      DRAFT.costs[v.id] = SAVED.costs[v.id];
+      renderStock();
+      renderWeek();
+      renderOrdersMeta();
+      toast(onShop(SAVED, v) || !before ? "Saved. Live on the website now" : "Saved");
+      return "";
+    },
+  });
+}
 function updateSaveBar() {
   const slot = $("savebar-slot");
   const groups = changedGroups();
@@ -3992,8 +4145,8 @@ function renderCustomers() {
       else { const next = Math.max(1, gap - daysSince); insight = "Next order in ~" + plural(next, "day"); cls = "good"; }
     } else if (daysSince <= 10) { insight = "New. Worth a follow-up"; cls = "due"; }
     else { insight = "Quiet for " + daysSince + " days"; cls = "soft"; }
-    const meta = BUNDLE_META[favBundle];
-    const usual = WORD[favBundle] || (meta && meta.label ? meta.label.replace(/ dozen| case/, "") : "-");
+    const fav = bundleInfo(favBundle);
+    const usual = WORD[favBundle] || (fav ? fav.v.name : "-");
     return '<div class="card cc"><div class="cc-top"><span class="av">' + esc(initials(b.name)) + '</span><div class="nm"><b>' + esc(b.name || "No name") + "</b><span>" + esc(sub) + '</span></div><span class="cc-spend num">' + esc(money(b.spend)) + "</span></div>" +
       (b.history.length > 1 ? sparkline(b.history, maxV) : "") +
       '<div class="cc-stats"><div><b class="num">' + b.orders + "</b><span>" + (b.orders === 1 ? "order" : "orders") + '</span></div><div><b class="num">' + b.trays + "</b><span>" + (b.trays === 1 ? "tray" : "trays") + "</span></div><div><b>" + esc(String(favDay).slice(0, 3)) + "</b><span>usual day</span></div><div><b>" + esc(usual) + "</b><span>usually</span></div></div>" +
@@ -4005,33 +4158,67 @@ function renderCustomers() {
 
 /* ============================== competitors ============================== */
 // Other shops' egg prices. The Worker reads Coles, Aldi, IGA, Umall and Gourmet Grocer every
-// 6 hours; Costco and Woolworths block that, so their prices are typed in here. Everything is
-// worked out to 30 eggs and set against the 1 tray price. Nothing here changes YOLKO's prices.
-let PW = null, PW_FILTER = "all";
-const PW_HOUSING = { caged: "Caged", barn: "Barn laid", free_range: "Free range" };
+// 6 hours; Costco and Woolworths block that, so their prices are typed in here. Every egg is filed
+// as Stock & prices files YOLKO's own (Trays or Dozens, then kind, then weight) and set against
+// YOLKO's price for the same thing, pack for pack. Nothing here changes YOLKO's prices.
+let PW = null, PW_FORMAT = "tray";
+try { if (localStorage.getItem("yolko_pw_format") === "dozen") PW_FORMAT = "dozen"; } catch (e) {}
+const PW_HOUSING = { caged: "Cage", barn: "Cage free", free_range: "Free range" };
+const PW_KIND_HOUSING = { cage: "caged", cf: "barn", fr: "free_range" };
 const PW_TYPED_SHOPS = ["Costco", "Woolworths"];
+// The sizes a typed-in price can be: eggs:grams, grams empty when the pack doesn't say.
+const PW_SIZES = [
+  ["30:1750", "Tray of 30, 1.75kg"], ["30:1500", "Tray of 30, 1.5kg"], ["30:1000", "Tray of 30, 1kg"], ["18:1000", "18 pack, 1kg"],
+  ["30:", "Tray of 30, weight not shown"], ["18:", "18 pack, weight not shown"],
+  ["12:800", "Dozen, 800g"], ["12:700", "Dozen, 700g"], ["12:600", "Dozen, 600g"], ["12:500", "Dozen, 500g"], ["12:", "Dozen, weight not shown"],
+];
 function pwCents(n) { return (Math.round(n * 1000) / 10).toFixed(1) + "¢"; }
-function pwPer30(o) { return o.per_egg_aud * 30; }
 function pwDate(iso) { return new Date(iso).toLocaleDateString("en-AU", { timeZone: TZ, day: "numeric", month: "short" }); }
 function pwNth(n) { const t = n % 100, d = n % 10; return n + (t > 10 && t < 14 ? "th" : d === 1 ? "st" : d === 2 ? "nd" : d === 3 ? "rd" : "th"); }
-function pwMine() { const p = PW && PW.mine ? Number(PW.mine.tray1) : NaN; return Number.isFinite(p) && p > 0 ? p : null; }
-function pwVs(per30) {
-  const mine = pwMine();
+/** YOLKO's price for one of a variety (1 tray, 1 dozen), or null when it isn't priced. */
+function pwMyPrice(id) {
+  const v = varietyOf(id);
+  if (!v || !PW || !PW.mine) return null;
+  const key = v.main ? "tray1" : v.format === "tray" ? id + "-1" : id;
+  const p = Number((PW.mine.prices || {})[key] != null ? PW.mine.prices[key] : PW.mine[key]);
+  return Number.isFinite(p) && p > 0 ? p : null;
+}
+function pwMyStock(id) { const s = PW && PW.mine && PW.mine.stock; return s && s[id] != null ? Number(s[id]) : null; }
+function pwVs(price, mine) {
   if (mine == null) return "";
-  const d = Math.round((per30 - mine) * 100) / 100;
+  const d = Math.round((price - mine) * 100) / 100;
   if (Math.abs(d) < 0.01) return "Same as you";
   const a = Math.abs(d);
   return (a < 1 ? Math.round(a * 100) + "¢" : money2(a)) + (d > 0 ? " dearer" : " cheaper");
 }
 function pwAllRows() {
   if (!PW) return [];
-  return (PW.offers || []).concat(PW.typed || []).filter(function (o) { return o.per_egg_aud > 0; });
+  return (PW.offers || []).concat(PW.typed || []).filter(function (o) { return o.price_aud > 0 && o.variety; });
+}
+/** Heading for a group: "Cage 1.5kg", "Cage free 18 pack, 1kg", "Cage, other weights". */
+function pwGroupName(g) {
+  const v = varietyOf(g);
+  if (v) return v.format === "tray" && v.eggs !== 30 ? KIND_NAME[v.kind] + " " + v.eggs + " pack, " + v.weight : v.name;
+  const m = /^(cage|fr|cf)-(tray|dozen)(x18)?$/.exec(g) || [];
+  return (KIND_NAME[m[1]] || "Eggs") + (m[3] ? " 18 pack" : "") + ", other or no weight";
+}
+function pwGroupEggs(g) { const v = varietyOf(g); if (v) return v.eggs + " eggs"; return /x18$/.test(g) ? "18 eggs" : /-dozen/.test(g) ? "12 eggs" : "30 eggs"; }
+/** The order groups show in: kind, then YOLKO's own weights, then other weights. */
+function pwGroupOrder(g) {
+  const v = varietyOf(g);
+  const kind = v ? v.kind : (/^(cage|fr|cf)/.exec(g) || [])[1];
+  const k = KIND_ORDER.indexOf(kind);
+  let w = 9;
+  if (v) w = v.format === "tray" ? [1750, 1500, 1000].indexOf(v.grams) + (v.eggs === 18 ? 3 : 0) : [500, 600, 700, 800].indexOf(v.grams);
+  return k * 100 + w;
 }
 function pwFacts(o) {
   const parts = [];
   if (o.stock === "out_of_stock") parts.push("Out of stock");
-  parts.push(PW_HOUSING[o.housing] || "");
-  if (o.pack_eggs !== 30) parts.push(money2(o.price_aud) + " for " + o.pack_eggs);
+  if (!o.wclass) parts.push(o.pack_weight_g ? weightText(o.pack_weight_g) : "Weight not shown");
+  else if (Math.abs(o.pack_weight_g - o.wclass) >= 50) parts.push(weightText(o.pack_weight_g));
+  parts.push(pwCents(o.per_egg_aud) + " an egg");
+  if (o.was_aud) parts.push("was " + money2(o.was_aud));
   if (o.member_price_aud) parts.push("members " + money2(o.member_price_aud));
   if (o.limit) parts.push(o.limit);
   if (o.source === "typed") {
@@ -4041,53 +4228,65 @@ function pwFacts(o) {
   if (o.stale) parts.push("last seen " + rel(o.checked_at));
   return parts.filter(Boolean).join(" · ");
 }
-function pwRow(o, rank) {
-  const per30 = pwPer30(o);
+function pwRow(o, rank, mine) {
   const inner = '<span class="av">' + (rank ? rank : "-") + '</span><span class="min0"><span class="nm"><b>' + esc(o.shop) + '</b></span><span class="mt">' + esc(o.title) + '</span><span class="mt2">' + esc(pwFacts(o)) + '</span></span>' +
-    '<span class="rt"><span class="pr num">' + esc(money2(per30)) + '</span><span class="tm">' + esc(pwVs(per30)) + "</span></span>";
-  const label = o.shop + ", " + money2(per30) + " for 30 eggs, " + pwVs(per30);
+    '<span class="rt"><span class="pr num">' + esc(money2(o.price_aud)) + '</span><span class="tm">' + esc(pwVs(o.price_aud, mine)) + "</span></span>";
+  const label = o.shop + ", " + money2(o.price_aud) + (mine != null ? ", " + pwVs(o.price_aud, mine) : "");
   if (o.source === "typed") return '<button type="button" class="row" data-action="pw-edit" data-id="' + esc(o.id) + '" aria-label="' + esc(label + ". Change this price") + '">' + inner + "</button>";
   return '<a class="row" href="' + esc(/^https:\/\//i.test(o.url || "") ? o.url : "#") + '" target="_blank" rel="noopener" aria-label="' + esc(label + ". Open on " + o.shop) + '">' + inner + "</a>";
 }
-function pwMineRow(rank) {
-  const mine = pwMine();
-  const p = PW.mine || {};
-  return '<div class="row me"><span class="av">' + rank + '</span><span class="min0"><span class="nm"><b>You</b></span><span class="mt">Pace Farm extra large caged eggs, tray of 30</span><span class="mt2">' +
-    esc(["1 tray " + money(p.tray1), "2 for " + money(p.tray2), "6 for " + money(p.box)].join(" · ")) + '</span></span><span class="rt"><span class="pr num">' + esc(money2(mine)) + '</span><span class="tm">' + esc(pwCents(mine / 30) + " an egg") + "</span></span></div>";
+function pwMineRow(g, rank, mine) {
+  const v = varietyOf(g);
+  const p = (PW.mine && PW.mine.prices) || {};
+  const more = [];
+  if (v.format === "tray") {
+    const two = p[v.main ? "tray2" : g + "-2"], box = p[v.main ? "box" : g + "-box"];
+    if (two > 0) more.push("2 for " + money(two));
+    if (box > 0) more.push("6 for " + money(box));
+  } else if (p[g + "case"] > 0) more.push("case of 15 " + money(p[g + "case"]));
+  const n = pwMyStock(g);
+  const stock = n == null ? "" : n > 0 ? plural(n, unitWord(v, 1), unitWord(v, 2)) + " in stock" : v.main ? "Sold out" : "Not on the shop, none in stock";
+  const what = v.main ? "Pace Farm extra large cage eggs, tray of 30" : "Your " + v.name.charAt(0).toLowerCase() + v.name.slice(1) + (v.format === "dozen" ? " dozen" : v.eggs === 30 ? " tray" : "");
+  return '<div class="row me"><span class="av">' + rank + '</span><span class="min0"><span class="nm"><b>You</b></span><span class="mt">' + esc(what) + '</span><span class="mt2">' +
+    esc([stock].concat(more).filter(Boolean).join(" · ")) + '</span></span><span class="rt"><span class="pr num">' + esc(money(mine)) + '</span><span class="tm">' + esc(pwCents(mine / v.eggs) + " an egg") + "</span></span></div>";
 }
 function pwAddRow(shop) {
   return '<button type="button" class="row add" data-action="pw-add" data-shop="' + esc(shop) + '"><span class="av">' + ic("plus", 18) + '</span><span class="min0"><span class="nm"><b>' + esc(shop) + '</b></span><span class="mt">Blocks automatic checks</span><span class="mt2">Type in the price you see</span></span><span class="rt"><span class="chip plain">Add price</span></span></button>';
 }
-function pwListHtml() {
-  const mine = pwMine();
-  const rows = pwAllRows().filter(pwShown);
-  const live = rows.filter(function (o) { return o.stock !== "out_of_stock"; }).sort(function (a, b) { return a.per_egg_aud - b.per_egg_aud; });
-  const out = rows.filter(function (o) { return o.stock === "out_of_stock"; });
-  let html = "", rank = 0, placed = mine == null;
+/** Every group for Trays or Dozens: YOLKO's price ranked among the shops selling the same thing. */
+function pwGroups(format) {
+  const map = {};
+  pwAllRows().filter(function (o) { return o.format === format; }).forEach(function (o) { (map[o.variety] = map[o.variety] || []).push(o); });
+  // The main tray always shows, even when no shop lists that size.
+  if (format === "tray" && !map[MAIN_V]) map[MAIN_V] = [];
+  return Object.keys(map).sort(function (a, b) { return pwGroupOrder(a) - pwGroupOrder(b) || a.localeCompare(b); }).map(function (g) { return { id: g, rows: map[g] }; });
+}
+function pwGroupHtml(grp) {
+  const mine = varietyOf(grp.id) ? pwMyPrice(grp.id) : null;
+  const live = grp.rows.filter(function (o) { return o.stock !== "out_of_stock"; }).sort(function (a, b) { return a.price_aud - b.price_aud; });
+  const out = grp.rows.filter(function (o) { return o.stock === "out_of_stock"; });
+  let html = "", rank = 0, placed = mine == null, rk = "";
   live.forEach(function (o) {
-    if (!placed && mine <= pwPer30(o) + 0.004) { html += pwMineRow(++rank); placed = true; }
-    html += pwRow(o, ++rank);
+    if (!placed && mine <= o.price_aud + 0.004) { html += pwMineRow(grp.id, ++rank, mine); placed = true; }
+    html += pwRow(o, ++rank, mine);
   });
-  if (!placed) html += pwMineRow(++rank);
-  out.forEach(function (o) { html += pwRow(o, 0); });
-  PW_TYPED_SHOPS.forEach(function (shop) {
-    const has = (PW.typed || []).some(function (o) { return o.shop.toLowerCase() === shop.toLowerCase(); });
-    if (!has && PW_FILTER === "all") html += pwAddRow(shop);
-  });
+  if (!placed) html += pwMineRow(grp.id, ++rank, mine);
+  out.forEach(function (o) { html += pwRow(o, 0, mine); });
+
+  if (mine != null && live.length) {
+    const cheaper = live.filter(function (o) { return o.price_aud < mine - 0.004; }).length;
+    rk = cheaper ? "You're " + pwNth(cheaper + 1) + " of " + (live.length + 1) : "You're cheapest";
+  }
+  return '<section class="pwg"><div class="pwg-h"><div class="min0"><b>' + esc(pwGroupName(grp.id)) + '</b><span>' + esc(pwGroupEggs(grp.id)) + '</span></div><span class="pwg-rk">' + esc(rk) + "</span></div>" +
+    '<div class="pwl">' + html + "</div>" + (grp.rows.length ? "" : '<p class="csub pwg-none">No shop we check lists this size right now.</p>') + "</section>";
+}
+function pwListHtml() {
+  const groups = pwGroups(PW_FORMAT);
+  let html = groups.map(pwGroupHtml).join("");
+  if (!groups.length) html = '<p class="csub pwg-none">No shop we check has ' + (PW_FORMAT === "dozen" ? "dozens" : "trays") + " right now.</p>";
+  const missing = PW_TYPED_SHOPS.filter(function (shop) { return !(PW.typed || []).some(function (o) { return o.shop.toLowerCase() === shop.toLowerCase(); }); });
+  if (missing.length) html += '<section class="pwg"><div class="pwl">' + missing.map(pwAddRow).join("") + "</div></section>";
   return html;
-}
-function pwShown(o) {
-  if (PW_FILTER === "caged") return o.housing === "caged";
-  if (PW_FILTER === "free") return o.housing !== "caged";
-  return true;
-}
-function pwYourRank() {
-  const mine = pwMine();
-  if (mine == null) return "";
-  const live = pwAllRows().filter(function (o) { return o.stock !== "out_of_stock" && pwShown(o); });
-  const cheaper = live.filter(function (o) { return pwPer30(o) < mine - 0.004; }).length;
-  if (!cheaper) return "You're the cheapest of " + (live.length + 1);
-  return "You're " + pwNth(cheaper + 1) + " cheapest of " + (live.length + 1);
 }
 function pwChange(ch) {
   let line = "";
@@ -4112,22 +4311,23 @@ function renderPriceWatch() {
   const body = $("pw-body");
   if (!PW) return;
   renderPwSub();
-  const mine = pwMine();
+  const mine = pwMyPrice(MAIN_V);
   const costco = (PW.typed || []).filter(function (o) { return o.shop.toLowerCase() === "costco"; })[0];
-  const others = pwAllRows().filter(function (o) { return o.stock !== "out_of_stock" && !o.stale; }).sort(function (a, b) { return a.per_egg_aud - b.per_egg_aud; });
-  const low = others[0];
+  // The cheapest cage tray of 30 anywhere, whatever its weight: what a shopper sets a YOLKO tray against.
+  const low = pwAllRows().filter(function (o) { return o.kind === "cage" && o.pack_eggs === 30 && o.stock !== "out_of_stock" && !o.stale; }).sort(function (a, b) { return a.price_aud - b.price_aud; })[0];
   const events = PW.events || [];
-  const seg = [["all", "All"], ["caged", "Caged"], ["free", "Cage free"]].map(function (f) {
-    return '<button type="button" class="' + (PW_FILTER === f[0] ? "on" : "") + '" data-action="pw-filter" data-f="' + f[0] + '">' + f[1] + "</button>";
+  const seg = [["tray", "Trays"], ["dozen", "Dozens"]].map(function (f) {
+    const n = pwGroups(f[0]).length;
+    return '<button type="button" role="tab" aria-selected="' + (PW_FORMAT === f[0]) + '" class="' + (PW_FORMAT === f[0] ? "on" : "") + '" data-action="pw-filter" data-f="' + f[0] + '">' + f[1] + ' <span class="c">' + n + "</span></button>";
   }).join("");
   body.innerHTML =
     '<div class="kpis three">' +
-      kpi("Your tray", mine == null ? "-" : money(mine), mine == null ? "" : pwCents(mine / 30) + " an egg", "", "", "tag") +
+      kpi("Your tray", mine == null ? "-" : money(mine), mine == null ? "" : "Cage 1.75kg · " + pwCents(mine / 30) + " an egg", "", "", "tag") +
       kpi("Costco", costco ? money2(costco.price_aud) : "-", costco ? (costco.member_price_aud ? "Members " + money2(costco.member_price_aud) : "30 pack on DoorDash") : "Not typed in yet", "", "", "receipt") +
-      kpi("Cheapest", low ? money2(pwPer30(low)) : "-", low ? low.shop + (low.limit ? ", " + low.limit : "") : "", "", "", "trend") +
+      kpi("Cheapest", low ? money2(low.price_aud) : "-", low ? "Cage tray, " + low.shop + (low.pack_weight_g ? " " + weightText(low.pack_weight_g) : "") : "", "", "", "trend") +
     "</div>" +
-    '<div class="card"><div class="chead pw-head"><div><h2>30 eggs at each shop</h2><p class="csub" id="pw-rank">' + esc(pwYourRank()) + '</p></div><div class="seg" role="tablist" aria-label="Kind of eggs">' + seg + "</div></div>" +
-      '<div class="pwl cascade" id="pw-list">' + pwListHtml() + "</div>" +
+    '<div class="card"><div class="chead pw-head"><div><h2>Same eggs at each shop</h2></div><div class="seg" role="tablist" aria-label="Trays or dozens">' + seg + "</div></div>" +
+      '<div class="cascade" id="pw-list">' + pwListHtml() + "</div>" +
       '<p class="csub pw-note">Coles, Aldi, IGA, Umall and Gourmet Grocer update by themselves every 6 hours. Costco and Woolworths block that, so their prices are typed in.</p>' +
     "</div>" +
     '<div class="card"><div class="chead"><div><h2>Recent changes</h2></div></div><div class="feed">' +
@@ -4159,23 +4359,30 @@ async function pollPriceWatchNow() {
   toast(!r.data.ran ? "Checked a moment ago" : failed ? "Checked. " + plural(failed, "shop") + " didn't answer" : r.data.changeCount ? plural(r.data.changeCount, "price change") : "Checked. No changes");
 }
 function pwFilter(t) {
-  PW_FILTER = t.getAttribute("data-f") || "all";
-  qsa('[data-action="pw-filter"]').forEach(function (b) { b.classList.toggle("on", b === t); });
+  PW_FORMAT = t.getAttribute("data-f") === "dozen" ? "dozen" : "tray";
+  try { localStorage.setItem("yolko_pw_format", PW_FORMAT); } catch (e) {}
+  qsa('[data-action="pw-filter"]').forEach(function (b) { const on = b === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
   const list = $("pw-list");
   if (!list) return;
   list.innerHTML = pwListHtml();
-  $("pw-rank").textContent = pwYourRank();
   list.classList.remove("cascade"); void list.offsetWidth; list.classList.add("cascade");
 }
 function pwSheet(o, shop) {
   const isNew = !o;
-  const v = o || { shop: shop || "", title: shop === "Costco" ? "Pace Farm caged eggs 30 pack, on DoorDash" : "", housing: "caged", pack_eggs: 30, price_aud: "", member_price_aud: "", url: "" };
+  const v = o || { shop: shop || "", title: shop === "Costco" ? "Pace Farm caged eggs 30 pack, on DoorDash" : "", housing: "caged", pack_eggs: PW_FORMAT === "dozen" ? 12 : 30, pack_weight_g: null, price_aud: "", member_price_aud: "", url: "" };
   const kinds = ["caged", "barn", "free_range"].map(function (h) { return '<label><input type="radio" name="pw-h" value="' + h + '"' + (v.housing === h ? " checked" : "") + "><span>" + PW_HOUSING[h] + "</span></label>"; }).join("");
+  // The size the pack is filed under; a size this list doesn't have stays as it was.
+  const cur = v.pack_eggs + ":" + (v.pack_weight_g || "");
+  const near = PW_SIZES.filter(function (s) { return s[0] === cur; })[0] ||
+    PW_SIZES.filter(function (s) { return o && o.wclass && s[0] === v.pack_eggs + ":" + o.wclass; })[0];
+  const sizes = PW_SIZES.slice();
+  if (!near) sizes.push([cur, v.pack_eggs + " eggs" + (v.pack_weight_g ? ", " + weightText(v.pack_weight_g) : "")]);
+  const pick = near ? near[0] : cur;
   const html = '<div class="pw-form">' +
-    '<div class="two"><label class="field"><span>Shop</span><input class="inp" id="pw-shop" type="text" maxlength="40" autocomplete="off" value="' + esc(v.shop) + '" placeholder="Woolworths"' + (isNew && !shop ? " autofocus" : "") + '></label>' +
-    '<label class="field"><span>Eggs in the pack</span><input class="inp num" id="pw-eggs" type="number" inputmode="numeric" min="1" max="60" step="1" value="' + esc(v.pack_eggs) + '"></label></div>' +
-    '<label class="field"><span>What it is</span><input class="inp" id="pw-title" type="text" maxlength="120" autocomplete="off" value="' + esc(v.title) + '" placeholder="Pace Farm caged eggs 30 pack"></label>' +
+    '<label class="field"><span>Shop</span><input class="inp" id="pw-shop" type="text" maxlength="40" autocomplete="off" value="' + esc(v.shop) + '" placeholder="Woolworths"' + (isNew && !shop ? " autofocus" : "") + "></label>" +
     '<div class="field"><span>Kind</span><div class="seg wide" role="radiogroup" aria-label="Kind of eggs">' + kinds + "</div></div>" +
+    '<label class="field"><span>Size</span><select class="inp dd" id="pw-size">' + sizes.map(function (s) { return '<option value="' + esc(s[0]) + '"' + (s[0] === pick ? " selected" : "") + ">" + esc(s[1]) + "</option>"; }).join("") + "</select></label>" +
+    '<label class="field"><span>What it is</span><input class="inp" id="pw-title" type="text" maxlength="120" autocomplete="off" value="' + esc(v.title) + '" placeholder="Pace Farm caged eggs 30 pack"></label>' +
     '<div class="two"><label class="field"><span>Price</span><span class="money"><i>$</i><input class="inp num" id="pw-price" type="number" inputmode="decimal" min="0" step="0.01" value="' + esc(v.price_aud) + '"' + (shop || !isNew ? " autofocus" : "") + "></span></label>" +
     '<label class="field"><span>Member price, if any</span><span class="money"><i>$</i><input class="inp num" id="pw-member" type="number" inputmode="decimal" min="0" step="0.01" value="' + esc(v.member_price_aud == null ? "" : v.member_price_aud) + '"></span></label></div>' +
     '<label class="field"><span>Link, if you have one</span><input class="inp" id="pw-url" type="url" inputmode="url" autocomplete="off" value="' + esc(v.url || "") + '" placeholder="https://"></label>' +
@@ -4189,19 +4396,19 @@ function pwSheet(o, shop) {
     actions: actions,
     validate: function (w) {
       if (!w.querySelector("#pw-shop").value.trim()) return "Enter the shop";
-      const n = Number(w.querySelector("#pw-eggs").value);
-      if (!(n >= 1 && n <= 60)) return "Enter how many eggs are in the pack";
       if (!(Number(w.querySelector("#pw-price").value) > 0)) return "Enter the price";
       return "";
     },
     collect: function (w) {
       const h = w.querySelector('input[name="pw-h"]:checked');
+      const size = String(w.querySelector("#pw-size").value || "30:").split(":");
       return {
         id: isNew ? "" : v.id,
         shop: w.querySelector("#pw-shop").value.trim(),
         title: w.querySelector("#pw-title").value.trim(),
         housing: h ? h.value : "caged",
-        pack_eggs: Number(w.querySelector("#pw-eggs").value),
+        pack_eggs: Number(size[0]) || 30,
+        pack_weight_g: Number(size[1]) > 0 ? Number(size[1]) : null,
         price_aud: w.querySelector("#pw-price").value,
         member_price_aud: w.querySelector("#pw-member").value,
         url: w.querySelector("#pw-url").value.trim(),
@@ -4211,6 +4418,9 @@ function pwSheet(o, shop) {
       const r = await api("/api/price-watch/typed", { method: "POST", body: body });
       if (!r.ok) return r.data.error || "Not saved. Try again";
       toast(body.shop + " price saved");
+      // Show the list the new price is filed under.
+      const fmt = body.pack_eggs === 12 ? "dozen" : "tray";
+      if (fmt !== PW_FORMAT) { PW_FORMAT = fmt; try { localStorage.setItem("yolko_pw_format", fmt); } catch (e) {} }
       loadPriceWatch();
       return "";
     },
@@ -4733,6 +4943,8 @@ const ACTIONS = {
   theme: function (t) { setTheme(t.getAttribute("data-t") || ""); },
   "save": saveSettings,
   "discard": discardSettings,
+  "st-edit": function (t) { editVariety(t.getAttribute("data-v")); },
+  "st-format": stFormat,
   "step": function (t) {
     const input = $(t.getAttribute("data-target"));
     if (!input) return;
@@ -4777,14 +4989,7 @@ document.addEventListener("input", function (e) {
 });
 document.addEventListener("change", function (e) {
   const t = e.target;
-  if (t.id === "st-dz-on") {
-    if (t.checked) { DRAFT.dozensAvailable = DRAFT.dozensAvailable > 0 ? DRAFT.dozensAvailable : lastDozens(); }
-    else { if (DRAFT.dozensAvailable > 0) rememberDozens(DRAFT.dozensAvailable); DRAFT.dozensAvailable = 0; }
-    const s = $("st-dozens"); if (s) s.value = DRAFT.dozensAvailable;
-    updateStockDerived(); updateSaveBar(); return;
-  }
-  if (t.name === "st-weight") { DRAFT.trayWeight = t.value; updateSaveBar(); return; }
-  if (t.id === "st-trays" || t.id === "st-dozens") { if (t.value === "") { t.value = 0; onStockInput(t); } return; }
+  if (/^st-n-/.test(t.id || "")) { if (t.value === "") { t.value = 0; onStockInput(t); } return; }
   if (t.id === "im-cat") { AF.cat = t.value; renderAssets(); return; }
   if (t.id === "im-view") { AF.view = t.value; renderAssets(); return; }
   if (t.id === "im-all") { ASSET_VISIBLE_IDS.forEach(function (id) { if (t.checked) ASSET_SELECTED[id] = true; else delete ASSET_SELECTED[id]; }); renderAssets(); return; }

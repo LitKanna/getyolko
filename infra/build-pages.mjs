@@ -27,7 +27,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "154";
+const CSS_V = "155";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";

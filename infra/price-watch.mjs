@@ -13,8 +13,9 @@
  * Costco only sells eggs through DoorDash, which blocks bots and bans scraping in its terms.
  * Those two are typed in by the owner (TYPED_KEY) and shown with the date they were typed.
  *
- * From the two big shops we keep the cheapest egg per housing (caged, barn, free range) plus
- * every tray of 24 or more, which is what a YOLKO tray of 30 competes with.
+ * Every egg is filed the way YOLKO's own catalogue is (catalogue.mjs): dozens or trays, then the
+ * kind (cage, free range, cage free; barn laid IS cage free), then the weight class. From the big
+ * shops we keep the cheapest egg in each of those groups, so Admin can set like against like.
  */
 
 const LATEST_KEY = "pricewatch:v2:latest";
@@ -28,6 +29,9 @@ const MIN_GAP_MS = 60 * 1000;
 const UA = "Mozilla/5.0 (compatible; YolkoPriceCheck/2.0; +https://getyolko.com)";
 
 const HOUSINGS = ["caged", "barn", "free_range"];
+// The rules for which eggs are kept. A new version doesn't fill Recent changes with "new on the list".
+const PICK_V = 3;
+const KIND_OF = { caged: "cage", barn: "cf", free_range: "fr" };
 
 const COLES_URL = "https://www.coles.com.au/browse/dairy-eggs-fridge/eggs";
 const ALDI_URL = "https://www.aldi.com.au/products/dairy-eggs-fridge/eggs/k/1111111162";
@@ -140,18 +144,41 @@ function eggRow(o) {
   };
 }
 
-/** Cheapest egg per housing at a big shop, plus every tray of 24 or more. */
-function pickForShop(rows) {
-  const ok = rows.filter((r) => r && HOUSINGS.includes(r.housing));
-  const keep = new Map();
-  for (const h of HOUSINGS) {
-    const pool = ok.filter((r) => r.housing === h && r.stock !== "out_of_stock");
-    if (!pool.length) continue;
-    const best = pool.reduce((a, b) => (b.per_egg_aud < a.per_egg_aud ? b : a));
-    keep.set(best.id, best);
+/**
+ * Where an egg sits next to YOLKO's own: dozen (12) or tray (30, or an 18 pack), its kind, and
+ * the nearest weight class. variety matches a catalogue id (cage1750, cf600, cage1000x18) when
+ * the weight is close enough, otherwise "cage-tray" and so on: same kind and size, other weight.
+ */
+function groupOf(o) {
+  const kind = KIND_OF[o?.housing] || null;
+  const eggs = Number(o?.pack_eggs);
+  const format = eggs === 12 ? "dozen" : eggs === 30 || eggs === 18 ? "tray" : null;
+  if (!kind || !format) return { format: null, kind, wclass: null, variety: null };
+  const classes = format === "dozen" ? [500, 600, 700, 800] : eggs === 18 ? [1000] : [1000, 1500, 1750];
+  const g = Number(o.pack_weight_g) || 0;
+  let wclass = null;
+  if (g) {
+    const best = classes.reduce((a, b) => (Math.abs(b - g) < Math.abs(a - g) ? b : a));
+    if (Math.abs(best - g) <= (format === "dozen" ? 100 : 150)) wclass = best;
   }
-  for (const r of ok) if (r.pack_eggs >= 24) keep.set(r.id, r);
-  return [...keep.values()];
+  const x18 = eggs === 18 ? "x18" : "";
+  return { format, kind, wclass, variety: wclass ? `${kind}${wclass}${x18}` : `${kind}-${format}${x18}` };
+}
+
+const withGroup = (o) => ({ ...o, ...groupOf(o) });
+
+/** The cheapest egg a big shop has in each group (in stock first). Other pack sizes are left out. */
+function pickForShop(rows) {
+  const best = new Map();
+  for (const r of rows) {
+    if (!r || !HOUSINGS.includes(r.housing)) continue;
+    const { variety } = groupOf(r);
+    if (!variety) continue;
+    const cur = best.get(variety);
+    const out = (x) => (x.stock === "out_of_stock" ? 1 : 0);
+    if (!cur || out(r) < out(cur) || (out(r) === out(cur) && r.price_aud < cur.price_aud)) best.set(variety, r);
+  }
+  return [...best.values()];
 }
 
 async function getText(url) {
@@ -411,7 +438,7 @@ async function getTyped(env) {
 
 function typedView(o) {
   const per = o.price_aud && o.pack_eggs ? Math.round((o.price_aud / o.pack_eggs) * 10000) / 10000 : null;
-  return { ...o, per_egg_aud: per, stock: "in_stock", source: "typed" };
+  return withGroup({ ...o, per_egg_aud: per, stock: "in_stock", source: "typed" });
 }
 
 /** Add or change a typed-in price (Costco, Woolworths, anything the Worker can't read). */
@@ -444,7 +471,10 @@ async function saveTyped(env, body) {
     title: title || (housing === "caged" ? "Caged" : housing === "barn" ? "Barn laid" : "Free range") + " eggs " + eggs + " pack",
     housing,
     pack_eggs: eggs,
-    pack_weight_g: Number(body?.pack_weight_g) > 0 ? Math.round(Number(body.pack_weight_g)) : (prev?.pack_weight_g ?? null),
+    // The size picker always sends a weight, or null for "weight not shown".
+    pack_weight_g: body?.pack_weight_g === undefined
+      ? (prev?.pack_weight_g ?? null)
+      : Number(body.pack_weight_g) > 0 ? Math.min(5000, Math.round(Number(body.pack_weight_g))) : null,
     price_aud: price,
     member_price_aud: member,
     url,
@@ -483,7 +513,7 @@ async function priceWatchView(env, limit = 30) {
     updatedAt: latest?.updatedAt || null,
     nextAt: latest?.updatedAt ? new Date(Date.parse(latest.updatedAt) + EVERY_MS).toISOString() : null,
     sources: latest?.sources || {},
-    offers: latest?.offers || [],
+    offers: (latest?.offers || []).map(withGroup),
     typed: typed.map(typedView),
     events: events.slice(0, limit),
   };
@@ -495,8 +525,10 @@ async function runPoll(env, { force = false } = {}) {
   const age = prev?.updatedAt ? Date.now() - Date.parse(prev.updatedAt) : Infinity;
   if (!force && age < MIN_GAP_MS) return { ran: false };
   const { offers, sources, checkedAt } = await checkAll(prev?.offers || []);
-  const changes = diffOffers(prev?.offers || [], offers);
-  await env.DATA.put(LATEST_KEY, JSON.stringify({ v: 2, updatedAt: checkedAt, sources, offers }));
+  // After the rules change, eggs that only joined or left because of the new rules aren't news.
+  const sameRules = prev?.v === PICK_V;
+  const changes = diffOffers(prev?.offers || [], offers).filter((c) => sameRules || c.type === "price" || c.type === "stock");
+  await env.DATA.put(LATEST_KEY, JSON.stringify({ v: PICK_V, updatedAt: checkedAt, sources, offers }));
   await pushEvents(env, changes);
   await notifyWebhook(env, changes);
   return { ran: true, changeCount: changes.length };
@@ -521,6 +553,7 @@ export {
   checkAll,
   diffOffers,
   eggRow,
+  groupOf,
   pickForShop,
   cleanTitle,
   eggsOf,
