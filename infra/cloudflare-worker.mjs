@@ -743,6 +743,46 @@ function orderRef(order) {
   return String(order.id || "").slice(-6).toUpperCase();
 }
 
+// Customer emails share the site's look: ivory page, black text, the yellow logo dot, one font.
+const EMAIL_C = { canvas: "#faf7f0", paper: "#fffefb", ink: "#171714", ink2: "#3d3b36", muted: "#6d6b64", line: "#e5e0d5", subtle: "#f3efe6", yellow: "#ffd32a" };
+// Single quotes only: this sits inside style="..." attributes.
+const EMAIL_FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
+const EMAIL_WA = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+
+function emailRow(label, value) {
+  const C = EMAIL_C;
+  return `<tr><td style="padding:7px 0;color:${C.muted}">${htmlEscape(label)}</td><td style="padding:7px 0;text-align:right;color:${C.ink}">${htmlEscape(value)}</td></tr>`;
+}
+
+/** The shaded box under an email's lead line: a small label, a bold line, then more lines. */
+function emailPanel(label, strong, lines) {
+  const C = EMAIL_C;
+  return `<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">${htmlEscape(label)}</span><strong style="font-weight:600">${htmlEscape(strong)}</strong>${lines.map((l) => `<br>${htmlEscape(l)}`).join("")}</td></tr></table></td></tr>`;
+}
+
+/** A whole customer email around `rows` (table rows inside the white card), ending with the help line. */
+function emailFrame({ subject, preheader, title, rows, help }) {
+  const C = EMAIL_C;
+  const FONT = EMAIL_FONT;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
+<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
+<body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.canvas}">${htmlEscape(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}"><tr><td align="center" style="padding:28px 12px 32px;font-family:${FONT}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;font-family:${FONT}">
+<tr><td style="padding:0 4px 16px"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:${C.yellow};vertical-align:middle"></span><span style="font-size:18px;line-height:22px;font-weight:800;color:${C.ink};letter-spacing:-0.3px;vertical-align:middle;padding-left:8px">YOLKO</span></td></tr>
+<tr><td style="background:${C.paper};border:1px solid ${C.line};border-radius:16px;padding:28px 24px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">${htmlEscape(title)}</td></tr>
+${rows}
+<tr><td style="padding-top:22px;font-size:14px;line-height:21px;color:${C.muted}">${htmlEscape(help)} Reply to this email or message us on <a href="${EMAIL_WA}" style="color:${C.ink};text-decoration:underline">WhatsApp</a>.</td></tr>
+</table>
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a></td></tr>
+</table>
+</td></tr></table></body></html>`;
+}
+
 function buildOrderEmail(order) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
   const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
@@ -752,29 +792,19 @@ function buildOrderEmail(order) {
   const where = order.deliveryAddress || "Your delivery address";
   const ref = orderRef(order);
   const receipt = order.stripe?.receiptUrl || "";
-  const wa = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+  const wa = EMAIL_WA;
   const subject = `Your YOLKO order is confirmed (#${ref})`;
-
-  // Same look as the site: ivory page, black text, the yellow logo dot, one font.
-  const C = { canvas: "#faf7f0", paper: "#fffefb", ink: "#171714", ink2: "#3d3b36", muted: "#6d6b64", line: "#e5e0d5", subtle: "#f3efe6", yellow: "#ffd32a" };
-  // Single quotes only: this sits inside style="..." attributes.
-  const FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
-  const row = (label, value) =>
-    `<tr><td style="padding:7px 0;color:${C.muted}">${htmlEscape(label)}</td><td style="padding:7px 0;text-align:right;color:${C.ink}">${htmlEscape(value)}</td></tr>`;
+  const C = EMAIL_C;
+  const row = emailRow;
   const preheader = `Order #${ref} is confirmed. Delivery on ${when}.`;
 
-  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
-<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
-<body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.canvas}">${htmlEscape(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.canvas};font-family:${FONT}"><tr><td align="center" style="padding:28px 12px 32px;font-family:${FONT}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;font-family:${FONT}">
-<tr><td style="padding:0 4px 16px"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:${C.yellow};vertical-align:middle"></span><span style="font-size:18px;line-height:22px;font-weight:800;color:${C.ink};letter-spacing:-0.3px;vertical-align:middle;padding-left:8px">YOLKO</span></td></tr>
-<tr><td style="background:${C.paper};border:1px solid ${C.line};border-radius:16px;padding:28px 24px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="font-size:22px;line-height:28px;font-weight:700;color:${C.ink};letter-spacing:-0.2px">Thanks ${htmlEscape(first)}, your eggs are booked</td></tr>
-<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
-<tr><td style="padding-top:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:12px"><tr><td style="padding:14px 16px;font-size:15px;line-height:22px;color:${C.ink}"><span style="display:block;font-size:12px;line-height:16px;color:${C.muted};padding-bottom:4px">Delivery</span><strong style="font-weight:600">${htmlEscape(when)}</strong><br>${htmlEscape(where)}</td></tr></table></td></tr>
+  const html = emailFrame({
+    subject,
+    preheader,
+    title: `Thanks ${first}, your eggs are booked`,
+    help: "Questions or need to change something?",
+    rows: `<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">We have your payment and your order is confirmed. We deliver on ${htmlEscape(when)}.</td></tr>
+${emailPanel("Delivery", when, [where])}
 <tr><td style="padding-top:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:20px">
 ${row("Order", "#" + ref)}
 ${row("Item", `${qty} x ${item}`)}
@@ -782,13 +812,8 @@ ${order.subtotal != null ? row("Subtotal", money(order.subtotal)) : ""}
 ${Number(order.deliveryFee) > 0 ? row("Delivery", money(order.deliveryFee)) : order.deliveryPerk ? row("Delivery", "Free") : ""}
 <tr><td style="padding:12px 0 0;border-top:1px solid ${C.line};font-weight:700;color:${C.ink}">Total paid</td><td style="padding:12px 0 0;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink}">${htmlEscape(money(total))} AUD</td></tr>
 </table></td></tr>
-${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:${C.ink};color:${C.paper};text-decoration:none;font-weight:600;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">View receipt</a></td></tr>` : ""}
-<tr><td style="padding-top:22px;font-size:14px;line-height:21px;color:${C.muted}">Questions or need to change something? Reply to this email or message us on <a href="${wa}" style="color:${C.ink};text-decoration:underline">WhatsApp</a>.</td></tr>
-</table>
-</td></tr>
-<tr><td style="padding:16px 4px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Fresh eggs delivered in Sydney · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a></td></tr>
-</table>
-</td></tr></table></body></html>`;
+${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" style="display:inline-block;background:${C.ink};color:${C.paper};text-decoration:none;font-weight:600;font-size:15px;line-height:20px;padding:13px 22px;border-radius:12px">View receipt</a></td></tr>` : ""}`,
+  });
 
   const text = [
     `Thanks ${first}, your eggs are booked.`,
@@ -810,18 +835,79 @@ ${receipt ? `<tr><td style="padding-top:24px"><a href="${htmlEscape(receipt)}" s
   return { subject, html, text };
 }
 
+function buildRefundEmail(order, refund) {
+  const first = String(order.name || "").split(/\s+/)[0] || "there";
+  const item = BUNDLE_CHECKOUT_LABELS[order.bundle] || "Eggs";
+  const qty = Math.max(1, Number(order.quantity) || 1);
+  const ref = orderRef(order);
+  const amount = money(refund.amount);
+  const currency = String(refund.currency || "AUD").toUpperCase();
+  const paid = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
+  const partial = Number(refund.amount) + 0.001 < Number(paid);
+  // completes: this refund pays back everything left after earlier partial refunds.
+  const rest = partial && refund.completes;
+  const card = order.stripe?.cardLast4
+    ? `${order.stripe.cardBrand ? order.stripe.cardBrand.toUpperCase() + " " : ""}card ending ${order.stripe.cardLast4}`
+    : "your original payment method";
+  const subject = `Your YOLKO refund (#${ref})`;
+  const lead = rest
+    ? `We've refunded the rest of your order, ${amount} ${currency}.`
+    : partial
+      ? `We've refunded part of your order, ${amount} ${currency}.`
+      : `We've refunded your order in full, ${amount} ${currency}.`;
+  const timing = "Refunds usually take 5 to 10 business days to reach your account, depending on your bank.";
+  const C = EMAIL_C;
+
+  const html = emailFrame({
+    subject,
+    preheader: `Your refund of ${amount} for order #${ref} is on its way.`,
+    title: `Hi ${first}, your refund is on its way`,
+    help: "Questions about your refund?",
+    rows: `<tr><td style="padding-top:8px;font-size:15px;line-height:22px;color:${C.ink2}">${htmlEscape(lead)}</td></tr>
+${emailPanel("Refunded to", card.charAt(0).toUpperCase() + card.slice(1), [timing])}
+<tr><td style="padding-top:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:20px">
+${emailRow("Order", "#" + ref)}
+${emailRow("Item", `${qty} x ${item}`)}
+${partial && paid != null ? emailRow("Paid", `${money(paid)} AUD`) : ""}
+<tr><td style="padding:12px 0 0;border-top:1px solid ${C.line};font-weight:700;color:${C.ink}">Amount refunded</td><td style="padding:12px 0 0;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink}">${htmlEscape(amount)} ${htmlEscape(currency)}</td></tr>
+</table></td></tr>`,
+  });
+
+  const text = [
+    `Hi ${first}, your refund is on its way.`,
+    "",
+    lead,
+    timing,
+    "",
+    `Order #${ref}`,
+    `${qty} x ${item}`,
+    partial && paid != null ? `Paid: ${money(paid)} AUD` : null,
+    `Refunded to: ${card}`,
+    `Amount refunded: ${amount} ${currency}`,
+    "",
+    `Questions? Reply to this email or WhatsApp us: ${EMAIL_WA}`,
+    "YOLKO · getyolko.com",
+  ].filter((l) => l !== null).join("\n");
+
+  return { subject, html, text };
+}
+
 /**
  * Send the confirmation via ZeptoMail. Returns { ok, skipped?, error? }.
  * test: admin sample send, marked [Test] in the subject and never copied to the shop.
  */
 async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
+  return sendCustomerEmail(env, order, buildOrderEmail(order), { test });
+}
+
+/** Send one YOLKO email to the order's customer through Zoho CPaaS (the ZeptoMail API). */
+async function sendCustomerEmail(env, order, { subject, html, text }, { test = false } = {}) {
   const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
   const from = String(env.ORDER_EMAIL_FROM || "").trim();
   const to = String(order.stripe?.email || order.email || "").trim();
   if (!token || !from) return { ok: false, skipped: true, reason: "email not configured" };
   if (!to) return { ok: false, skipped: true, reason: "no customer email" };
 
-  const { subject, html, text } = buildOrderEmail(order);
   const payload = {
     from: { address: from, name: STRIPE_BRAND },
     to: [{ email_address: { address: to, name: order.name || "" } }],
@@ -856,6 +942,175 @@ async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
     return { ok: false, transient: resp.status >= 500 || resp.status === 429, error: String(error).slice(0, 300) };
   }
   return { ok: true, to, requestId: data?.request_id || null };
+}
+
+const refundEmailKey = (refundId) => `email:refund:${refundId}`;
+const refundTryKey = (refundId) => `email:refund:try:${refundId}`;
+
+// Refunds made before this (when refund emails and charge.refunded handling
+// went live) are never emailed or recorded retroactively.
+const REFUND_EMAIL_LAUNCH = Date.parse("2026-11-03T08:45:00Z");
+
+/**
+ * Email the customer about one refund, once. Each refund has a single sender
+ * and a single retry path: the admin Refund button for refunds it creates
+ * (retried by the cron), the webhook for refunds made in the Stripe
+ * dashboard (retried by Stripe redelivering). The marker stops resends.
+ */
+async function maybeSendRefundEmail(env, order, refund) {
+  if (!emailConfigured(env)) return { ok: false, skipped: true, reason: "email not configured" };
+  if (!refund?.id || !(Number(refund.amount) > 0)) return { ok: false, skipped: true, reason: "no refund" };
+  const key = refundEmailKey(refund.id);
+  if (await env.DATA.get(key)) return { ok: true, already: true };
+  const result = await sendCustomerEmail(env, order, buildRefundEmail(order, refund)).catch((err) => ({
+    ok: false,
+    error: String(err?.message || err),
+  }));
+  try {
+    if (result.ok) {
+      await env.DATA.put(key, JSON.stringify({ sentAt: new Date().toISOString(), to: result.to, requestId: result.requestId, orderId: order.id }));
+    } else {
+      console.log("refund email not sent", order.id, refund.id, result.error || result.reason);
+      const prev = (await env.DATA.get(refundTryKey(refund.id), "json")) || {};
+      await env.DATA.put(
+        refundTryKey(refund.id),
+        JSON.stringify({ orderId: order.id, attempts: (prev.attempts || 0) + 1, lastTriedAt: new Date().toISOString(), lastError: result.error || result.reason }),
+        { expirationTtl: 4 * 24 * 3600 }
+      );
+    }
+  } catch (err) {
+    // Bookkeeping only; never turn a sent email into a failure.
+    console.log("refund email bookkeeping failed", refund.id, String(err?.message || err));
+  }
+  return result;
+}
+
+/**
+ * Cron retry for failed admin refund emails, found by their try keys so an
+ * order's place in the order index doesn't matter. Dashboard refunds retry
+ * through Stripe redelivering instead.
+ */
+async function retryRefundEmails(env, now) {
+  const listed = await env.DATA.list({ prefix: refundTryKey("") }).catch(() => null);
+  for (const { name } of listed?.keys || []) {
+    const refundId = name.slice(refundTryKey("").length);
+    const tries = await env.DATA.get(name, "json").catch(() => null);
+    if (!tries?.orderId || (tries.attempts || 0) >= EMAIL_MAX_ATTEMPTS) continue;
+    if (now - (Date.parse(tries.lastTriedAt || "") || 0) < 10 * 60000) continue;
+    const order = await env.DATA.get(tries.orderId, "json").catch(() => null);
+    const s = order?.stripe || {};
+    const refundedAt = Date.parse(s.refundedAt || "") || 0;
+    if (order?.paymentStatus !== "refunded" || s.refundId !== refundId || s.refundSource === "stripe") continue;
+    if (refundedAt < REFUND_EMAIL_LAUNCH || now - refundedAt < WEBHOOK_GRACE_SEC * 1000 || now - refundedAt > 3 * 24 * 3600 * 1000) continue;
+    if (await env.DATA.get(refundEmailKey(refundId))) continue;
+    await maybeSendRefundEmail(env, order, { id: refundId, amount: s.refundAmount, currency: s.refundCurrency, completes: true })
+      .catch((err) => console.log("refund email retry failed", tries.orderId, String(err?.message || err)));
+  }
+}
+
+async function stripeGet(env, path, timeoutMs = 10000) {
+  try {
+    const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+      headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return await resp.json();
+  } catch (err) {
+    return { error: { message: String(err?.message || err) } };
+  }
+}
+
+const liveRefunds = (charge) =>
+  (charge?.refunds?.data || []).filter((r) => r.status !== "failed" && r.status !== "canceled");
+// Refunds the charge.refunded webhook records and emails: made outside the
+// admin (the Refund button tags its refunds with metadata.orderId) since launch.
+const webhookRefunds = (charge) =>
+  liveRefunds(charge).filter((r) => !r.metadata?.orderId && Number(r.created) * 1000 >= REFUND_EMAIL_LAUNCH);
+const hasAdminRefund = (charge) => liveRefunds(charge).some((r) => r.metadata?.orderId);
+
+/** A paid order's charge with its refunds, or null. */
+async function fetchChargeWithRefunds(env, { paymentIntentId, chargeId }, timeoutMs) {
+  if (paymentIntentId) {
+    const pi = await stripeGet(env, `payment_intents/${encodeURIComponent(paymentIntentId)}?expand[]=latest_charge.refunds`, timeoutMs);
+    return pi.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+  }
+  if (chargeId) {
+    const charge = await stripeGet(env, `charges/${encodeURIComponent(chargeId)}?expand[]=refunds`, timeoutMs);
+    return charge.error ? null : charge;
+  }
+  return null;
+}
+
+/**
+ * A full refund made in the Stripe dashboard in the last WEBHOOK_GRACE_SEC.
+ * The webhook records it (status and stock), and this location's copy of the
+ * order may not show that yet: admin paths must not apply it a second time.
+ */
+function webhookRefundPending(charge) {
+  const own = webhookRefunds(charge);
+  if (charge?.refunded !== true || !own.length || hasAdminRefund(charge)) return false;
+  return Date.now() / 1000 - Math.max(...own.map((r) => Number(r.created) || 0)) < WEBHOOK_GRACE_SEC;
+}
+
+/**
+ * charge.refunded: record refunds made outside the admin (Stripe dashboard)
+ * and email the customer. Refunds created by /api/refund carry
+ * metadata.orderId; that path records and emails them itself.
+ */
+async function handleChargeRefunded(env, chargeId) {
+  if (!/^(ch|py)_/.test(String(chargeId || ""))) return { ignored: "no charge" };
+  const charge = await stripeGet(env, `charges/${encodeURIComponent(chargeId)}?expand[]=refunds`);
+  if (charge.error) return { error: charge.error.message || "stripe error" };
+  const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+  if (!piId) return { ignored: "no payment intent" };
+  const external = webhookRefunds(charge);
+  if (!external.length) return { ignored: "no dashboard refunds" };
+  const sessions = await stripeGet(env, `checkout/sessions?payment_intent=${encodeURIComponent(piId)}&limit=1`);
+  if (sessions.error) return { error: sessions.error.message || "stripe error" };
+  const orderId = sessions.data?.[0]?.metadata?.orderId;
+  if (!String(orderId || "").startsWith("order:")) return { ignored: "no order" };
+  const order = await env.DATA.get(orderId, "json");
+  if (!order) return { ignored: "order not found" };
+  // A refund of a second payment for the same order (a duplicate checkout)
+  // leaves the order, its stock and the customer's emails alone.
+  if (order.stripe?.paymentIntentId && order.stripe.paymentIntentId !== piId) return { ignored: "not the order's payment" };
+
+  const currency = String(charge.currency || "aud").toUpperCase();
+  const amountRefunded = Number(charge.amount_refunded) / 100;
+  if (hasAdminRefund(charge)) {
+    // The admin Refund button finished this charge and records the order itself.
+  } else if (charge.refunded === true && order.paymentStatus !== "refunded") {
+    order.paymentStatus = "refunded";
+    order.status = "cancelled";
+    order.stripe = {
+      ...(order.stripe || {}),
+      refundId: external[0].id,
+      refundStatus: external[0].status,
+      refundAmount: amountRefunded,
+      refundCurrency: currency,
+      refundedAt: new Date().toISOString(),
+      refundSource: "stripe",
+    };
+    await syncStock(env, order, "cancelled");
+    await env.DATA.put(orderId, JSON.stringify(order));
+  } else if (order.stripe?.amountRefunded !== amountRefunded) {
+    order.stripe = { ...(order.stripe || {}), amountRefunded, refundCurrency: currency };
+    await env.DATA.put(orderId, JSON.stringify(order));
+  }
+  // The newest refund on a fully refunded charge pays back whatever was left.
+  const newest = liveRefunds(charge).reduce((a, r) => (!a || Number(r.created) > Number(a.created) ? r : a), null);
+  let sent = 0;
+  let failed = 0;
+  for (const r of external) {
+    const completes = charge.refunded === true && r.id === newest?.id;
+    const res = await maybeSendRefundEmail(env, order, { id: r.id, amount: Number(r.amount) / 100, currency, completes });
+    if (res.ok && !res.already) sent++;
+    else if (!res.ok && res.transient) failed++;
+  }
+  // Stripe redelivers on an error response: the order writes above are
+  // idempotent and the markers stop resending emails that went out.
+  if (failed) return { orderId, emailsSent: sent, error: "refund email failed" };
+  return { orderId, refunds: external.length, emailsSent: sent };
 }
 
 /** Record a payment the live paths missed, from a fresh copy, and email the customer. */
@@ -1896,6 +2151,7 @@ async function emailStatus(env) {
  * 1. Paid Checkout Sessions (last 26 h) whose order is still unpaid: the
  *    webhook was missed (wrong secret, outage) and so was the success page.
  * 2. Recent paid orders with no confirmation email yet: retried a few times.
+ * 3. Admin refunds whose refund email failed: retried the same way.
  */
 async function reconcileOrders(env) {
   if (env.STRIPE_KEY) {
@@ -1939,6 +2195,7 @@ async function reconcileOrders(env) {
       await maybeSendOrderEmail(env, id).catch((err) => console.log("email retry failed", id, String(err?.message || err)));
     }
   }
+  await retryRefundEmails(env, now);
 }
 
 // How many physical trays an order consumes (dozen packs do not use tray stock)
@@ -2854,6 +3111,10 @@ async function handleApi(request, env, url, ctx) {
     if (!ok) return json({ error: "bad signature" }, 400);
 
     const event = JSON.parse(payload);
+    if (event.type === "charge.refunded") {
+      const result = await handleChargeRefunded(env, event.data?.object?.id);
+      return json({ received: true, ...result }, result.error ? 502 : 200);
+    }
     const handled = ["checkout.session.completed", "checkout.session.async_payment_succeeded"];
     if (!handled.includes(event.type)) return json({ received: true, ignored: event.type });
 
@@ -2947,7 +3208,7 @@ async function handleApi(request, env, url, ctx) {
     });
   }
 
-  // Admin: send a sample confirmation to any address (one a minute)
+  // Admin: send a sample confirmation or refund email to any address (one a minute)
   if (url.pathname === "/api/admin/test-email" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
     if (!emailConfigured(env)) return json({ ok: false, error: "Email sending isn't set up" }, 503);
@@ -2969,7 +3230,9 @@ async function handleApi(request, env, url, ctx) {
       deliveryAddress: "1 Example St, Sydney NSW",
       stripe: { email: to },
     };
-    const result = await sendOrderConfirmationEmail(env, sample, { test: true });
+    const result = body?.kind === "refund"
+      ? await sendCustomerEmail(env, sample, buildRefundEmail(sample, { id: "re_test", amount: sample.price, currency: "AUD" }), { test: true })
+      : await sendOrderConfirmationEmail(env, sample, { test: true });
     return json(result, result.ok ? 200 : 502);
   }
 
@@ -3552,7 +3815,10 @@ async function handleApi(request, env, url, ctx) {
 
     const refundParams = new URLSearchParams({
       reason: "requested_by_customer",
+      // metadata.orderId marks refunds made here: the charge.refunded webhook
+      // leaves those to this path (one sender per refund email).
       "metadata[orderId]": id,
+      "metadata[source]": "yolko-admin",
       "metadata[customerName]": String(order.name || "").slice(0, 80),
     });
     if (paymentIntentId) refundParams.set("payment_intent", paymentIntentId);
@@ -3571,13 +3837,40 @@ async function handleApi(request, env, url, ctx) {
       // Already fully refunded in Stripe. sync local state
       const msg = String(refund.error.message || "");
       if (/already been refunded|has already been refunded/i.test(msg)) {
+        const charge = await fetchChargeWithRefunds(env, { paymentIntentId, chargeId });
+        if (webhookRefundPending(charge)) {
+          return json({ ok: true, already: true, syncing: true, stripe: order.stripe || null });
+        }
+        // A refund this button made whose request failed before saving it:
+        // record it now and send its email (the marker stops a second copy).
+        const mine = liveRefunds(charge).find((r) => r.metadata?.orderId === id);
         order.paymentStatus = "refunded";
         order.status = "cancelled";
+        if (mine && !order.stripe?.refundId) {
+          order.stripe = {
+            ...(order.stripe || {}),
+            refundId: mine.id,
+            refundStatus: mine.status,
+            refundAmount: Number(mine.amount) / 100,
+            refundCurrency: String(mine.currency || "aud").toUpperCase(),
+            refundedAt: new Date(Number(mine.created) * 1000).toISOString(),
+            paymentIntentId: paymentIntentId || order.stripe?.paymentIntentId || null,
+          };
+        }
         const stock = await syncStock(env, order, "cancelled");
         await env.DATA.put(id, JSON.stringify(order));
+        const refundEmail = mine && Number(mine.created) * 1000 >= REFUND_EMAIL_LAUNCH
+          ? await maybeSendRefundEmail(env, order, {
+            id: mine.id,
+            amount: Number(mine.amount) / 100,
+            currency: String(mine.currency || "aud").toUpperCase(),
+            completes: true,
+          })
+          : null;
         return json({
           ok: true,
           already: true,
+          refundEmail: refundEmail && { ok: Boolean(refundEmail.ok), skipped: Boolean(refundEmail.skipped), error: refundEmail.error || null },
           traysAvailable: stock.traysAvailable,
           stockDelta: stock.delta,
           stripe: order.stripe || null,
@@ -3599,6 +3892,13 @@ async function handleApi(request, env, url, ctx) {
     };
     const stock = await syncStock(env, order, "cancelled");
     await env.DATA.put(id, JSON.stringify(order));
+    // A failed send is retried by the cron.
+    const refundEmail = await maybeSendRefundEmail(env, order, {
+      id: refund.id,
+      amount: order.stripe.refundAmount,
+      currency: order.stripe.refundCurrency,
+      completes: true,
+    });
 
     return json({
       ok: true,
@@ -3607,6 +3907,7 @@ async function handleApi(request, env, url, ctx) {
       currency: order.stripe.refundCurrency,
       status: refund.status,
       email: order.stripe.email || null,
+      refundEmail: { ok: Boolean(refundEmail.ok), skipped: Boolean(refundEmail.skipped), error: refundEmail.error || null },
       traysAvailable: stock.traysAvailable,
       stockDelta: stock.delta,
       stripe: order.stripe,
@@ -3622,6 +3923,13 @@ async function handleApi(request, env, url, ctx) {
     if (!id.startsWith("order:") || !status) return json({ error: "bad request" }, 400);
     const order = await env.DATA.get(id, "json");
     if (!order) return json({ error: "not found" }, 404);
+    if (order.paymentStatus === "paid" && order.stripe?.paymentIntentId && env.STRIPE_KEY) {
+      // Fails open: a slow Stripe never blocks order updates.
+      const charge = await fetchChargeWithRefunds(env, { paymentIntentId: order.stripe.paymentIntentId }, 4000);
+      if (webhookRefundPending(charge)) {
+        return json({ error: "Refunded in Stripe a moment ago. Refresh in a minute." }, 409);
+      }
+    }
     const stock = await syncStock(env, order, status);
     order.status = status;
     await env.DATA.put(id, JSON.stringify(order));
@@ -3987,7 +4295,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "118",
+          "X-Yolko-Admin": "119",
         },
       });
     }
