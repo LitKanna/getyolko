@@ -10,7 +10,7 @@ import { qrcode } from "qrcode-generator";
 import ADMIN_HTML from "./admin.html";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "8709b9b4e7d926790473778ad91fa3968df55dd5";
+const DEPLOY_SHA = "7c9c99d75cc36ae703068a876fdebd5320358531";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -4867,7 +4867,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "221",
+      "X-Yolko-Build": "222",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
