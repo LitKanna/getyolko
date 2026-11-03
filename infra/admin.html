@@ -3212,6 +3212,19 @@ async function loadMail(folder, more) {
   if (folder === "inbox" && r.ok && !more) { MAIL_UNREAD = (r.data.messages || []).filter(function (m) { return m.unread; }).length; renderNav(); }
   if (S.view === "emails") renderEmails();
   if (S.selectedId && S.view === "orders") renderDetail(true);
+  if (r.ok && !more && S.view === "emails") mailWarmTop(folder);
+}
+/** Read the newest few messages ahead, two at a time, so opening them is instant. */
+function mailWarmTop(folder) {
+  const box = MAIL[folder];
+  const list = (box && box.messages ? box.messages.slice(0, 6) : []).filter(function (m) { return !PREVIEWS["mail:" + m.folderId + ":" + m.messageId]; });
+  let i = 0;
+  function next() {
+    const m = list[i++];
+    if (!m || S.view !== "emails") return;
+    mailFetch(m, false).then(function () { setTimeout(next, 150); });
+  }
+  setTimeout(function () { next(); next(); }, 500);
 }
 async function pollUnread() {
   if (!mailConnected() || document.hidden) return;
@@ -3578,6 +3591,52 @@ function mailMsg(folder, id) {
   const box = MAIL[folder];
   return id && box ? box.messages.find(function (x) { return x.folderId + ":" + x.messageId === id; }) || null : null;
 }
+/* Opening a message: the request starts when the pointer rests on the row or presses it, so the
+ * message (with its small pictures inside, see MAIL_EMBED_EACH in the worker) is often here by the
+ * time the tap lands. One request per message, however many times it's asked for. */
+const MAIL_FETCHING = {};
+function mailFetch(m, markRead) {
+  const key = "mail:" + m.folderId + ":" + m.messageId;
+  if (PREVIEWS[key]) return Promise.resolve({ ok: true, data: PREVIEWS[key] });
+  if (MAIL_FETCHING[key]) {
+    if (markRead) api("/api/admin/mail/flag", { method: "POST", body: { messageId: m.messageId, read: true } });
+    return MAIL_FETCHING[key];
+  }
+  const job = api("/api/admin/mail/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + (markRead ? "&markRead=1" : "")).then(function (r) {
+    delete MAIL_FETCHING[key];
+    if (r.ok) { PREVIEWS[key] = r.data; mailWarmPictures(r.data); }
+    return r;
+  });
+  MAIL_FETCHING[key] = job;
+  return job;
+}
+/** Start loading the message's web pictures and photo tiles before it's on screen. */
+function mailWarmPictures(full) {
+  const seen = {};
+  const urls = [];
+  String(full.html || "").replace(/\b(?:src|background)\s*=\s*["']?([^"'\s>]*\/api\/admin\/mail\/(?:image|inline)\?[^"'\s>]+)/gi, function (m, u) {
+    u = u.replace(/&amp;/g, "&");
+    if (!seen[u] && urls.length < 24) { seen[u] = 1; urls.push(u); }
+    return m;
+  });
+  (full.attachments || []).forEach(function (a) { if (a.kind === "image" && urls.length < 30) urls.push(a.url); });
+  urls.forEach(function (u) { const i = new Image(); i.decoding = "async"; i.referrerPolicy = "no-referrer"; i.src = u; });
+}
+let mailWarmTimer = 0;
+function mailWarm(row) {
+  const m = row && mailMsg(row.getAttribute("data-folder"), row.getAttribute("data-id"));
+  if (m) mailFetch(m, false);
+}
+document.addEventListener("pointerover", function (e) {
+  if (e.pointerType !== "mouse") return;
+  const row = e.target.closest && e.target.closest('[data-action="open-mail"]');
+  clearTimeout(mailWarmTimer);
+  if (row) mailWarmTimer = setTimeout(function () { mailWarm(row); }, 120);
+});
+document.addEventListener("pointerdown", function (e) {
+  const row = e.target.closest && e.target.closest('[data-action="open-mail"]');
+  if (row) mailWarm(row);
+}, { passive: true });
 function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
 async function renderMailDetail(pane, folder) {
   const id = S.mailSel[folder];
@@ -3610,11 +3669,19 @@ async function renderMailDetail(pane, folder) {
     '<div class="ep-body" id="ep-body"><span class="sk" style="max-width:640px;height:300px;margin:0 auto;border-radius:12px"></span></div></div>';
   watchEmailScroll(pane);
   if (!full) {
-    const r = await api("/api/admin/mail/message?folderId=" + encodeURIComponent(m.folderId) + "&messageId=" + encodeURIComponent(m.messageId) + (m.unread ? "&markRead=1" : ""));
+    const r = await mailFetch(m, m.unread);
     if (!r.ok) { const b = $("ep-body"); if (b && S.mailSel[folder] === id) b.innerHTML = '<div class="empty-state">' + ic("alert", 28) + "<b>Could not open this message</b><p>" + esc(r.data.error || "Try again") + "</p></div>"; return; }
-    PREVIEWS[key] = r.data;
     if (m.unread) { m.unread = false; MAIL_UNREAD = Math.max(0, MAIL_UNREAD - 1); renderNav(); renderEmails(); return; }
     if (S.mailSel[folder] === id && S.emailFilter === folder) renderMailDetail(pane, folder);
+    return;
+  }
+  if (m.unread) {
+    // Read ahead of the tap (see mailWarm), so it's marked read on its own.
+    m.unread = false;
+    MAIL_UNREAD = Math.max(0, MAIL_UNREAD - 1);
+    api("/api/admin/mail/flag", { method: "POST", body: { messageId: m.messageId, read: true } });
+    renderNav();
+    renderEmails();
     return;
   }
   const b = $("ep-body");

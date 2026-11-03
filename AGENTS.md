@@ -120,6 +120,13 @@ about a week). Files are served with `nosniff` and, for pictures and text, a san
 runs as a page on getyolko.com. The admin shows attachments at the end of the message like Mail
 (pictures as tiles that open in the lightbox, files as chips), tries a web picture straight from its
 host if the proxy can't get it, and hides a picture that still won't load unless it has alt text.
+Speed: every Zoho call crosses the Pacific, so a message's Zoho answers, its inline pictures and its
+attachments (up to 25 MB) are kept in the Cloudflare Cache API for 30 days under signed keys
+(messages don't change), and opening one again takes about 10 ms. Inline pictures up to 400 KB (2 MB
+a message) come inside the message as `data:` URLs, so they show with the text; the message waits at
+most 2 s for them, then sends links. The admin starts loading a message when the mouse rests on its
+row or a finger presses it, reads the newest six ahead when the Inbox opens, and preloads web
+pictures and photo tiles; marking read happens separately so the read-ahead doesn't mark anything.
 Delivery status (delivered, opened, clicked, bounced, spam) comes from the Zoho CPaaS webhook
 `POST /api/zoho/email-events` (set in CPaaS > Agents > agent_1 > Webhooks). Zoho webhooks carry no
 credentials, so there is no token: an event only counts when its request id matches an

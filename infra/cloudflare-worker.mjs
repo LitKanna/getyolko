@@ -1243,8 +1243,9 @@ function zohoMailHostFor(accountsUrl) {
 }
 
 function b64(bytes) {
+  const u = new Uint8Array(bytes);
   let s = "";
-  for (const b of new Uint8Array(bytes)) s += String.fromCharCode(b);
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
   return btoa(s);
 }
 
@@ -1616,7 +1617,7 @@ function mailImageTarget(raw) {
  * style="...url()" and <style> blocks. Remote <img>s keep their address in data-yolko-orig, so the
  * admin can try it directly if the proxy can't get it.
  */
-async function rewriteMailImages(env, origin, html, { folderId, messageId, inline = [] }) {
+async function rewriteMailImages(env, origin, html, { folderId, messageId, inline = [], embed = null }) {
   html = String(html || "");
   const x = mailFileExpiry();
   const own = new URL(origin).host;
@@ -1637,7 +1638,10 @@ async function rewriteMailImages(env, origin, html, { folderId, messageId, inlin
     const part = same || (n ? inline[Number(n[1]) - 1] : null) || null;
     const cid = same ? normCid(same.cid) : t.cid || (part ? normCid(part.cid) : "");
     if (!cid && !part) return links.set(key, null);
-    links.set(key, mailInlineLink(env, origin, folderId, messageId, cid, part ? part.attachmentId : "", x).then((href) => ({ href })));
+    const attId = part ? part.attachmentId : "";
+    const link = () => mailInlineLink(env, origin, folderId, messageId, cid, attId, x).then((href) => ({ href }));
+    // Small pictures go right into the message (see MAIL_EMBED_EACH), the rest load by link.
+    links.set(key, embed ? embed(cid, attId).then((d) => (d ? { href: d } : link())) : link());
   };
 
   const TAG = /<([a-z][\w:-]*)((?:\s+(?:[^\s"'>/=]+)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*(\/?)>/gi;
@@ -1755,6 +1759,119 @@ async function mailImageResponse(resp, maxAge) {
   return new Response(body, {
     headers: { "Content-Type": type, "Content-Security-Policy": MAIL_SANDBOX, "Cache-Control": `private, max-age=${maxAge}`, ...MAIL_FILE_HEADERS },
   });
+}
+
+/* A message never changes once it arrives, so what Zoho says about it (and its inline
+ * pictures) is kept in this data centre's cache. Opening it again then skips Zoho, which is
+ * the slow part: every call to Zoho crosses the Pacific. Keys are signed, so they can't be
+ * guessed, and the Cache API is only read by this code. */
+const MAIL_CACHE_SECS = 30 * 86400;
+// Inline pictures up to this size go straight into the message, so they show with the text.
+const MAIL_EMBED_EACH = 400 * 1024;
+const MAIL_EMBED_TOTAL = 2 * 1024 * 1024;
+// How long the message waits for its inline pictures before sending links instead.
+const MAIL_EMBED_WAIT = 2000;
+// Which way of asking Zoho for an inline picture worked last ("cid" or "att"), so it goes first.
+let mailInlineWay = "cid";
+
+async function mailCacheKey(env, kind, parts) {
+  const sig = await mailSign(env, `cache\n${kind}\n${parts.join("\n")}`);
+  return new Request(`https://getyolko.com/__yolko-mail-cache/${kind}/${sig}`);
+}
+
+function mailCacheKeep(ctx, job) {
+  job = job.catch(() => null);
+  if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(job);
+  return job;
+}
+
+/** Keep a download in the cache while it streams to the browser, unless it's over 25 MB. */
+async function mailCacheStream(cache, key, stream) {
+  const reader = stream.getReader();
+  const parts = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAIL_IMAGE_MAX) {
+      await reader.cancel().catch(() => null);
+      return;
+    }
+    parts.push(value);
+  }
+  if (!size) return;
+  const buf = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) {
+    buf.set(p, at);
+    at += p.byteLength;
+  }
+  await cache.put(key, new Response(buf, { headers: { "Content-Type": "application/octet-stream", "Cache-Control": `max-age=${MAIL_CACHE_SECS}` } }));
+}
+
+/** A Zoho Mail JSON answer about one message, from the cache when we have it. */
+async function zohoMailCached(env, auth, ctx, path) {
+  const cache = globalThis.caches?.default;
+  const key = cache ? await mailCacheKey(env, "api", [path]).catch(() => null) : null;
+  if (key) {
+    const hit = await cache.match(key).catch(() => null);
+    const data = hit ? await hit.json().catch(() => null) : null;
+    if (data) return data;
+  }
+  const data = await zohoMailFetch(env, auth, path);
+  if (key && data?.data) {
+    mailCacheKeep(ctx, cache.put(key, new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${MAIL_CACHE_SECS}` } })));
+  }
+  return data;
+}
+
+/** The bytes of a Zoho download when they are a picture: { type, buf }, or null. */
+async function mailPictureBytes(resp) {
+  if (!resp?.ok) return null;
+  if (Number(resp.headers.get("Content-Length")) > MAIL_IMAGE_MAX) return null;
+  const buf = await resp.arrayBuffer().catch(() => null);
+  if (!buf || !buf.byteLength || buf.byteLength > MAIL_IMAGE_MAX) return null;
+  let type = String(resp.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase().replace("image/jpg", "image/jpeg");
+  if (!MAIL_IMAGE_TYPES.has(type)) type = sniffImage(buf);
+  return type ? { type, buf } : null;
+}
+
+/** One inline picture of a message, by its Content-ID (and Zoho's part id when known). */
+async function mailInlinePicture(env, auth, ctx, accountId, folderId, messageId, cid, attId) {
+  const cache = globalThis.caches?.default;
+  const key = cache ? await mailCacheKey(env, "inl", [accountId, folderId, messageId, cid, attId]).catch(() => null) : null;
+  if (key) {
+    const hit = await cache.match(key).catch(() => null);
+    const buf = hit ? await hit.arrayBuffer().catch(() => null) : null;
+    if (buf?.byteLength) return { type: hit.headers.get("Content-Type") || "application/octet-stream", buf };
+  }
+  const base = `/accounts/${encodeURIComponent(accountId)}/folders/${folderId}/messages/${messageId}`;
+  const get = async (path) => mailPictureBytes(await zohoMailFetch(env, auth, path, { raw: true, timeout: 30000 }).catch(() => null));
+  const byCid = cid ? () => get(`${base}/inline?contentId=${encodeURIComponent(cid)}`) : null;
+  const byAtt = /^[\w.-]{1,80}$/.test(attId) ? () => get(`${base}/attachments/${attId}`) : null;
+  const ways = mailInlineWay === "att" ? [["att", byAtt], ["cid", byCid]] : [["cid", byCid], ["att", byAtt]];
+  let out = null;
+  for (const [way, ask] of ways) {
+    if (!ask) continue;
+    out = await ask();
+    if (out) {
+      mailInlineWay = way;
+      break;
+    }
+  }
+  if (!out) {
+    // Look the part up again in case Zoho's ids moved on.
+    const info = await zohoMailFetch(env, auth, `${base}/attachmentinfo?includeInline=true`).catch(() => null);
+    const parts = Array.isArray(info?.data?.inline) ? info.data.inline : [];
+    const hit = parts.find((p) => cid && cidKey(p.cid || p.contentId) === cidKey(cid));
+    if (hit?.attachmentId && String(hit.attachmentId) !== attId) out = await get(`${base}/attachments/${encodeURIComponent(hit.attachmentId)}`);
+    if (!out && hit?.cid && normCid(hit.cid) !== cid) out = await get(`${base}/inline?contentId=${encodeURIComponent(normCid(hit.cid))}`);
+  }
+  if (out && key) {
+    mailCacheKeep(ctx, cache.put(key, new Response(out.buf.slice(0), { headers: { "Content-Type": out.type, "Cache-Control": `max-age=${MAIL_CACHE_SECS}` } })));
+  }
+  return out;
 }
 
 /** Content-Disposition with the real file name (RFC 6266 / 5987). */
@@ -3712,18 +3829,22 @@ async function handleApi(request, env, url, ctx) {
     try {
       const acct = await zohoMailAccount(env, auth);
       const base = `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}`;
+      if (url.searchParams.get("markRead") === "1") {
+        // Marking it read doesn't hold up the message.
+        mailCacheKeep(
+          ctx,
+          zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/updatemessage`, {
+            method: "PUT",
+            body: { mode: "markAsRead", messageId: [messageId] },
+          })
+        );
+      }
       const [content, details, files] = await Promise.all([
-        zohoMailFetch(env, auth, `${base}/content`),
-        zohoMailFetch(env, auth, `${base}/details`).catch(() => null),
-        zohoMailFetch(env, auth, `${base}/attachmentinfo?includeInline=true`).catch(() => null),
+        zohoMailCached(env, auth, ctx, `${base}/content`),
+        zohoMailCached(env, auth, ctx, `${base}/details`).catch(() => null),
+        zohoMailCached(env, auth, ctx, `${base}/attachmentinfo?includeInline=true`).catch(() => null),
       ]);
       const d = details?.data || {};
-      if (url.searchParams.get("markRead") === "1") {
-        await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/updatemessage`, {
-          method: "PUT",
-          body: { mode: "markAsRead", messageId: [messageId] },
-        }).catch(() => null);
-      }
       // Inline pictures and attachments load through signed links to this site (see rewriteMailImages).
       const inline = (Array.isArray(files?.data?.inline) ? files.data.inline : []).map((p) => ({
         cid: String(p.cid || p.contentId || ""),
@@ -3741,7 +3862,18 @@ async function handleApi(request, env, url, ctx) {
           return { id, name, size: Number(a.attachmentSize) || 0, kind, url: open, download };
         })
       );
-      const html = await rewriteMailImages(env, url.origin, String(content?.data?.content || ""), { folderId, messageId, inline }).catch(() => String(content?.data?.content || ""));
+      // Small inline pictures come inside the message, so they show at once with the text.
+      const until = Date.now() + MAIL_EMBED_WAIT;
+      let room = MAIL_EMBED_TOTAL;
+      const embed = async (cid, attId) => {
+        const job = mailCacheKeep(ctx, mailInlinePicture(env, auth, ctx, acct.accountId, folderId, messageId, cid, attId));
+        const pic = await Promise.race([job, new Promise((r) => setTimeout(r, Math.max(0, until - Date.now()), null))]);
+        if (!pic || pic.buf.byteLength > MAIL_EMBED_EACH || pic.buf.byteLength > room) return null;
+        room -= pic.buf.byteLength;
+        return `data:${pic.type};base64,${b64(pic.buf)}`;
+      };
+      const raw = String(content?.data?.content || "");
+      const html = await rewriteMailImages(env, url.origin, raw, { folderId, messageId, inline, embed }).catch(() => raw);
       return json({
         ok: true,
         html,
@@ -3820,21 +3952,12 @@ async function handleApi(request, env, url, ctx) {
     if (!auth) return mailMiss(503);
     try {
       const acct = await zohoMailAccount(env, auth);
-      const base = `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}`;
+      const pic = await mailInlinePicture(env, auth, ctx, acct.accountId, folderId, messageId, cid, attId);
+      if (!pic) return mailMiss(404);
       const maxAge = Math.max(0, Number(x) - Math.floor(Date.now() / 1000));
-      const tryPath = async (path) => mailImageResponse(await zohoMailFetch(env, auth, path, { raw: true, timeout: 30000 }).catch(() => null), maxAge).catch(() => null);
-      let out = null;
-      if (cid) out = await tryPath(`${base}/inline?contentId=${encodeURIComponent(cid)}`);
-      if (!out && /^[\w.-]{1,80}$/.test(attId)) out = await tryPath(`${base}/attachments/${attId}`);
-      if (!out) {
-        // Look the part up again in case Zoho's ids moved on.
-        const info = await zohoMailFetch(env, auth, `${base}/attachmentinfo?includeInline=true`).catch(() => null);
-        const parts = Array.isArray(info?.data?.inline) ? info.data.inline : [];
-        const hit = parts.find((p) => cid && cidKey(p.cid || p.contentId) === cidKey(cid));
-        if (hit?.attachmentId && String(hit.attachmentId) !== attId) out = await tryPath(`${base}/attachments/${encodeURIComponent(hit.attachmentId)}`);
-        if (!out && hit?.cid && normCid(hit.cid) !== cid) out = await tryPath(`${base}/inline?contentId=${encodeURIComponent(normCid(hit.cid))}`);
-      }
-      return out || mailMiss(404);
+      return new Response(pic.buf, {
+        headers: { "Content-Type": pic.type, "Content-Security-Policy": MAIL_SANDBOX, "Cache-Control": `private, max-age=${maxAge}, immutable`, ...MAIL_FILE_HEADERS },
+      });
     } catch {
       return mailMiss(502);
     }
@@ -3852,19 +3975,32 @@ async function handleApi(request, env, url, ctx) {
     if (!auth) return mailMiss(503);
     try {
       const acct = await zohoMailAccount(env, auth);
-      const resp = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/attachments/${attId}`, { raw: true, timeout: 120000 });
+      // Kept in the cache too (up to 25 MB), so photo tiles show at once the next time.
+      const cache = globalThis.caches?.default;
+      const key = cache ? await mailCacheKey(env, "att", [acct.accountId, folderId, messageId, attId]).catch(() => null) : null;
+      const hit = key ? await cache.match(key).catch(() => null) : null;
+      let body = hit?.body || null;
+      if (!body) {
+        const resp = await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/folders/${folderId}/messages/${messageId}/attachments/${attId}`, { raw: true, timeout: 120000 });
+        body = resp.body;
+        if (key && body && !(Number(resp.headers.get("Content-Length")) > MAIL_IMAGE_MAX)) {
+          const [mine, kept] = body.tee();
+          body = mine;
+          mailCacheKeep(ctx, mailCacheStream(cache, key, kept));
+        }
+      }
       const [type, kind] = mailFileType(name);
       const save = q("dl") === "1" || kind === "file";
       const headers = {
         "Content-Type": save ? "application/octet-stream" : type,
         "Content-Disposition": contentDisposition(save ? "attachment" : "inline", name),
-        "Cache-Control": `private, max-age=${Math.max(0, Number(x) - Math.floor(Date.now() / 1000))}`,
+        "Cache-Control": `private, max-age=${Math.max(0, Number(x) - Math.floor(Date.now() / 1000))}, immutable`,
         ...MAIL_FILE_HEADERS,
       };
       // Chrome won't show a PDF in a sandboxed page, and a PDF or media file can't run script here anyway.
       if (!save && kind === "image") headers["Content-Security-Policy"] = MAIL_SANDBOX;
       if (!save && type.startsWith("text/")) headers["Content-Security-Policy"] = MAIL_SANDBOX;
-      return new Response(resp.body, { headers });
+      return new Response(body, { headers });
     } catch {
       return mailMiss(502);
     }
