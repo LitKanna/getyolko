@@ -89,7 +89,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=154">
+  <link rel="stylesheet" href="styles-modern.css?v=155">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -723,21 +723,22 @@
                 <h3>Your eggs</h3>
                 <p class="stock-note" id="stock-note" hidden></p>
               </div>
-              <fieldset class="picker">
+              <div class="kind-chips" id="tray-kinds" role="radiogroup" aria-label="Kind of tray" hidden></div>
+              <fieldset class="picker" id="tray-picker">
                 <legend class="sr-only">Trays (30 eggs)</legend>
-                <label class="bundle-opt">
+                <label class="bundle-opt" data-opt="one">
                   <input type="radio" name="bundle" value="tray1">
                   <span class="bo-name">1 tray</span>
                   <span class="bo-eggs">30 eggs</span>
                   <span class="bo-price-row"><span class="bo-price" id="bp-tray1">$13</span><span class="bo-each"><span data-per-egg="tray1">43¢</span> an egg</span></span>
                 </label>
-                <label class="bundle-opt">
+                <label class="bundle-opt" data-opt="two">
                   <input type="radio" name="bundle" value="tray2" checked>
                   <span class="bo-name">2 trays</span>
                   <span class="bo-eggs">60 eggs</span>
                   <span class="bo-price-row"><span class="bo-price" id="bp-tray2">$25</span><span class="bo-each"><span data-per-egg="tray2">42¢</span> an egg</span></span>
                 </label>
-                <label class="bundle-opt">
+                <label class="bundle-opt" data-opt="box">
                   <input type="radio" name="bundle" value="box">
                   <span class="bo-name">Full box</span>
                   <span class="bo-eggs">180 eggs</span>
@@ -745,49 +746,7 @@
                 </label>
               </fieldset>
 
-              <fieldset class="picker picker-dozen" data-dozen-picker hidden>
-                <legend>Cage eggs, a dozen</legend>
-                <label class="bundle-opt" data-dozen="cage600">
-                  <input type="radio" name="bundle" value="cage600">
-                  <span class="bo-name">600g</span>
-                  <span class="bo-eggs">12 cage eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-cage600">$6</span></span>
-                </label>
-                <label class="bundle-opt" data-dozen="cage700">
-                  <input type="radio" name="bundle" value="cage700">
-                  <span class="bo-name">700g</span>
-                  <span class="bo-eggs">12 cage eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-cage700">$7</span></span>
-                </label>
-                <label class="bundle-opt" data-dozen="cage800">
-                  <input type="radio" name="bundle" value="cage800">
-                  <span class="bo-name">800g</span>
-                  <span class="bo-eggs">12 cage eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-cage800">$8</span></span>
-                </label>
-              </fieldset>
-
-              <fieldset class="picker picker-dozen" data-dozen-picker hidden>
-                <legend>Free range eggs, a dozen</legend>
-                <label class="bundle-opt" data-dozen="fr600">
-                  <input type="radio" name="bundle" value="fr600">
-                  <span class="bo-name">600g</span>
-                  <span class="bo-eggs">12 free range</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-fr600">$8</span></span>
-                </label>
-                <label class="bundle-opt" data-dozen="fr700">
-                  <input type="radio" name="bundle" value="fr700">
-                  <span class="bo-name">700g</span>
-                  <span class="bo-eggs">12 free range</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-fr700">$9</span></span>
-                </label>
-                <label class="bundle-opt" data-dozen="fr800">
-                  <input type="radio" name="bundle" value="fr800">
-                  <span class="bo-name">800g</span>
-                  <span class="bo-eggs">12 free range</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-fr800">$10</span></span>
-                </label>
-              </fieldset>
+              <div id="dozen-pickers"></div>
 
               <input type="hidden" name="fulfillment" value="delivery">
               <input type="hidden" name="pickupDay" value="Saturday">
@@ -1126,6 +1085,6 @@
   </footer>
 
   <script src="config.js?v=89"></script>
-  <script src="app.js?v=152"></script>
+  <script src="app.js?v=153"></script>
 </body>
 </html>

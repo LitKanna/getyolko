@@ -168,8 +168,9 @@ shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
 `/browse/dairy-eggs-fridge/eggs` (Next.js `__NEXT_DATA__`, every egg on one page), Aldi
 `/products/dairy-eggs-fridge/eggs/k/1111111162` (server-rendered product tiles), one IGA and one
 Gourmet Grocer product page (JSON-LD) and Umall (Shopify `/products/<handle>.js`). Never read Coles
-`/search/` or Aldi `/results` (robots.txt disallows them). From Coles and Aldi it keeps the cheapest
-egg per housing (caged, barn, free range) plus every pack of 24 or more. The cron asks every 15
+`/search/` or Aldi `/results` (robots.txt disallows them). Every egg is filed like YOLKO's own
+catalogue (`groupOf`: dozen or tray, then cage / free range / cage free, then weight class; barn
+laid is cage free), and from Coles and Aldi it keeps the cheapest egg in each group. The cron asks every 15
 minutes but the shops are only read once every 6 hours (30 minutes after a shop failed; Umall's
 Shopify sometimes answers 429 to Cloudflare) (`pricewatch:v2:latest`); Check now in the
 admin reads them at once (at most once a minute). A shop that fails keeps its last prices, marked
@@ -177,8 +178,9 @@ stale, and the page says so under the heading. Changes go to `pricewatch:v2:even
 Woolworths blocks every automated request (Akamai 403, even robots.txt, from Cloudflare and from
 cloud servers) and Costco only sells eggs through DoorDash, which blocks bots and bans scraping, so
 their prices are typed in from the admin (`pricewatch:v2:typed`, `POST /api/price-watch/typed`);
-Costco starts with what Kanna saw on 3 Nov 2026 ($14.79, members $12.99). Everything is worked out
-to 30 eggs and ranked against the 1 tray price. This is comparison only: nothing here may ever
+Costco starts with what Kanna saw on 3 Nov 2026 ($14.79, members $12.99), weight not shown. The
+page has Trays and Dozens tabs; each group ranks the real pack prices with YOLKO's price for the
+same variety (1 tray, 1 dozen) slotted in. This is comparison only: nothing here may ever
 change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
 admin only.
 
@@ -198,6 +200,22 @@ outlet's own copy replaces the Google News one), all in one KV key `news:v1`, wr
 something changed or every half hour. Routes (admin only): `GET /api/news`, `POST /api/news/poll`,
 `POST /api/news/feeds {url}` or `{id, remove: true}`. Run `npm run test:news` after changing the
 parser. Nothing here is shown on the shop.
+
+### Egg varieties, stock and prices (Nov 2026)
+`infra/catalogue.mjs` is the one list of everything YOLKO can sell, as Kanna set it out: trays
+(cage 1.75kg, which is the main tray, cage 1.5kg, cage 1kg, cage 1kg 18 pack, free range and cage
+free at 1.5kg and 1.75kg) and dozens (cage and free range 500 to 800g, cage free 600 to 800g).
+Barn laid is cage free. Keys: the main tray keeps `tray1` / `tray2` / `box` and its stock stays
+`traysAvailable`; other trays are `<id>-1`, `<id>-2`, `<id>-box` (e.g. `fr1500-2`); dozens are
+`<id>` and `<id>case` (15 dozens). Every other variety's stock is `settings.stock[<id>]` and its
+cost `trayCosts` (box of 6) or `dozenCosts` (case of 15). A price of 0 means that option isn't
+sold. A variety shows on the shop only with stock and a price (`shopView`, sent as `shop` in
+`GET /api/settings`); the order and checkout routes refuse anything else (`stockProblem`). The
+main tray keeps its old rule: always orderable, the shop says when it's sold out. Paid orders take
+stock from their own variety (`stockHeld: { variety, units }`; older `{ trays, dozens }` holds
+still release). Admin > Stock & prices lists every variety under Trays or Dozens, then kind; stock
+is typed in the row and saved from the save bar, prices open in a sheet that saves at once. Prices
+never move by themselves (Kanna, 3 Nov 2026: $13 / $25 / $72 for the main tray, fixed).
 
 ### Admin page design (Apple HIG, Oct 2026)
 `infra/admin.html` follows Apple's Human Interface Guidelines. Keep: 44 x 44 pt touch targets
