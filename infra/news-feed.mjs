@@ -4,11 +4,16 @@
  *
  * The cron runs every 15 minutes and reads the sources that are due (at most PER_TICK a tick,
  * so one tick never makes too many requests). Refresh in the admin reads them all at once.
- *   Google News     two searches: egg prices and supply, and bird flu in Australia
+ *   Google News     two searches: egg prices and supply, and bird flu in Australia. Google
+ *                   answers Cloudflare with 503, so a GitHub Actions job (news-relay.yml) reads
+ *                   these two and posts them to /api/news/relay; the Worker only tries Google
+ *                   itself when that relay has gone quiet
  *   ABC News        the "Poultry and egg production" and "Bird flu" topic feeds
  *   NSW Government  the bird flu page's "Latest advice" box (no feed, so the Worker reads it)
  *   NSW DPIRD       bird flu updates for poultry farmers (on the extensionAUS site)
  *   Australian Eggs, Egg Farmers of Australia, Inside FMCG (egg stories only)
+ *   Outlets         7NEWS, The Guardian Australia, the Sydney Morning Herald, SBS News and Farm
+ *                   Online: their general feeds, egg stories from here only
  *   Reddit          new posts about eggs in r/sydney, r/australia and r/AusFinance
  *   Added feeds     any RSS or Atom link the owner pastes in, such as a Google Alerts feed
  * Everything lives in one KV key (NEWS_KEY), written when something changed or every half hour,
@@ -19,7 +24,9 @@ const NEWS_KEY = "news:v1";
 const CUSTOM_KEY = "news:v1:custom";
 const MAX_ITEMS = 500;
 const MAX_AGE_MS = 90 * 864e5;
-const PER_TICK = 6;
+const PER_TICK = 12;
+const RELAY_FRESH_MS = 90 * 60 * 1000;
+const MAX_RELAY_BYTES = 3_000_000;
 const MIN_GAP_MS = 60 * 1000;
 const WRITE_EVERY_MS = 30 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 12 * 1000;
@@ -32,12 +39,12 @@ const GN = (q) => "https://news.google.com/rss/search?q=" + encodeURIComponent(q
 /** Built-in sources. `every` is minutes between reads; `filter` keeps only what fits. */
 const SOURCES = [
   {
-    id: "gn-eggs", name: "Google News", group: "Google News", kind: "rss", every: 15,
+    id: "gn-eggs", name: "Google News", group: "Google News", kind: "rss", every: 15, relay: true,
     url: GN('("egg prices" OR "egg price" OR "egg shortage" OR "egg supply" OR "egg farmers" OR "egg farm" OR "egg industry" OR "caged eggs" OR "free range eggs" OR "egg producers" OR "egg cartel") australia when:7d'),
     about: "Egg prices, supply and farms, every outlet",
   },
   {
-    id: "gn-birdflu", name: "Google News", group: "Google News", kind: "rss", every: 15, filter: "au", topic: "birdflu",
+    id: "gn-birdflu", name: "Google News", group: "Google News", kind: "rss", every: 15, filter: "au", topic: "birdflu", relay: true,
     url: GN('("bird flu" OR "avian influenza" OR H5N1 OR H7) (poultry OR eggs OR "egg farm" OR chickens OR hens OR farms) (australia OR NSW OR victoria OR queensland) when:7d'),
     about: "Bird flu and poultry farms in Australia, every outlet",
   },
@@ -53,6 +60,11 @@ const SOURCES = [
     url: "https://www.reddit.com/r/sydney+australia+AusFinance/search.rss?q=eggs&restrict_sr=on&sort=new&t=month",
     about: "New posts about eggs in r/sydney, r/australia and r/AusFinance",
   },
+  { id: "7news", name: "7NEWS", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://7news.com.au/feed", about: "Egg stories from 7NEWS" },
+  { id: "guardian-au", name: "The Guardian", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://www.theguardian.com/australia-news/rss", about: "Egg stories from The Guardian Australia" },
+  { id: "smh", name: "Sydney Morning Herald", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://www.smh.com.au/rss/national.xml", about: "Egg stories from the Herald" },
+  { id: "sbs", name: "SBS News", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://www.sbs.com.au/news/feed", about: "Egg stories from SBS News" },
+  { id: "farmonline", name: "Farm Online", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://www.farmonline.com.au/rss.xml", about: "Egg stories from Farm Online" },
 ];
 
 /* ------------------------------ text helpers ------------------------------ */
@@ -212,6 +224,8 @@ const AU_PUBLISHER_RE = /australia|\babc\b|\bsbs\b|nine|9news|7news|news\.com\.a
 const EGG_RE = /\beggs?\b|egg[\s-]?(farm|farmers|industry|price|prices|supply|shortage|producers?|layers?)|\bpoultry\b|\bhens?\b|layer hens?|bird[\s-]?flu|avian (influenza|flu)|\bh5n1\b/i;
 const NOT_EGG_RE = /easter eggs?|chocolate eggs?|kinder|nest[\s-]?eggs?|egg[\s-]?hunt|scotch eggs?|eggplant|egg[\s-]?tarts?|eggnog/i;
 const REDDIT_EGG_RE = /\beggs?\b/i;
+const FOREIGN_RE = /\b(america|american|americans|trump|britain|british|england|scotland|ireland|new zealand|canada|canadian|china|chinese|india|japan|japanese|europe|european|mexico|brazil|south africa|philippines|indonesia|korea)\b/i;
+const FOREIGN_CAPS_RE = /\bU\.?S\.?A?\b|\bUK\b|\bNZ\b|\bEU\b/;
 
 const BIRDFLU_RE = /bird[\s-]?flu|avian (influenza|flu)|\bh5n1\b|\bh5\b|\bh7\b|\bhpai\b|housing order|poultry (lockdown|housing)/i;
 const PRICE_RE = /\bprices?\b|\bpricing\b|\bcosts?\b|\bcostly\b|cheap|dearer|expensive|inflation|cartel|\baccc\b|price[\s-]?fix|shortages?|\bsupply\b|shelves|buying limits?|purchase limits?|\blimits?\b|out of stock|sold out|no eggs|can'?t find|hard to find|where to (buy|find)|\$\s?\d/i;
@@ -221,6 +235,8 @@ function keep(source, row) {
   const t = row.title;
   if (source.filter === "reddit") return REDDIT_EGG_RE.test(t) && !NOT_EGG_RE.test(t);
   if (source.filter === "egg") return EGG_RE.test(t) && !NOT_EGG_RE.test(t);
+  // General Australian outlets also run overseas egg stories; keep those only if they name Australia.
+  if (source.filter === "egg-local") return EGG_RE.test(t) && !NOT_EGG_RE.test(t) && (!(FOREIGN_RE.test(t) || FOREIGN_CAPS_RE.test(t)) || AU_RE.test(t));
   if (source.filter === "au") {
     const host = hostOf(row.publisherUrl || row.url);
     return /\.au$/.test(host) || AU_RE.test(t) || AU_PUBLISHER_RE.test(row.publisher || "");
@@ -353,6 +369,12 @@ async function getText(url) {
 async function readSource(source, prevNsw, nowIso) {
   const got = await getText(source.url);
   if (!got.ok) return { ok: false, error: got.error, stories: [] };
+  return storiesFrom(source, got.body, prevNsw, nowIso);
+}
+
+/** A fetched page or feed to stories. Shared by the Worker's own reads and the GitHub relay. */
+function storiesFrom(source, body, prevNsw, nowIso) {
+  const got = { body };
   if (source.kind === "nsw") {
     const nsw = parseNswPage(got.body);
     if (!nsw) return { ok: false, error: "The Latest advice box wasn't on the page", stories: [] };
@@ -400,16 +422,23 @@ function mergeStories(items, fresh) {
   return { items: next, added };
 }
 
+/** Relayed sources are read by GitHub; the Worker tries them itself only once the relay is quiet. */
+function relayQuiet(source, state, now) {
+  return !source.relay || !state?.relayAt || now - Date.parse(state.relayAt) > RELAY_FRESH_MS;
+}
+
 function due(source, state, now) {
+  if (!relayQuiet(source, state, now)) return false;
   const last = state?.checkedAt ? Date.parse(state.checkedAt) : 0;
   const gap = (state && !state.ok ? Math.min(source.every, 30) : source.every) * 60 * 1000;
   return now - last >= gap - 60 * 1000;
 }
 
-/** Read the given sources and save what changed. */
-async function readAndSave(env, store, sources, { force = false } = {}) {
+/** Read the given sources and save what changed. `read` swaps in another reader (the relay). */
+async function readAndSave(env, store, sources, { force = false, read = null, relayed = false } = {}) {
   const nowIso = new Date().toISOString();
-  const results = await Promise.all(sources.map((s) => readSource(s, store.nsw, nowIso).then((r) => [s, r])));
+  const reader = read || ((s) => readSource(s, store.nsw, nowIso));
+  const results = await Promise.all(sources.map((s) => Promise.resolve(reader(s, nowIso)).then((r) => [s, r])));
   let fresh = [];
   let statusChanged = false;
   const sourceState = { ...store.sources };
@@ -424,6 +453,7 @@ async function readAndSave(env, store, sources, { force = false } = {}) {
       okAt: r.ok ? nowIso : prev?.okAt || null,
       error: r.ok ? null : r.error,
       count: r.ok ? r.stories.length : prev?.count ?? 0,
+      ...(s.relay ? { relayAt: relayed && r.ok ? nowIso : prev?.relayAt || null } : {}),
     };
     if (r.ok) fresh = fresh.concat(r.stories);
     if (r.nsw) {
@@ -474,7 +504,9 @@ async function runNewsPoll(env, { force = false } = {}) {
   const allFresh = Object.keys(store.sources || {}).length > 0 && age < MIN_GAP_MS;
   if (!force && allFresh) return { ran: false, added: 0 };
   const custom = await getCustom(env);
-  const r = await readAndSave(env, store, SOURCES.concat(customSources(custom)), { force: true });
+  const now = Date.now();
+  const all = SOURCES.concat(customSources(custom)).filter((s) => relayQuiet(s, store.sources?.[s.id], now));
+  const r = await readAndSave(env, store, all, { force: true });
   return { ran: true, added: r.added, failed: r.failed };
 }
 
@@ -490,6 +522,59 @@ async function runScheduledNews(env) {
   if (!waiting.length) return { ran: false };
   const r = await readAndSave(env, store, waiting);
   return { ran: true, added: r.added, failed: r.failed };
+}
+
+/* ------------------------------ GitHub relay ------------------------------ */
+
+const GH_ISSUER = "https://token.actions.githubusercontent.com";
+const GH_REPO = "LitKanna/getyolko";
+const GH_WORKFLOW = GH_REPO + "/.github/workflows/news-relay.yml@refs/heads/main";
+const RELAY_AUDIENCE = "https://getyolko.com";
+
+function b64urlBytes(s) {
+  const bin = atob(String(s).replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(String(s).length / 4) * 4, "="));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
+/** True when the request carries a GitHub Actions OIDC token from news-relay.yml on main of this
+ *  repo. No shared secret: GitHub signs the token and the Worker checks it against GitHub's keys. */
+async function isGithubRelay(request) {
+  const m = /^Bearer\s+([\w-]+)\.([\w-]+)\.([\w-]+)$/.exec(request.headers.get("Authorization") || "");
+  if (!m) return false;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(b64urlBytes(m[1])));
+    const claims = JSON.parse(new TextDecoder().decode(b64urlBytes(m[2])));
+    if (header.alg !== "RS256" || !header.kid) return false;
+    const now = Date.now() / 1000;
+    if (claims.iss !== GH_ISSUER || claims.aud !== RELAY_AUDIENCE) return false;
+    if (claims.repository !== GH_REPO || claims.ref !== "refs/heads/main" || claims.job_workflow_ref !== GH_WORKFLOW) return false;
+    if (!(claims.exp > now) || !(claims.iat < now + 300)) return false;
+    const res = await fetch(GH_ISSUER + "/.well-known/jwks", { cf: { cacheTtl: 3600 } });
+    if (!res.ok) return false;
+    const jwk = ((await res.json()).keys || []).find((k) => k.kid === header.kid && k.kty === "RSA");
+    if (!jwk) return false;
+    const key = await crypto.subtle.importKey("jwk", { kty: "RSA", n: jwk.n, e: jwk.e, alg: "RS256", ext: true }, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlBytes(m[3]), new TextEncoder().encode(m[1] + "." + m[2]));
+  } catch {
+    return false;
+  }
+}
+
+/** The feeds the GitHub job read for us: { feeds: [{ id, status, body }] }. Only relayed sources. */
+async function takeNewsRelay(env, payload) {
+  const feeds = Array.isArray(payload?.feeds) ? payload.feeds : [];
+  const byId = new Map(feeds.map((f) => [String(f?.id || ""), f]));
+  const sources = SOURCES.filter((s) => s.relay && byId.has(s.id));
+  if (!sources.length) return { error: "No relayed feeds in that" };
+  const store = await getStore(env);
+  const read = (s, nowIso) => {
+    const f = byId.get(s.id);
+    const body = typeof f.body === "string" ? f.body.slice(0, MAX_RELAY_BYTES) : "";
+    if (!body) return { ok: false, error: f.error ? String(f.error).slice(0, 120) : "GitHub couldn't read it", stories: [] };
+    return storiesFrom(s, body, store.nsw, nowIso);
+  };
+  const r = await readAndSave(env, store, sources, { read, relayed: true });
+  return { ok: true, read: r.read, added: r.added, failed: r.failed };
 }
 
 /** Add or remove a pasted feed (for example a Google Alerts RSS link). */
@@ -534,7 +619,11 @@ export {
   runNewsPoll,
   runScheduledNews,
   saveNewsFeed,
-  // for tests
+  isGithubRelay,
+  takeNewsRelay,
+  // for tests and the relay job
+  storiesFrom,
+  isFeed,
   parseFeed,
   parseNswPage,
   keep,

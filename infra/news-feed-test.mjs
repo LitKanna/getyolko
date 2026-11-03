@@ -1,6 +1,6 @@
 // Checks the news parser on small copies of each feed shape: node infra/news-feed-test.mjs
 import assert from "node:assert/strict";
-import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES } from "./news-feed.mjs";
+import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
 
 const now = new Date().toISOString();
 const src = (id) => SOURCES.find((s) => s.id === id);
@@ -52,5 +52,58 @@ const merged = mergeStories([g], [direct]).items;
 assert.equal(merged.length, 1);
 assert.equal(merged[0].url, "https://www.abc.net.au/news/x");
 assert.equal(merged[0].seen, g.seen);
+
+// General outlets keep Australian egg stories only.
+assert.equal(keep(src("7news"), { title: "Egg prices jump again at Coles", url: "https://7news.com.au/a" }), true);
+assert.equal(keep(src("7news"), { title: "US egg prices hit a record as bird flu spreads", url: "https://7news.com.au/b" }), false);
+assert.equal(keep(src("7news"), { title: "Bird flu in the US: what it means for Australian eggs", url: "https://7news.com.au/c" }), true);
+assert.equal(keep(src("smh"), { title: "Let us talk about the budget", url: "https://smh.com.au/d" }), false);
+
+// The GitHub relay: a bad or missing token is refused; posted feeds are stored like the Worker's own reads.
+const fakeReq = (auth) => ({ headers: { get: (k) => (k === "Authorization" ? auth : null) } });
+assert.equal(await isGithubRelay(fakeReq(null)), false);
+assert.equal(await isGithubRelay(fakeReq("Bearer abc.def.ghi")), false);
+
+{
+  // A real RS256 token, signed with a throwaway key, against a stubbed GitHub key list.
+  const { subtle } = globalThis.crypto;
+  const pair = await subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+  const jwk = await subtle.exportKey("jwk", pair.publicKey);
+  const b64u = (buf) => Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const sign = async (claims) => {
+    const head = b64u(JSON.stringify({ alg: "RS256", kid: "k1", typ: "JWT" }));
+    const body = b64u(JSON.stringify(claims));
+    const sig = await subtle.sign("RSASSA-PKCS1-v1_5", pair.privateKey, new TextEncoder().encode(head + "." + body));
+    return "Bearer " + head + "." + body + "." + b64u(sig);
+  };
+  const t = Math.floor(Date.now() / 1000);
+  const good = { iss: "https://token.actions.githubusercontent.com", aud: "https://getyolko.com", repository: "LitKanna/getyolko", ref: "refs/heads/main", job_workflow_ref: "LitKanna/getyolko/.github/workflows/news-relay.yml@refs/heads/main", iat: t - 10, exp: t + 300 };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ keys: [{ ...jwk, kid: "k1" }] }), { status: 200 });
+  try {
+    assert.equal(await isGithubRelay(fakeReq(await sign(good))), true);
+    assert.equal(await isGithubRelay(fakeReq(await sign({ ...good, repository: "someone/fork" }))), false);
+    assert.equal(await isGithubRelay(fakeReq(await sign({ ...good, ref: "refs/heads/feature" }))), false);
+    assert.equal(await isGithubRelay(fakeReq(await sign({ ...good, exp: t - 5 }))), false);
+    const forged = (await sign(good)).replace(/\.[\w-]+$/, ".AAAA");
+    assert.equal(await isGithubRelay(fakeReq(forged)), false);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+{
+  const kv = new Map();
+  const env = { DATA: { get: async (k, type) => (kv.has(k) ? (type === "json" ? JSON.parse(kv.get(k)) : kv.get(k)) : null), put: async (k, v) => { kv.set(k, v); } } };
+  const out = await takeNewsRelay(env, { feeds: [{ id: "gn-eggs", body: gn }, { id: "gn-birdflu", error: "HTTP 503" }, { id: "abc-eggs", body: gn }] });
+  assert.equal(out.ok, true);
+  assert.equal(out.read, 2); // abc-eggs isn't relayed, so it is ignored
+  const store = JSON.parse(kv.get("news:v1"));
+  assert.equal(store.items.length, 1);
+  assert.equal(store.sources["gn-eggs"].ok, true);
+  assert.ok(store.sources["gn-eggs"].relayAt);
+  assert.equal(store.sources["gn-birdflu"].ok, false);
+  assert.equal((await takeNewsRelay(env, { feeds: [] })).error, "No relayed feeds in that");
+}
 
 console.log("news feed tests passed");

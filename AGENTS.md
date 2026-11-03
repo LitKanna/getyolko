@@ -189,17 +189,24 @@ admin only.
 (egg prices, supply and farms; bird flu on poultry farms), the ABC "Poultry and egg production"
 (`/news/feed/2276/rss.xml`) and "Bird flu" (`/news/feed/1676/rss.xml`) topic feeds, NSW DPIRD's
 bird flu updates (extensionAUS feed), Australian Eggs, Egg Farmers of Australia, Inside FMCG (egg
-stories only) and Reddit search (r/sydney, r/australia, r/AusFinance, posts with "eggs" in the
-title, "nest egg" and Easter eggs left out). The NSW bird flu page has no feed, so the Worker reads
-its "Latest advice" box for the case count and whether NSW farms are clear, and adds a story when
-it changes. The owner can paste more feeds (Google Alerts set to "Deliver to: RSS feed") in the
-Sources sheet (`news:v1:custom`, up to 10). The cron asks every 15 minutes and reads at most 6
-due sources a tick (Google News and ABC every 15 minutes, others every 30 or 60); Refresh reads
-them all (at most once a minute). Stories are kept 90 days, 500 at most, one row per headline (an
-outlet's own copy replaces the Google News one), all in one KV key `news:v1`, written only when
-something changed or every half hour. Routes (admin only): `GET /api/news`, `POST /api/news/poll`,
-`POST /api/news/feeds {url}` or `{id, remove: true}`. Run `npm run test:news` after changing the
-parser. Nothing here is shown on the shop.
+stories only), Reddit search (r/sydney, r/australia, r/AusFinance, posts with "eggs" in the
+title, "nest egg" and Easter eggs left out) and the general feeds of 7NEWS, The Guardian
+Australia, the SMH, SBS News and Farm Online (filter `egg-local`: egg headlines, overseas ones only
+if they also name Australia). The NSW bird flu page has no feed, so the Worker reads its "Latest
+advice" box for the case count and whether NSW farms are clear, and adds a story when it changes.
+The owner can paste more feeds (Google Alerts set to "Deliver to: RSS feed") in the Sources sheet
+(`news:v1:custom`, up to 10). The cron asks every 15 minutes and reads at most 12 due sources a
+tick (ABC every 15 minutes, others every 30 or 60); Refresh reads them all (at most once a minute).
+Google News answers Cloudflare with HTTP 503, so `.github/workflows/news-relay.yml` (every 15
+minutes, `node infra/news-relay.mjs`) reads the two `relay: true` sources from GitHub and posts
+them to `POST /api/news/relay`. That route needs no secret: the Worker checks the GitHub Actions
+OIDC token (issuer token.actions.githubusercontent.com, audience https://getyolko.com, repository
+LitKanna/getyolko, `job_workflow_ref` news-relay.yml on refs/heads/main) against GitHub's keys.
+While the relay is fresh (90 minutes) the Worker doesn't try Google itself. Stories are kept 90
+days, 500 at most, one row per headline (an outlet's own copy replaces the Google News one), all in
+one KV key `news:v1`, written only when something changed or every half hour. Admin routes:
+`GET /api/news`, `POST /api/news/poll`, `POST /api/news/feeds {url}` or `{id, remove: true}`. Run
+`npm run test:news` after changing the parser. Nothing here is shown on the shop.
 
 ### Egg varieties, stock and prices (Nov 2026)
 `infra/catalogue.mjs` is the one list of everything YOLKO can sell, as Kanna set it out: trays

@@ -1,6 +1,6 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
-import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed } from "./news-feed.mjs";
+import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
 import {
   MAIN, DOZENS_PER_CASE, VARIETIES, BUNDLES, BUNDLE_KEYS, isBundle, bundleLabel,
   stockOf, addStock, holdFor, heldBy, traysIn, stockProblem, catalogueView, shopView,
@@ -4729,6 +4729,18 @@ async function handleApi(request, env, url, ctx) {
     return json({ ...(await newsView(env)), ...result });
   }
 
+  // GitHub Actions (news-relay.yml) posts the Google News feeds here, since Google answers
+  // Cloudflare with 503. Signed by GitHub's OIDC token for this repo's main branch, no secret.
+  if (url.pathname === "/api/news/relay" && request.method === "POST") {
+    if (!(await isGithubRelay(request))) return json({ error: "unauthorised" }, 401);
+    const len = Number(request.headers.get("Content-Length") || 0);
+    if (len > 8_000_000) return json({ error: "too big" }, 413);
+    const body = await request.json().catch(() => null);
+    const result = await takeNewsRelay(env, body);
+    if (result.error) return json(result, 400);
+    return json(result);
+  }
+
   return json({ error: "not found" }, 404);
 }
 
@@ -4867,7 +4879,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "222",
+      "X-Yolko-Build": "223",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
