@@ -868,19 +868,31 @@ body:has(#savebar) .toasts { bottom:84px; }
 .insight.warn { color:var(--ink); font-weight:600; }
 .insight.due { color:var(--ink2); }
 
-/* ---------- tables (competitors) ---------- */
-.tbl { width:100%; border-collapse:collapse; font-size:15px; line-height:20px; }
-.tbl th { text-align:left; font-size:13px; font-weight:400; color:var(--muted); padding:0 8px 8px 0; box-shadow:inset 0 -.5px 0 var(--line); white-space:nowrap; }
-.tbl td { padding:10px 8px 10px 0; box-shadow:inset 0 -.5px 0 var(--line); vertical-align:top; }
-.tbl tr:last-child td { box-shadow:none; }
-.tbl td.num { font-weight:600; white-space:nowrap; }
-.tbl .t2 { color:var(--muted); font-size:13px; margin-top:2px; }
-.tbl a { font-weight:600; color:var(--tint); }
+/* ---------- competitors ---------- */
+/* One ranked list, cheapest 30 eggs first. Your own tray is the solid row, so where you stand
+   reads at a glance; rank numbers sit where order lists show initials. */
+.pw-head { flex-wrap:wrap; }
+.pwl { display:flex; flex-direction:column; margin:0 -12px; }
+.pwl .row { min-height:68px; color:inherit; text-decoration:none; }
+.pwl .av { font-variant-numeric:tabular-nums; }
+.pwl .mt { font-size:15px; }
+.pwl .mt2 { display:block; margin-top:1px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pwl .rt { align-self:center; }
+.pwl .pr { font-variant-numeric:tabular-nums; }
+.pwl .row.me, .pwl .row.me:hover { background:var(--sel); color:var(--on-sel); }
+.pwl .row.me .mt, .pwl .row.me .mt2, .pwl .row.me .tm { color:color-mix(in srgb, var(--on-sel) 72%, transparent); }
+.pwl .row.me .av { background:var(--on-sel); color:var(--sel); }
+.pwl .row.me::after, .pwl .row:has(+ .me)::after { display:none; }
+.pwl .row.add .av { background:var(--subtle); color:var(--ink); }
+.pw-note { margin-top:14px; }
+.pw-form .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pw-form .seg.wide { grid-auto-flow:column; grid-template-columns:none; }
+.modal.pw-sheet { width:min(520px, 100%); }
 .feed { display:flex; flex-direction:column; }
 .feed > div { padding:12px 0; box-shadow:inset 0 .5px 0 var(--line); font-size:15px; }
 .feed > div:first-child { box-shadow:none; padding-top:0; }
 .feed b { font-weight:600; }
-.feed .m { color:var(--muted); margin-top:2px; }
+.feed .m { color:var(--muted); margin-top:2px; font-size:13px; line-height:18px; }
 .kpis.three { grid-template-columns:repeat(3, minmax(0,1fr)); }
 
 /* ---------- visits ---------- */
@@ -1152,11 +1164,9 @@ body:has(#savebar) .toasts { bottom:84px; }
   .modal::before { content:""; display:block; width:36px; height:5px; border-radius:3px; background:var(--line3); margin:0 auto 14px; opacity:.6; }
   .modal .mact { gap:10px; }
   .modal .mact .btn { flex:1; min-width:0; height:50px; border-radius:25px; }
-  .tbl.stack thead { display:none; }
-  .tbl.stack tr { display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:10px 0; box-shadow:inset 0 -.5px 0 var(--line); }
-  .tbl.stack tr:last-child { box-shadow:none; }
-  .tbl.stack td { padding:0; box-shadow:none; }
-  .tbl.stack td.first { grid-column:1 / -1; }
+  .pwl { margin:0 -10px; }
+  .pwl .row { padding-left:10px; padding-right:10px; }
+  .pw-head .seg { width:100%; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; }
   .vgrid { grid-template-columns:repeat(2, minmax(0,1fr)); }
   .agrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
   .acard .a3 { grid-template-columns:1fr 1fr; }
@@ -1329,8 +1339,8 @@ body:has(#savebar) .toasts { bottom:84px; }
 
     <section class="view grow" data-view="competitors" id="v-competitors" hidden>
       <div class="vhead">
-        <div class="min0"><h1>Competitors</h1></div>
-        <div class="vact"><button class="btn ghost sm" type="button" data-action="pw-poll" id="pw-poll"><span data-icon="refresh"></span><span class="lbl">Check prices now</span></button></div>
+        <div class="min0"><h1>Competitors</h1><p class="sub" id="pw-sub"></p></div>
+        <div class="vact"><button class="btn ghost sm" type="button" data-action="pw-new" aria-label="Type in a price"><span data-icon="plus"></span><span class="lbl">Type in a price</span></button><button class="btn ghost sm" type="button" data-action="pw-poll" id="pw-poll" aria-label="Check prices now"><span data-icon="refresh"></span><span class="lbl">Check now</span></button></div>
       </div>
       <div id="pw-body"></div>
     </section>
@@ -3834,63 +3844,226 @@ function renderCustomers() {
 }
 
 /* ============================== competitors ============================== */
-function pwPerEgg(n) { return n == null || n === "" || !Number.isFinite(Number(n)) ? "-" : (Number(n) * 100).toFixed(1) + "¢"; }
-function pwStock(s) {
-  s = String(s || "unknown");
-  return chip(s === "in_stock" ? "ok" : s === "out_of_stock" ? "warn" : "plain", s.replace(/_/g, " ").replace(/^./, function (c) { return c.toUpperCase(); }));
+// Other shops' egg prices. The Worker reads Coles, Aldi, IGA, Umall and Gourmet Grocer every
+// 6 hours; Costco and Woolworths block that, so their prices are typed in here. Everything is
+// worked out to 30 eggs and set against the 1 tray price. Nothing here changes YOLKO's prices.
+let PW = null, PW_FILTER = "all";
+const PW_HOUSING = { caged: "Caged", barn: "Barn laid", free_range: "Free range" };
+const PW_TYPED_SHOPS = ["Costco", "Woolworths"];
+function pwCents(n) { return (Math.round(n * 1000) / 10).toFixed(1) + "¢"; }
+function pwPer30(o) { return o.per_egg_aud * 30; }
+function pwDate(iso) { return new Date(iso).toLocaleDateString("en-AU", { timeZone: TZ, day: "numeric", month: "short" }); }
+function pwNth(n) { const t = n % 100, d = n % 10; return n + (t > 10 && t < 14 ? "th" : d === 1 ? "st" : d === 2 ? "nd" : d === 3 ? "rd" : "th"); }
+function pwMine() { const p = PW && PW.mine ? Number(PW.mine.tray1) : NaN; return Number.isFinite(p) && p > 0 ? p : null; }
+function pwVs(per30) {
+  const mine = pwMine();
+  if (mine == null) return "";
+  const d = Math.round((per30 - mine) * 100) / 100;
+  if (Math.abs(d) < 0.01) return "Same as you";
+  const a = Math.abs(d);
+  return (a < 1 ? Math.round(a * 100) + "¢" : money2(a)) + (d > 0 ? " dearer" : " cheaper");
 }
-function priceTable(rows) {
-  if (!rows.length) return '<p class="csub" style="padding:8px 0">None found in the latest check.</p>';
-  const sorted = rows.slice().sort(function (a, b) { return (a.per_egg_aud == null ? 999 : a.per_egg_aud) - (b.per_egg_aud == null ? 999 : b.per_egg_aud); });
-  return '<table class="tbl stack"><thead><tr><th>Shop</th><th>Price</th><th>Per egg</th><th>Pack</th><th>Stock</th><th></th></tr></thead><tbody>' + sorted.map(function (o) {
-    const pack = (o.pack_eggs || "?") + " eggs · " + (o.pack_weight_g ? o.pack_weight_g + "g" : "?");
-    return '<tr><td class="first"><b>' + esc(o.retailer || "") + '</b><div class="t2">' + esc(o.title || "") + '</div></td><td class="num">' + esc(money2(o.price_aud)) + '</td><td class="num">' + esc(pwPerEgg(o.per_egg_aud)) + "</td><td>" + esc(pack) + "</td><td>" + pwStock(o.stock) + "</td><td>" + (/^https?:\/\//i.test(o.url || "") ? '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">Open</a>' : "") + "</td></tr>";
-  }).join("") + "</tbody></table>";
+function pwAllRows() {
+  if (!PW) return [];
+  return (PW.offers || []).concat(PW.typed || []).filter(function (o) { return o.per_egg_aud > 0; });
+}
+function pwFacts(o) {
+  const parts = [];
+  if (o.stock === "out_of_stock") parts.push("Out of stock");
+  parts.push(PW_HOUSING[o.housing] || "");
+  if (o.pack_eggs !== 30) parts.push(money2(o.price_aud) + " for " + o.pack_eggs);
+  if (o.member_price_aud) parts.push("members " + money2(o.member_price_aud));
+  if (o.limit) parts.push(o.limit);
+  if (o.source === "typed") {
+    const days = Math.floor((Date.now() - Date.parse(o.checked_at)) / 864e5);
+    parts.push(days > 14 ? "typed " + days + " days ago" : "typed " + pwDate(o.checked_at));
+  }
+  if (o.stale) parts.push("last seen " + rel(o.checked_at));
+  return parts.filter(Boolean).join(" · ");
+}
+function pwRow(o, rank) {
+  const per30 = pwPer30(o);
+  const inner = '<span class="av">' + (rank ? rank : "-") + '</span><span class="min0"><span class="nm"><b>' + esc(o.shop) + '</b></span><span class="mt">' + esc(o.title) + '</span><span class="mt2">' + esc(pwFacts(o)) + '</span></span>' +
+    '<span class="rt"><span class="pr num">' + esc(money2(per30)) + '</span><span class="tm">' + esc(pwVs(per30)) + "</span></span>";
+  const label = o.shop + ", " + money2(per30) + " for 30 eggs, " + pwVs(per30);
+  if (o.source === "typed") return '<button type="button" class="row" data-action="pw-edit" data-id="' + esc(o.id) + '" aria-label="' + esc(label + ". Change this price") + '">' + inner + "</button>";
+  return '<a class="row" href="' + esc(/^https:\/\//i.test(o.url || "") ? o.url : "#") + '" target="_blank" rel="noopener" aria-label="' + esc(label + ". Open on " + o.shop) + '">' + inner + "</a>";
+}
+function pwMineRow(rank) {
+  const mine = pwMine();
+  const p = PW.mine || {};
+  return '<div class="row me"><span class="av">' + rank + '</span><span class="min0"><span class="nm"><b>You</b></span><span class="mt">Pace Farm extra large caged eggs, tray of 30</span><span class="mt2">' +
+    esc(["1 tray " + money(p.tray1), "2 for " + money(p.tray2), "6 for " + money(p.box)].join(" · ")) + '</span></span><span class="rt"><span class="pr num">' + esc(money2(mine)) + '</span><span class="tm">' + esc(pwCents(mine / 30) + " an egg") + "</span></span></div>";
+}
+function pwAddRow(shop) {
+  return '<button type="button" class="row add" data-action="pw-add" data-shop="' + esc(shop) + '"><span class="av">' + ic("plus", 18) + '</span><span class="min0"><span class="nm"><b>' + esc(shop) + '</b></span><span class="mt">Blocks automatic checks</span><span class="mt2">Type in the price you see</span></span><span class="rt"><span class="chip plain">Add price</span></span></button>';
+}
+function pwListHtml() {
+  const mine = pwMine();
+  const rows = pwAllRows().filter(pwShown);
+  const live = rows.filter(function (o) { return o.stock !== "out_of_stock"; }).sort(function (a, b) { return a.per_egg_aud - b.per_egg_aud; });
+  const out = rows.filter(function (o) { return o.stock === "out_of_stock"; });
+  let html = "", rank = 0, placed = mine == null;
+  live.forEach(function (o) {
+    if (!placed && mine <= pwPer30(o) + 0.004) { html += pwMineRow(++rank); placed = true; }
+    html += pwRow(o, ++rank);
+  });
+  if (!placed) html += pwMineRow(++rank);
+  out.forEach(function (o) { html += pwRow(o, 0); });
+  PW_TYPED_SHOPS.forEach(function (shop) {
+    const has = (PW.typed || []).some(function (o) { return o.shop.toLowerCase() === shop.toLowerCase(); });
+    if (!has && PW_FILTER === "all") html += pwAddRow(shop);
+  });
+  return html;
+}
+function pwShown(o) {
+  if (PW_FILTER === "caged") return o.housing === "caged";
+  if (PW_FILTER === "free") return o.housing !== "caged";
+  return true;
+}
+function pwYourRank() {
+  const mine = pwMine();
+  if (mine == null) return "";
+  const live = pwAllRows().filter(function (o) { return o.stock !== "out_of_stock" && pwShown(o); });
+  const cheaper = live.filter(function (o) { return pwPer30(o) < mine - 0.004; }).length;
+  if (!cheaper) return "You're the cheapest of " + (live.length + 1);
+  return "You're " + pwNth(cheaper + 1) + " cheapest of " + (live.length + 1);
+}
+function pwChange(ch) {
+  let line = "";
+  if (ch.type === "price") line = money2(ch.from && ch.from.price_aud) + " to " + money2(ch.to && ch.to.price_aud);
+  else if (ch.type === "stock") line = ch.to && ch.to.stock === "out_of_stock" ? "Out of stock" : "Back in stock";
+  else if (ch.type === "added") line = "New on the list at " + money2(ch.to && ch.to.price_aud);
+  else if (ch.type === "removed") line = "Off the list";
+  return "<div><b>" + esc(ch.shop || "") + "</b> · " + esc(line) + '<div class="m">' + esc((ch.title || "") + (ch.typed ? " · typed in" : "") + " · " + fmtWhen(ch.at)) + "</div></div>";
+}
+function renderPwSub() {
+  const el = $("pw-sub");
+  if (!el || !PW) return;
+  const failed = Object.keys(PW.sources || {}).map(function (k) { return PW.sources[k]; }).filter(function (s) { return s && !s.ok; });
+  if (failed.length) { el.textContent = "Couldn't read " + failed.map(function (s) { return s.shop; }).join(" and ") + " at " + fmtClock(failed[0].checked_at) + ". Showing their last prices"; return; }
+  el.textContent = PW.updatedAt ? "Checked " + rel(PW.updatedAt) : "Not checked yet";
+}
+function renderPriceWatch() {
+  const body = $("pw-body");
+  if (!PW) return;
+  renderPwSub();
+  const mine = pwMine();
+  const costco = (PW.typed || []).filter(function (o) { return o.shop.toLowerCase() === "costco"; })[0];
+  const others = pwAllRows().filter(function (o) { return o.stock !== "out_of_stock" && !o.stale; }).sort(function (a, b) { return a.per_egg_aud - b.per_egg_aud; });
+  const low = others[0];
+  const events = PW.events || [];
+  const seg = [["all", "All"], ["caged", "Caged"], ["free", "Cage free"]].map(function (f) {
+    return '<button type="button" class="' + (PW_FILTER === f[0] ? "on" : "") + '" data-action="pw-filter" data-f="' + f[0] + '">' + f[1] + "</button>";
+  }).join("");
+  body.innerHTML =
+    '<div class="kpis three">' +
+      kpi("Your tray", mine == null ? "-" : money(mine), mine == null ? "" : pwCents(mine / 30) + " an egg", "", "", "tag") +
+      kpi("Costco", costco ? money2(costco.price_aud) : "-", costco ? (costco.member_price_aud ? "Members " + money2(costco.member_price_aud) : "30 pack on DoorDash") : "Not typed in yet", "", "", "receipt") +
+      kpi("Cheapest", low ? money2(pwPer30(low)) : "-", low ? low.shop + (low.limit ? ", " + low.limit : "") : "", "", "", "trend") +
+    "</div>" +
+    '<div class="card"><div class="chead pw-head"><div><h2>30 eggs at each shop</h2><p class="csub" id="pw-rank">' + esc(pwYourRank()) + '</p></div><div class="seg" role="tablist" aria-label="Kind of eggs">' + seg + "</div></div>" +
+      '<div class="pwl cascade" id="pw-list">' + pwListHtml() + "</div>" +
+      '<p class="csub pw-note">Coles, Aldi, IGA, Umall and Gourmet Grocer update by themselves every 6 hours. Costco and Woolworths block that, so their prices are typed in.</p>' +
+    "</div>" +
+    '<div class="card"><div class="chead"><div><h2>Recent changes</h2></div></div><div class="feed">' +
+      (events.length ? events.map(pwChange).join("") : '<p class="csub">Price changes show here after the next checks.</p>') +
+    "</div></div>";
 }
 async function loadPriceWatch() {
   const body = $("pw-body");
-  if (!body.innerHTML) body.innerHTML = '<div class="kpis three">' + [1, 2, 3].map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("") + '</div><div class="card"><span class="sk" style="height:160px"></span></div>';
-  try {
-    const both = await Promise.all([fetch("/api/price-watch"), api("/api/price-watch/events?limit=30")]);
-    const snap = both[0], ev = both[1];
-    if (!snap.ok) { body.innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load prices (" + snap.status + ")</b><p>Tap Check prices now to run a fresh check.</p></div></div>"; return; }
-    const data = await snap.json();
-    const offers = data.offers || [];
-    const s = data.summary || {};
-    const c700 = offers.filter(function (o) { return o.category === "caged_700g"; });
-    const c30 = offers.filter(function (o) { return o.category === "caged_30pack"; });
-    let events = ev.ok ? (ev.data.events || []) : [];
-    if (!events.length && Array.isArray(data.last_changes)) events = data.last_changes;
-    body.innerHTML =
-      '<div class="kpis three">' +
-        kpi("Cheapest 700g dozen", s.cheapest_700g_in_stock ? pwPerEgg(s.cheapest_700g_in_stock.per_egg_aud) + " /egg" : "-", s.cheapest_700g_in_stock ? (s.cheapest_700g_in_stock.retailer || "") : "in stock now", "", "", "tag") +
-        kpi("Cheapest 30-pack", s.cheapest_30pack_in_stock ? pwPerEgg(s.cheapest_30pack_in_stock.per_egg_aud) + " /egg" : "-", s.cheapest_30pack_in_stock ? (s.cheapest_30pack_in_stock.retailer || "") : "in stock now", "", "", "tag") +
-        kpi("Products watched", String(offers.length), data.updatedAt ? "Checked " + rel(data.updatedAt) : "No check yet", "", "", "eye") +
-      "</div>" +
-      (offers.length ? "" : '<div class="card"><div class="empty-state">' + ic("trend", 28) + "<b>No prices yet</b><p>Tap Check prices now to run the first check.</p></div></div>") +
-      (offers.length ? '<div class="card"><div class="chead"><div><h2>Caged 700g dozens</h2><p class="csub">Cheapest per egg first</p></div></div>' + priceTable(c700) + "</div>" +
-        '<div class="card"><div class="chead"><div><h2>Caged 30-packs</h2><p class="csub">Not 700g. Usually 1.5 to 1.75 kg trays</p></div></div>' + priceTable(c30) + "</div>" : "") +
-      '<div class="card"><div class="chead"><div><h2>Recent changes</h2><p class="csub">' + esc(data.updatedAt ? "Updated " + fmtDateTime(data.updatedAt) + (data.source ? " · source " + data.source : "") : "Price and stock changes show here") + '</p></div></div><div class="feed">' +
-        (events.length ? events.map(function (ch) {
-          const delta = ch.delta_aud != null ? " · " + (ch.delta_aud > 0 ? "+" : "") + money2(ch.delta_aud) : "";
-          const fromP = ch.from ? money2(ch.from.price_aud) + " " + String(ch.from.stock || "").replace(/_/g, " ") : "-";
-          const toP = ch.to ? money2(ch.to.price_aud) + " " + String(ch.to.stock || "").replace(/_/g, " ") : "-";
-          return "<div><b>" + esc(String(ch.type || "change").replace(/_/g, " ")) + "</b> · " + esc(ch.retailer || "") + '<div>' + esc((ch.title || "") + delta) + '</div><div class="m">' + esc(fromP + " → " + toP + (ch.at ? " · " + fmtDateTime(ch.at) : "")) + "</div></div>";
-        }).join("") : '<p class="csub">No changes recorded yet.</p>') +
-      "</div></div>";
-  } catch (e) {
-    body.innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load prices</b><p>Check the connection and try again.</p></div></div>";
+  if (!PW) body.innerHTML = '<div class="kpis three">' + [1, 2, 3].map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("") + '</div><div class="card"><span class="sk" style="height:320px"></span></div>';
+  const r = await api("/api/price-watch");
+  if (!r.ok) {
+    if (!PW) body.innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load prices</b><p>Check the connection and try again.</p></div></div>";
+    else toast("Could not refresh prices");
+    return;
   }
+  PW = r.data;
+  renderPriceWatch();
 }
 async function pollPriceWatchNow() {
   const btn = $("pw-poll");
+  if (btn.classList.contains("busy")) return;
   btn.classList.add("busy");
-  toast("Checking prices…");
   const r = await api("/api/price-watch/poll", { method: "POST" });
   btn.classList.remove("busy");
   if (!r.ok) { toast(r.data.error || "Price check failed"); return; }
-  toast("Done · " + plural(r.data.changeCount || 0, "change"));
-  loadPriceWatch();
+  PW = r.data;
+  renderPriceWatch();
+  const failed = Object.keys(PW.sources || {}).filter(function (k) { return !PW.sources[k].ok; }).length;
+  toast(!r.data.ran ? "Checked a moment ago" : failed ? "Checked. " + plural(failed, "shop") + " didn't answer" : r.data.changeCount ? plural(r.data.changeCount, "price change") : "Checked. No changes");
+}
+function pwFilter(t) {
+  PW_FILTER = t.getAttribute("data-f") || "all";
+  qsa('[data-action="pw-filter"]').forEach(function (b) { b.classList.toggle("on", b === t); });
+  const list = $("pw-list");
+  if (!list) return;
+  list.innerHTML = pwListHtml();
+  $("pw-rank").textContent = pwYourRank();
+  list.classList.remove("cascade"); void list.offsetWidth; list.classList.add("cascade");
+}
+function pwSheet(o, shop) {
+  const isNew = !o;
+  const v = o || { shop: shop || "", title: shop === "Costco" ? "Pace Farm caged eggs 30 pack, on DoorDash" : "", housing: "caged", pack_eggs: 30, price_aud: "", member_price_aud: "", url: "" };
+  const kinds = ["caged", "barn", "free_range"].map(function (h) { return '<label><input type="radio" name="pw-h" value="' + h + '"' + (v.housing === h ? " checked" : "") + "><span>" + PW_HOUSING[h] + "</span></label>"; }).join("");
+  const html = '<div class="pw-form">' +
+    '<div class="two"><label class="field"><span>Shop</span><input class="inp" id="pw-shop" type="text" maxlength="40" autocomplete="off" value="' + esc(v.shop) + '" placeholder="Woolworths"' + (isNew && !shop ? " autofocus" : "") + '></label>' +
+    '<label class="field"><span>Eggs in the pack</span><input class="inp num" id="pw-eggs" type="number" inputmode="numeric" min="1" max="60" step="1" value="' + esc(v.pack_eggs) + '"></label></div>' +
+    '<label class="field"><span>What it is</span><input class="inp" id="pw-title" type="text" maxlength="120" autocomplete="off" value="' + esc(v.title) + '" placeholder="Pace Farm caged eggs 30 pack"></label>' +
+    '<div class="field"><span>Kind</span><div class="seg wide" role="radiogroup" aria-label="Kind of eggs">' + kinds + "</div></div>" +
+    '<div class="two"><label class="field"><span>Price</span><span class="money"><i>$</i><input class="inp num" id="pw-price" type="number" inputmode="decimal" min="0" step="0.01" value="' + esc(v.price_aud) + '"' + (shop || !isNew ? " autofocus" : "") + "></span></label>" +
+    '<label class="field"><span>Member price, if any</span><span class="money"><i>$</i><input class="inp num" id="pw-member" type="number" inputmode="decimal" min="0" step="0.01" value="' + esc(v.member_price_aud == null ? "" : v.member_price_aud) + '"></span></label></div>' +
+    '<label class="field"><span>Link, if you have one</span><input class="inp" id="pw-url" type="url" inputmode="url" autocomplete="off" value="' + esc(v.url || "") + '" placeholder="https://"></label>' +
+    "</div>";
+  const actions = [{ label: "Cancel", kind: "ghost", value: null }, { label: "Save", kind: "primary", value: true }];
+  if (!isNew) actions.unshift({ label: "Remove", kind: "ghost", value: "remove" });
+  openModal({
+    title: isNew ? "Type in a price" : v.shop + " price",
+    cls: "pw-sheet",
+    html: html,
+    actions: actions,
+    validate: function (w) {
+      if (!w.querySelector("#pw-shop").value.trim()) return "Enter the shop";
+      const n = Number(w.querySelector("#pw-eggs").value);
+      if (!(n >= 1 && n <= 60)) return "Enter how many eggs are in the pack";
+      if (!(Number(w.querySelector("#pw-price").value) > 0)) return "Enter the price";
+      return "";
+    },
+    collect: function (w) {
+      const h = w.querySelector('input[name="pw-h"]:checked');
+      return {
+        id: isNew ? "" : v.id,
+        shop: w.querySelector("#pw-shop").value.trim(),
+        title: w.querySelector("#pw-title").value.trim(),
+        housing: h ? h.value : "caged",
+        pack_eggs: Number(w.querySelector("#pw-eggs").value),
+        price_aud: w.querySelector("#pw-price").value,
+        member_price_aud: w.querySelector("#pw-member").value,
+        url: w.querySelector("#pw-url").value.trim(),
+      };
+    },
+    submit: async function (body) {
+      const r = await api("/api/price-watch/typed", { method: "POST", body: body });
+      if (!r.ok) return r.data.error || "Not saved. Try again";
+      toast(body.shop + " price saved");
+      loadPriceWatch();
+      return "";
+    },
+  }).then(function (val) {
+    if (val === "remove") pwRemove(v);
+  });
+}
+async function pwRemove(o) {
+  const r = await api("/api/price-watch/typed", { method: "POST", body: { id: o.id, remove: true } });
+  if (!r.ok) { toast(r.data.error || "Not removed. Try again"); return; }
+  await loadPriceWatch();
+  const back = r.data.removed;
+  toast(o.shop + " price removed", { label: "Undo", run: async function () {
+    const u = await api("/api/price-watch/typed", { method: "POST", body: Object.assign({}, back, { restore: true }) });
+    if (!u.ok) { toast("Couldn't put it back"); return; }
+    loadPriceWatch();
+  } });
 }
 
 /* ============================== flyer visits ============================== */
@@ -4204,6 +4377,10 @@ const ACTIONS = {
     onStockInput(input);
   },
   "pw-poll": pollPriceWatchNow,
+  "pw-filter": pwFilter,
+  "pw-add": function (t) { pwSheet(null, t.getAttribute("data-shop") || ""); },
+  "pw-new": function () { pwSheet(null, ""); },
+  "pw-edit": function (t) { const o = PW && (PW.typed || []).filter(function (x) { return x.id === t.getAttribute("data-id"); })[0]; if (o) pwSheet(o); },
   "visits-filter": function (t) { loadVisits(t.getAttribute("data-f")); },
   "visits-refresh": function () { loadVisits(); },
   "assets-refresh": function () { loadAssets(); },
