@@ -108,6 +108,18 @@ admin calls `POST /api/admin/zoho/connect`, and the callback stores the refresh 
 `GET /api/admin/mail/attachment`, `POST /api/admin/mail/flag {messageId, read}`,
 `POST /api/admin/mail/send {to, subject, text, replyTo?, quote?}`. Optional `ZOHO_ACCOUNTS_URL` /
 `ZOHO_MAIL_URL` override the Zoho hosts (used for local tests against a fake Zoho).
+Pictures and attachments in the mailbox (Nov 2026): Zoho's message HTML points inline pictures at
+its own web app (`/mail/ImageDisplay?...&cid=`), which 404s on getyolko.com. `/api/admin/mail/message`
+rewrites every picture (`<img src/srcset>`, `background=`, `url()` in styles) to the site:
+`/api/admin/mail/inline` (from the Zoho API by Content-ID, then by attachment id) and
+`/api/admin/mail/image` (a proxy for web pictures: no cookies or Referer, edge cached a day). Each
+attachment comes with signed `url` / `download` links to `/api/admin/mail/file`: pictures, PDFs, text and
+media open in the browser, anything else downloads with its real name. `<img>` can't send the Bearer
+key, so these links carry an HMAC under a key derived from `ADMIN_KEY` (mailbox files expire after
+about a week). Files are served with `nosniff` and, for pictures and text, a sandbox CSP, so nothing
+runs as a page on getyolko.com. The admin shows attachments at the end of the message like Mail
+(pictures as tiles that open in the lightbox, files as chips), tries a web picture straight from its
+host if the proxy can't get it, and hides a picture that still won't load unless it has alt text.
 Delivery status (delivered, opened, clicked, bounced, spam) comes from the Zoho CPaaS webhook
 `POST /api/zoho/email-events` (set in CPaaS > Agents > agent_1 > Webhooks). Zoho webhooks carry no
 credentials, so there is no token: an event only counts when its request id matches an
