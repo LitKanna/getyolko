@@ -2393,7 +2393,7 @@ async function refundOrder(id) {
   const back = money(r.data.amount != null ? r.data.amount : amt);
   const mail = r.data.refundEmail && !r.data.refundEmail.skipped ? (r.data.refundEmail.ok ? ". Email sent" : ". Email didn't send, retrying soon") : "";
   if (r.data.syncing) toast("Refunded in Stripe a moment ago. It shows here in a minute");
-  else toast(r.data.already ? "Already refunded · " + back : "Refunded " + back + " to " + who + mail);
+  else toast(r.data.already ? "Already refunded · " + back + mail : "Refunded " + back + " to " + who + mail);
   await loadOrders(true);
 }
 async function fetchStripeDetails(id) {

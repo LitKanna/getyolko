@@ -844,13 +844,17 @@ function buildRefundEmail(order, refund) {
   const currency = String(refund.currency || "AUD").toUpperCase();
   const paid = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
   const partial = Number(refund.amount) + 0.001 < Number(paid);
+  // completes: this refund pays back everything left after earlier partial refunds.
+  const rest = partial && refund.completes;
   const card = order.stripe?.cardLast4
     ? `${order.stripe.cardBrand ? order.stripe.cardBrand.toUpperCase() + " " : ""}card ending ${order.stripe.cardLast4}`
     : "your original payment method";
   const subject = `Your YOLKO refund (#${ref})`;
-  const lead = partial
-    ? `We've refunded part of your order, ${amount} ${currency}.`
-    : `We've refunded your order in full, ${amount} ${currency}.`;
+  const lead = rest
+    ? `We've refunded the rest of your order, ${amount} ${currency}.`
+    : partial
+      ? `We've refunded part of your order, ${amount} ${currency}.`
+      : `We've refunded your order in full, ${amount} ${currency}.`;
   const timing = "Refunds usually take 5 to 10 business days to reach your account, depending on your bank.";
   const C = EMAIL_C;
 
@@ -945,7 +949,7 @@ const refundTryKey = (refundId) => `email:refund:try:${refundId}`;
 
 // Refunds made before this (when refund emails and charge.refunded handling
 // went live) are never emailed or recorded retroactively.
-const REFUND_EMAIL_LAUNCH = Date.parse("2026-11-03T09:00:00Z");
+const REFUND_EMAIL_LAUNCH = Date.parse("2026-11-03T08:45:00Z");
 
 /**
  * Email the customer about one refund, once. Each refund has a single sender
@@ -970,7 +974,7 @@ async function maybeSendRefundEmail(env, order, refund) {
       const prev = (await env.DATA.get(refundTryKey(refund.id), "json")) || {};
       await env.DATA.put(
         refundTryKey(refund.id),
-        JSON.stringify({ attempts: (prev.attempts || 0) + 1, lastTriedAt: new Date().toISOString(), lastError: result.error || result.reason }),
+        JSON.stringify({ orderId: order.id, attempts: (prev.attempts || 0) + 1, lastTriedAt: new Date().toISOString(), lastError: result.error || result.reason }),
         { expirationTtl: 4 * 24 * 3600 }
       );
     }
@@ -981,17 +985,27 @@ async function maybeSendRefundEmail(env, order, refund) {
   return result;
 }
 
-/** Cron retry for a failed admin refund email (dashboard refunds retry through Stripe redelivery). */
-async function retryRefundEmail(env, order, now) {
-  const s = order.stripe || {};
-  const refundedAt = Date.parse(s.refundedAt || "") || 0;
-  if (!s.refundId || s.refundSource === "stripe" || refundedAt < REFUND_EMAIL_LAUNCH) return;
-  if (now - refundedAt < WEBHOOK_GRACE_SEC * 1000 || now - refundedAt > 3 * 24 * 3600 * 1000) return;
-  if (await env.DATA.get(refundEmailKey(s.refundId))) return;
-  const tries = (await env.DATA.get(refundTryKey(s.refundId), "json")) || {};
-  if ((tries.attempts || 0) >= EMAIL_MAX_ATTEMPTS) return;
-  if (now - (Date.parse(tries.lastTriedAt || "") || 0) < 10 * 60000) return;
-  await maybeSendRefundEmail(env, order, { id: s.refundId, amount: s.refundAmount, currency: s.refundCurrency });
+/**
+ * Cron retry for failed admin refund emails, found by their try keys so an
+ * order's place in the order index doesn't matter. Dashboard refunds retry
+ * through Stripe redelivering instead.
+ */
+async function retryRefundEmails(env, now) {
+  const listed = await env.DATA.list({ prefix: refundTryKey("") }).catch(() => null);
+  for (const { name } of listed?.keys || []) {
+    const refundId = name.slice(refundTryKey("").length);
+    const tries = await env.DATA.get(name, "json").catch(() => null);
+    if (!tries?.orderId || (tries.attempts || 0) >= EMAIL_MAX_ATTEMPTS) continue;
+    if (now - (Date.parse(tries.lastTriedAt || "") || 0) < 10 * 60000) continue;
+    const order = await env.DATA.get(tries.orderId, "json").catch(() => null);
+    const s = order?.stripe || {};
+    const refundedAt = Date.parse(s.refundedAt || "") || 0;
+    if (order?.paymentStatus !== "refunded" || s.refundId !== refundId || s.refundSource === "stripe") continue;
+    if (refundedAt < REFUND_EMAIL_LAUNCH || now - refundedAt < WEBHOOK_GRACE_SEC * 1000 || now - refundedAt > 3 * 24 * 3600 * 1000) continue;
+    if (await env.DATA.get(refundEmailKey(refundId))) continue;
+    await maybeSendRefundEmail(env, order, { id: refundId, amount: s.refundAmount, currency: s.refundCurrency, completes: true })
+      .catch((err) => console.log("refund email retry failed", tries.orderId, String(err?.message || err)));
+  }
 }
 
 async function stripeGet(env, path, timeoutMs = 10000) {
@@ -1057,6 +1071,9 @@ async function handleChargeRefunded(env, chargeId) {
   if (!String(orderId || "").startsWith("order:")) return { ignored: "no order" };
   const order = await env.DATA.get(orderId, "json");
   if (!order) return { ignored: "order not found" };
+  // A refund of a second payment for the same order (a duplicate checkout)
+  // leaves the order, its stock and the customer's emails alone.
+  if (order.stripe?.paymentIntentId && order.stripe.paymentIntentId !== piId) return { ignored: "not the order's payment" };
 
   const currency = String(charge.currency || "aud").toUpperCase();
   const amountRefunded = Number(charge.amount_refunded) / 100;
@@ -1080,10 +1097,13 @@ async function handleChargeRefunded(env, chargeId) {
     order.stripe = { ...(order.stripe || {}), amountRefunded, refundCurrency: currency };
     await env.DATA.put(orderId, JSON.stringify(order));
   }
+  // The newest refund on a fully refunded charge pays back whatever was left.
+  const newest = liveRefunds(charge).reduce((a, r) => (!a || Number(r.created) > Number(a.created) ? r : a), null);
   let sent = 0;
   let failed = 0;
   for (const r of external) {
-    const res = await maybeSendRefundEmail(env, order, { id: r.id, amount: Number(r.amount) / 100, currency });
+    const completes = charge.refunded === true && r.id === newest?.id;
+    const res = await maybeSendRefundEmail(env, order, { id: r.id, amount: Number(r.amount) / 100, currency, completes });
     if (res.ok && !res.already) sent++;
     else if (!res.ok && res.transient) failed++;
   }
@@ -2135,10 +2155,6 @@ async function reconcileOrders(env) {
   const now = Date.now();
   for (const id of (await getOrderIndex(env)).slice(0, 40)) {
     const order = await env.DATA.get(id, "json").catch(() => null);
-    if (order?.paymentStatus === "refunded") {
-      await retryRefundEmail(env, order, now).catch((err) => console.log("refund email retry failed", id, String(err?.message || err)));
-      continue;
-    }
     if (!order || order.paymentStatus !== "paid" || order.status === "cancelled") continue;
     const ce = order.confirmationEmail || {};
     const paidAt = Date.parse(order.stripe?.paidAt || "") || 0;
@@ -2153,6 +2169,7 @@ async function reconcileOrders(env) {
       await maybeSendOrderEmail(env, id).catch((err) => console.log("email retry failed", id, String(err?.message || err)));
     }
   }
+  await retryRefundEmails(env, now);
 }
 
 // How many physical trays an order consumes (dozen packs do not use tray stock)
@@ -3797,13 +3814,36 @@ async function handleApi(request, env, url, ctx) {
         if (webhookRefundPending(charge)) {
           return json({ ok: true, already: true, syncing: true, stripe: order.stripe || null });
         }
+        // A refund this button made whose request failed before saving it:
+        // record it now and send its email (the marker stops a second copy).
+        const mine = liveRefunds(charge).find((r) => r.metadata?.orderId === id);
         order.paymentStatus = "refunded";
         order.status = "cancelled";
+        if (mine && !order.stripe?.refundId) {
+          order.stripe = {
+            ...(order.stripe || {}),
+            refundId: mine.id,
+            refundStatus: mine.status,
+            refundAmount: Number(mine.amount) / 100,
+            refundCurrency: String(mine.currency || "aud").toUpperCase(),
+            refundedAt: new Date(Number(mine.created) * 1000).toISOString(),
+            paymentIntentId: paymentIntentId || order.stripe?.paymentIntentId || null,
+          };
+        }
         const stock = await syncStock(env, order, "cancelled");
         await env.DATA.put(id, JSON.stringify(order));
+        const refundEmail = mine && Number(mine.created) * 1000 >= REFUND_EMAIL_LAUNCH
+          ? await maybeSendRefundEmail(env, order, {
+            id: mine.id,
+            amount: Number(mine.amount) / 100,
+            currency: String(mine.currency || "aud").toUpperCase(),
+            completes: true,
+          })
+          : null;
         return json({
           ok: true,
           already: true,
+          refundEmail: refundEmail && { ok: Boolean(refundEmail.ok), skipped: Boolean(refundEmail.skipped), error: refundEmail.error || null },
           traysAvailable: stock.traysAvailable,
           stockDelta: stock.delta,
           stripe: order.stripe || null,
@@ -3830,6 +3870,7 @@ async function handleApi(request, env, url, ctx) {
       id: refund.id,
       amount: order.stripe.refundAmount,
       currency: order.stripe.refundCurrency,
+      completes: true,
     });
 
     return json({

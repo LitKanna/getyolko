@@ -74,7 +74,8 @@ sends the email if the webhook has not. Admins can resend with `POST /api/admin/
 Refunds email the customer once per refund (`email:refund:<refundId>` marker). The admin Refund
 button sends for refunds it creates (tagged `metadata.orderId`); the webhook's `charge.refunded`
 event (also on the live endpoint) records and emails refunds made in the Stripe dashboard after
-`REFUND_EMAIL_LAUNCH`. A failed admin refund email is retried by the cron; a failed dashboard one
+`REFUND_EMAIL_LAUNCH`. A failed admin refund email is retried by the cron (it lists the
+`email:refund:try:<refundId>` keys); a failed dashboard one
 answers 502 so Stripe redelivers. For `WEBHOOK_GRACE_SEC` after a dashboard full refund,
 `/api/refund` and `/api/order-status` leave the order to the webhook, so a stale KV copy never
 returns stock twice. The confirmation and refund emails share `emailFrame()`.
