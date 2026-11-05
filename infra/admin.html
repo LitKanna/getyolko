@@ -60,7 +60,7 @@
   --line:rgba(0,0,0,.09); --line2:#dadada; --line3:#b3b3b3;
   /* "Tint" is simply the ink: links, plain buttons and selections are black (white in dark). */
   --tint:var(--ink); --tint-fill:#111; --tint-hover:#333; --on-tint:#fff; --tint-soft:rgba(0,0,0,.06);
-  --focus:rgba(0,0,0,.5);
+  --focus:rgba(0,0,0,.5); --search-ring:rgba(0,0,0,.22);
   --badge:#111; --on-badge:#fff;
   --green:var(--ink); --green-soft:rgba(0,0,0,.06); --red:var(--ink); --red-soft:rgba(0,0,0,.075);
   --amber:var(--ink); --amber-soft:rgba(0,0,0,.06);
@@ -109,7 +109,7 @@
     --ink:#f2f2f2; --ink2:#ccc; --muted:#9e9e9e; --faint:#5c5c5c;
     --line:rgba(255,255,255,.1); --line2:#333; --line3:#555;
     --tint-fill:#f2f2f2; --tint-hover:#fff; --on-tint:#000; --tint-soft:rgba(255,255,255,.1);
-    --focus:rgba(255,255,255,.6);
+    --focus:rgba(255,255,255,.6); --search-ring:rgba(255,255,255,.3);
     --badge:#f2f2f2; --on-badge:#000;
     --sel:#383838; --on-sel:#fff;
     --green-soft:rgba(255,255,255,.1); --red-soft:rgba(255,255,255,.12); --amber-soft:rgba(255,255,255,.1);
@@ -244,20 +244,36 @@ a { color:inherit; text-decoration:none; }
 .ibg { display:flex; flex:none; border-radius:22px; background:var(--glass-hi); box-shadow:var(--glass-shadow); }
 .ibg .ib { background:none; box-shadow:none; }
 .ibg .ib:hover { background:var(--hover); }
-/* Search is a Liquid Glass capsule. */
+/* Search is one Liquid Glass capsule, like the search field in an iOS 27 toolbar. The input inside
+   has no box, ring or native search styling of its own, so focus never draws a second shape: the
+   capsule just gets a hairline ring and the icon darkens. A clear button shows once there is text,
+   and the "/" shortcut hint only shows with a mouse, while the field is empty and not in use. */
 .search {
-  display:flex; align-items:center; gap:8px; width:280px; height:44px; padding:0 10px 0 14px;
-  border-radius:22px; background:var(--glass-hi); box-shadow:var(--glass-shadow); color:var(--muted);
-  transition:box-shadow .15s;
+  display:flex; align-items:center; gap:8px; width:280px; height:44px; padding:0 4px 0 14px;
+  border-radius:22px; background:var(--glass-hi); box-shadow:var(--glass-shadow); color:var(--muted); cursor:text;
+  transition:box-shadow .2s var(--ease), color .2s var(--ease);
 }
-.search:focus-within { box-shadow:var(--glass-shadow), 0 0 0 3px var(--focus); color:var(--ink); }
+.search:focus-within { box-shadow:var(--glass-shadow), 0 0 0 1.5px var(--search-ring); color:var(--ink); }
 .search .i { width:20px; height:20px; }
-.search input { flex:1; min-width:0; border:0; background:none; height:100%; font-size:16px; color:var(--ink); }
-.search input::placeholder { color:var(--muted); }
+.search input {
+  flex:1; min-width:0; height:100%; padding:0; border:0; border-radius:0; outline:none; background:none;
+  appearance:none; -webkit-appearance:none; font-size:16px; line-height:22px; color:var(--ink); caret-color:var(--ink);
+}
+.search input::placeholder { color:var(--muted); opacity:1; }
+.search input::-webkit-search-decoration, .search input::-webkit-search-cancel-button,
+.search input::-webkit-search-results-button, .search input::-webkit-search-results-decoration { -webkit-appearance:none; display:none; }
 .search kbd {
-  font:inherit; font-size:12px; line-height:20px; min-width:22px; padding:0 6px; text-align:center;
+  flex:none; margin-right:8px; font:inherit; font-size:12px; line-height:20px; min-width:22px; padding:0 6px; text-align:center;
   border-radius:6px; background:var(--subtle); color:var(--ink2);
 }
+.search:focus-within kbd, .search input:not(:placeholder-shown) ~ kbd { display:none; }
+/* The clear button fills the capsule's height, so it is a full 44pt target round a small grey disc. */
+.search .sx { display:none; flex:none; width:36px; height:44px; place-items:center; border-radius:22px; color:var(--muted); }
+.search .sx .dot { display:grid; place-items:center; width:18px; height:18px; border-radius:50%; background:var(--muted); color:var(--paper); }
+.search .sx .i { width:11px; height:11px; stroke-width:3; }
+.search .sx:active .dot { background:var(--ink2); }
+.search input:not(:placeholder-shown) ~ .sx { display:grid; }
+@media (hover:none), (pointer:coarse) { .search kbd { display:none; } }
 /* Round Liquid Glass buttons with one icon. */
 .ib {
   width:44px; height:44px; flex:none; border-radius:50%; background:var(--glass-hi); box-shadow:var(--glass-shadow);
@@ -324,7 +340,7 @@ a { color:inherit; text-decoration:none; }
   transition:background .15s, box-shadow .15s;
 }
 .inp:hover, .dd:hover { background:var(--press); }
-.inp:focus, .dd:focus { background:var(--subtle); box-shadow:0 0 0 3px var(--focus); }
+.inp:focus, .dd:focus { background:var(--subtle); box-shadow:0 0 0 3px var(--focus); outline:none; }
 .inp::placeholder { color:var(--muted); font-weight:400; }
 .dd {
   appearance:none; -webkit-appearance:none; padding-right:36px; cursor:pointer; font-weight:400; font-size:15px;
@@ -1170,7 +1186,12 @@ body:has(#savebar) .toasts { bottom:84px; }
   .vhead .vact .btn { width:44px; height:44px; padding:0; border-radius:50%; }
   .vhead .vact .btn .i { width:20px; height:20px; }
   .search { display:none; }
-  .searching .search { display:flex; position:fixed; left:calc(16px + var(--safe-l)); right:calc(16px + var(--safe-r)); top:calc(8px + var(--safe-t)); width:auto; z-index:32; height:44px; box-shadow:var(--glass-shadow), var(--shadow-md); animation:blobIn var(--t-spring) var(--spring) both; transform-origin:100% 50%; }
+  .searching .search { display:flex; position:fixed; left:calc(16px + var(--safe-l)); right:calc(68px + var(--safe-r)); top:calc(8px + var(--safe-t)); width:auto; z-index:32; height:44px; box-shadow:var(--glass-shadow), var(--shadow-md); animation:blobIn var(--t-spring) var(--spring) both; transform-origin:100% 50%; }
+  .searching .search:focus-within { box-shadow:var(--glass-shadow), var(--shadow-md), 0 0 0 1.5px var(--search-ring); }
+  /* While searching, the bell and refresh step aside and the search button turns into Close. */
+  .searching .vact .ibg { display:none; }
+  #o-search-btn .i + .i, .searching #o-search-btn .i:first-child { display:none; }
+  .searching #o-search-btn .i + .i { display:block; }
   /* The large title folds into a small one on a frosted bar as the page scrolls, as in iOS. */
   .navbar {
     display:flex; position:fixed; z-index:30; top:0; left:0; right:0; height:calc(var(--safe-t) + 64px);
@@ -1382,8 +1403,8 @@ body:has(#savebar) .toasts { bottom:84px; }
       <div class="vhead tight">
         <div class="min0"><h1>Orders</h1><p class="sub" id="o-sub">Loading orders</p></div>
         <div class="vact">
-          <label class="search" id="o-search"><span data-icon="search"></span><input id="o-q" type="search" placeholder="Search orders" autocomplete="off" aria-label="Search orders"><kbd>/</kbd></label>
-          <button class="ib sm-only" type="button" data-action="toggle-search" aria-label="Search"><span data-icon="search"></span></button>
+          <label class="search" id="o-search"><span data-icon="search"></span><input id="o-q" type="search" placeholder="Search orders" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Search orders"><kbd aria-hidden="true">/</kbd><button class="sx" type="button" data-action="clear-search" aria-label="Clear search"><span class="dot"><span data-icon="x" data-size="11"></span></span></button></label>
+          <button class="ib sm-only" type="button" data-action="toggle-search" id="o-search-btn" aria-label="Search" aria-expanded="false"><span data-icon="search"></span><span data-icon="x"></span></button>
           <div class="ibg">
             <button class="ib bell" type="button" data-action="alerts" id="o-alerts" aria-label="New order alerts" title="New order alerts"><span data-icon="bell"></span></button>
             <button class="ib" type="button" data-action="refresh" id="o-refresh" aria-label="Refresh" title="Refresh"><span data-icon="refresh"></span></button>
@@ -2153,6 +2174,23 @@ function mapsRoute(orders, keepOrder) {
     (via.length ? "&waypoints=" + encodeURIComponent(via.join("|")) : "");
 }
 let VISIBLE_IDS = [];
+/** Sets the Orders search text and redraws the list, as typing would. */
+function setQuery(q) {
+  const el = $("o-q");
+  el.value = q; S.q = q;
+  renderOrdersMeta(); renderOrderList();
+}
+/** Opens or closes search. On a phone the field covers the top bar, so closing it also clears the
+    text: the list never stays filtered by a field you can't see. */
+function setSearching(on) {
+  const v = $("v-orders");
+  const was = v.classList.contains("searching");
+  v.classList.toggle("searching", on);
+  const b = $("o-search-btn");
+  if (b) { b.setAttribute("aria-expanded", on ? "true" : "false"); b.setAttribute("aria-label", on ? "Close search" : "Search"); }
+  if (on) { $("o-q").focus(); return; }
+  if (was && matchMedia("(max-width:899px)").matches) { if (S.q) setQuery(""); $("o-q").blur(); }
+}
 function renderOrderList() {
   const el = $("o-list");
   if (!S.ordersLoaded) {
@@ -5182,7 +5220,8 @@ const ACTIONS = {
   "alerts": alertsSheet,
   "kpi-stock": function () { go("stock"); },
   "refresh": function () { loadOrders(true); refreshSettingsQuiet(); },
-  "toggle-search": function () { const v = $("v-orders"); v.classList.toggle("searching"); if (v.classList.contains("searching")) $("o-q").focus(); },
+  "toggle-search": function () { setSearching(!$("v-orders").classList.contains("searching")); },
+  "clear-search": function () { setQuery(""); $("o-q").focus(); },
   "copy": function (t) { copyText(t.getAttribute("data-text"), t.getAttribute("data-msg")); },
   "copy-addresses": copyAddresses,
   "status": function (t) { setStatus(t.getAttribute("data-id"), t.getAttribute("data-status")); },
@@ -5273,6 +5312,8 @@ document.addEventListener("click", function (e) {
   if (t.tagName === "A") e.preventDefault();
   fn(t, e);
 });
+// Tapping the clear button keeps the cursor in the search field, so a phone keyboard stays up.
+document.addEventListener("mousedown", function (e) { if (e.target.closest && e.target.closest(".search .sx")) e.preventDefault(); });
 document.addEventListener("input", function (e) {
   const t = e.target;
   if (t.id === "o-q") { S.q = t.value; renderOrdersMeta(); renderOrderList(); return; }
@@ -5311,12 +5352,17 @@ document.addEventListener("keydown", function (e) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && S.view === "stock") { e.preventDefault(); saveSettings(); return; }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   if (typing) {
-    if (e.key === "Escape") { e.target.blur(); if (e.target.id === "o-q") $("v-orders").classList.remove("searching"); }
+    if (e.key === "Escape" && e.target.id === "o-q") {
+      // Like a Mac search field: the first Escape clears the text, the next one leaves the field.
+      if (e.target.value) { setQuery(""); return; }
+      setSearching(false); e.target.blur(); return;
+    }
+    if (e.key === "Escape") e.target.blur();
     return;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.view === "orders") {
-    if (e.key === "/") { e.preventDefault(); $("v-orders").classList.add("searching"); $("o-q").focus(); return; }
+    if (e.key === "/") { e.preventDefault(); setSearching(true); return; }
     if (e.key === "Escape" && S.selectedId) { closeDetail(); return; }
     if (e.key === "j" || e.key === "k") {
       if (!VISIBLE_IDS.length) return;
