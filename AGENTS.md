@@ -177,13 +177,18 @@ its own, 30 minutes later (Umall's Shopify sometimes answers 429, Coles sometime
 waits for the next 6-hourly read. Never re-read every shop on every retry: that most likely got Coles to
 bot-check us on 6 Nov while a dead shop kept the old rule retrying every 30 minutes (`pricewatch:v2:latest`); Check now in the
 admin reads them at once (at most once a minute). A shop that fails keeps its last prices, marked
-stale, and the page says so under the heading. Changes go to `pricewatch:v2:events`.
+stale, and the page says so under the heading. Only real price and stock changes go to
+`pricewatch:v2:events` ("added" and "removed" were mostly the cheapest pick moving to another egg).
 Woolworths blocks every automated request (Akamai 403, even robots.txt, from Cloudflare and from
 cloud servers) and Costco only sells eggs through DoorDash, which blocks bots and bans scraping, so
 their prices are typed in from the admin (`pricewatch:v2:typed`, `POST /api/price-watch/typed`);
 Costco starts with what Kanna saw on 3 Nov 2026 ($14.79, members $12.99), weight not shown. The
-page has Trays and Dozens tabs; each group ranks the real pack prices with YOLKO's price for the
-same variety (1 tray, 1 dozen) slotted in. This is comparison only: nothing here may ever
+page (redesigned 6 Nov 2026 after Kanna called it ugly) is built like Stock & prices: three KPIs,
+Trays / Dozens, then one card per size and kind that another shop sells, each a plain list
+cheapest first with YOLKO's own price for that variety in its place (a "You" tag, same row style,
+no rank circles, no filler rows). Rows show shop, product name without the pack size, and price
+with "$1.00 dearer" or "Out of stock" under it. Price changes below show 6 at a time, keep only the
+latest stock flip per egg, and name the egg by its group ("Cage 1.5kg tray"). This is comparison only: nothing here may ever
 change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
 admin only.
 

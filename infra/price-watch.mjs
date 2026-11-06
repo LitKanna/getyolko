@@ -415,7 +415,10 @@ async function getEvents(env) {
   return Array.isArray(raw) ? raw : [];
 }
 
-async function pushEvents(env, changes) {
+/** Only real price and stock changes are kept. "Added" and "removed" mostly meant the cheapest pick
+ *  in a group moved to another egg, which filled the history with noise (6 Nov 2026). */
+async function pushEvents(env, all) {
+  const changes = all.filter((c) => c.type === "price" || c.type === "stock");
   if (!changes.length) return;
   const prev = await getEvents(env);
   await env.DATA.put(EVENTS_KEY, JSON.stringify([...changes, ...prev].slice(0, EVENTS_MAX)));
@@ -513,6 +516,13 @@ async function getLatest(env) {
   return (await env.DATA.get(LATEST_KEY, "json")) || null;
 }
 
+/** Which size and kind a history line is about ("cf1500"), worked out from its product name. */
+function eventGroup(e) {
+  if (e.variety !== undefined) return e;
+  const row = eggRow({ title: e.title, price_aud: e.to?.price_aud || e.from?.price_aud || 1 });
+  return { ...e, variety: row ? groupOf(row).variety : null };
+}
+
 /** Everything the Competitors page shows, in one answer. */
 async function priceWatchView(env, limit = 30) {
   const [latest, typed, events] = await Promise.all([getLatest(env), getTyped(env), getEvents(env)]);
@@ -523,7 +533,7 @@ async function priceWatchView(env, limit = 30) {
     sources: latest?.sources || {},
     offers: (latest?.offers || []).map(withGroup),
     typed: typed.map(typedView),
-    events: events.slice(0, limit),
+    events: events.filter((e) => e.type === "price" || e.type === "stock").slice(0, limit).map(eventGroup),
   };
 }
 
