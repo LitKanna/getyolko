@@ -926,29 +926,28 @@ body:has(#savebar) .toasts { bottom:84px; }
 .insight.due { color:var(--ink2); }
 
 /* ---------- competitors ---------- */
-/* One ranked list, cheapest 30 eggs first. Your own tray is the solid row, so where you stand
-   reads at a glance; rank numbers sit where order lists show initials. */
-.pw-head { flex-wrap:wrap; }
-/* One group per size and kind (Cage 1.5kg, Free range 600g): a small heading, then the shops. */
-.pwg + .pwg { margin-top:18px; }
-.pwg-h { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:0 0 6px; }
-.pwg-h b { font-size:15px; line-height:20px; font-weight:600; }
-.pwg-h .min0 span { margin-left:8px; color:var(--muted); font-size:13px; line-height:18px; }
-.pwg-rk { flex:none; color:var(--muted); font-size:13px; line-height:18px; }
-.pwg-none { margin:8px 0 0; }
-.pwl { display:flex; flex-direction:column; margin:0 -12px; }
-.pwl .row { min-height:68px; color:inherit; text-decoration:none; }
-.pwl .av { font-variant-numeric:tabular-nums; }
-.pwl .mt { font-size:15px; }
-.pwl .mt2 { display:block; margin-top:1px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.pwl .rt { align-self:center; }
-.pwl .pr { font-variant-numeric:tabular-nums; }
-.pwl .row.me, .pwl .row.me:hover { background:var(--sel); color:var(--on-sel); }
-.pwl .row.me .mt, .pwl .row.me .mt2, .pwl .row.me .tm { color:color-mix(in srgb, var(--on-sel) 72%, transparent); }
-.pwl .row.me .av { background:var(--on-sel); color:var(--sel); }
-.pwl .row.me::after, .pwl .row:has(+ .me)::after { display:none; }
-.pwl .row.add .av { background:var(--subtle); color:var(--ink); }
-.pw-note { margin-top:14px; }
+/* Built like Stock & prices: Trays / Dozens, then one card per size and kind (Cage 1.5kg, Free
+   range 700g), each a plain list, cheapest first. YOLKO sits in its place among the shops with a
+   small You tag, in the same row style as everyone else. */
+.pw-grid { align-items:start; }
+.pwg .chead { align-items:center; margin-bottom:4px; }
+.pwg h2 .h2x, .pw-hist h2 .h2x { color:var(--muted); font-weight:400; }
+.pwl { display:flex; flex-direction:column; }
+.pwr { display:flex; align-items:center; gap:12px; min-height:60px; margin:0 -10px; padding:8px 10px; border-radius:14px; text-align:left; color:inherit; text-decoration:none; position:relative; transition:background .12s; }
+.pwr + .pwr::before { content:""; position:absolute; top:0; left:10px; right:10px; height:.5px; background:var(--line); }
+a.pwr:hover, button.pwr:hover { background:var(--hover); }
+a.pwr:active, button.pwr:active { background:var(--press); }
+a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); outline-offset:-1px; }
+.pwr:hover::before, .pwr:hover + .pwr::before { opacity:0; }
+.pwr-t { flex:1; min-width:0; }
+.pwr-t b { display:flex; align-items:center; gap:8px; font-size:17px; line-height:22px; font-weight:600; letter-spacing:-.012em; }
+.pwr-s { display:block; margin-top:1px; color:var(--muted); font-size:15px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pwr-r { flex:none; text-align:right; }
+.pwr-r b { display:block; font-size:17px; line-height:22px; font-weight:600; letter-spacing:-.012em; font-variant-numeric:tabular-nums; }
+.pwr-n { display:block; margin-top:1px; color:var(--muted); font-size:13px; line-height:18px; white-space:nowrap; }
+.pwr.off .pwr-t b, .pwr.off .pwr-r b { color:var(--muted); font-weight:400; }
+.pw-note { margin:12px 2px 16px; }
+.pw-more { margin-top:8px; }
 .pw-form .two { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .pw-form .seg.wide { grid-auto-flow:column; grid-template-columns:none; }
 .modal.pw-sheet { width:min(520px, 100%); }
@@ -1288,9 +1287,6 @@ body:has(#savebar) .toasts { bottom:84px; }
   .modal::before { content:""; display:block; width:36px; height:5px; border-radius:3px; background:var(--line3); margin:0 auto 14px; opacity:.6; }
   .modal .mact { gap:10px; }
   .modal .mact .btn { flex:1; min-width:0; height:50px; border-radius:25px; }
-  .pwl { margin:0 -10px; }
-  .pwl .row { padding-left:10px; padding-right:10px; }
-  .pw-head .seg { width:100%; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; }
   .vgrid { grid-template-columns:repeat(2, minmax(0,1fr)); }
   .agrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
   .acard .a3 { grid-template-columns:1fr 1fr; }
@@ -4240,7 +4236,6 @@ let PW = null, PW_FORMAT = "tray";
 try { if (localStorage.getItem("yolko_pw_format") === "dozen") PW_FORMAT = "dozen"; } catch (e) {}
 const PW_HOUSING = { caged: "Cage", barn: "Cage free", free_range: "Free range" };
 const PW_KIND_HOUSING = { cage: "caged", cf: "barn", fr: "free_range" };
-const PW_TYPED_SHOPS = ["Costco", "Woolworths"];
 // The sizes a typed-in price can be: eggs:grams, grams empty when the pack doesn't say.
 const PW_SIZES = [
   ["30:1750", "Tray of 30, 1.75kg"], ["30:1500", "Tray of 30, 1.5kg"], ["30:1000", "Tray of 30, 1kg"], ["18:1000", "18 pack, 1kg"],
@@ -4275,7 +4270,7 @@ function pwGroupName(g) {
   const v = varietyOf(g);
   if (v) return v.format === "tray" && v.eggs !== 30 ? KIND_NAME[v.kind] + " " + v.eggs + " pack, " + v.weight : v.name;
   const m = /^(cage|fr|cf)-(tray|dozen)(x18)?$/.exec(g) || [];
-  return (KIND_NAME[m[1]] || "Eggs") + (m[3] ? " 18 pack" : "") + ", other or no weight";
+  return (KIND_NAME[m[1]] || "Eggs") + (m[3] ? " 18 pack" : "") + ", other weights";
 }
 function pwGroupEggs(g) { const v = varietyOf(g); if (v) return v.eggs + " eggs"; return /x18$/.test(g) ? "18 eggs" : /-dozen/.test(g) ? "12 eggs" : "30 eggs"; }
 /** The order groups show in: kind, then YOLKO's own weights, then other weights. */
@@ -4287,89 +4282,138 @@ function pwGroupOrder(g) {
   if (v) w = v.format === "tray" ? [1750, 1500, 1000].indexOf(v.grams) + (v.eggs === 18 ? 3 : 0) : [500, 600, 700, 800].indexOf(v.grams);
   return k * 100 + w;
 }
-function pwFacts(o) {
-  const parts = [];
-  if (o.stock === "out_of_stock") parts.push("Out of stock");
-  if (!o.wclass) parts.push(o.pack_weight_g ? weightText(o.pack_weight_g) : "Weight not shown");
-  else if (Math.abs(o.pack_weight_g - o.wclass) >= 50) parts.push(weightText(o.pack_weight_g));
-  parts.push(pwCents(o.per_egg_aud) + " an egg");
-  if (o.was_aud) parts.push("was " + money2(o.was_aud));
-  if (o.member_price_aud) parts.push("members " + money2(o.member_price_aud));
-  if (o.limit) parts.push(o.limit);
-  if (o.source === "typed") {
-    const days = Math.floor((Date.now() - Date.parse(o.checked_at)) / 864e5);
-    parts.push(days > 14 ? "typed " + days + " days ago" : "typed " + pwDate(o.checked_at));
-  }
+/** "Pace Farm Caged Eggs Large 30 Pack 1.5kg" -> "Pace Farm Caged Eggs Large": the card already says the size. */
+function pwName(title) {
+  return String(title || "")
+    .replace(/\(.*?\)/g, " ")
+    .replace(/\b\d+\s*(pack|pk|pieces|pcs|eggs)\b/gi, " ")
+    .replace(/\b\d+(\.\d+)?\s*(kg|g)\b/gi, " ")
+    .replace(/\s+-\s*$|\s+-\s+(?=\s)/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+,/g, ",")
+    .replace(/[\s\-–,·]+$/, "")
+    .trim();
+}
+/** Short name of a group for the history: "Cage 1.5kg tray", "Free range 700g dozen", "Cage tray, other weights". */
+function pwShortName(g) {
+  const v = varietyOf(g);
+  if (v) return v.format === "dozen" ? v.name + " dozen" : v.eggs === 30 ? v.name + " tray" : KIND_NAME[v.kind] + " " + v.eggs + " pack, " + v.weight;
+  const m = /^(cage|fr|cf)-(tray|dozen)(x18)?$/.exec(String(g || ""));
+  if (!m) return "";
+  return KIND_NAME[m[1]] + (m[3] ? " 18 pack" : " " + m[2]) + ", other weights";
+}
+/** Second line of a shop's row: the product, then only what changes the comparison. */
+function pwSub(o) {
+  const parts = [pwName(o.title)];
+  if (!o.wclass) parts.push(o.pack_weight_g ? weightText(o.pack_weight_g) : "weight not shown");
+  if (o.member_price_aud) parts.push("members " + money(o.member_price_aud));
+  if (o.limit) parts.push(String(o.limit).toLowerCase());
+  if (o.source === "typed") parts.push("typed " + pwDate(o.checked_at));
   if (o.stale) parts.push("last seen " + rel(o.checked_at));
   return parts.filter(Boolean).join(" · ");
 }
-function pwRow(o, rank, mine) {
-  const inner = '<span class="av">' + (rank ? rank : "-") + '</span><span class="min0"><span class="nm"><b>' + esc(o.shop) + '</b></span><span class="mt">' + esc(o.title) + '</span><span class="mt2">' + esc(pwFacts(o)) + '</span></span>' +
-    '<span class="rt"><span class="pr num">' + esc(money2(o.price_aud)) + '</span><span class="tm">' + esc(pwVs(o.price_aud, mine)) + "</span></span>";
-  const label = o.shop + ", " + money2(o.price_aud) + (mine != null ? ", " + pwVs(o.price_aud, mine) : "");
-  if (o.source === "typed") return '<button type="button" class="row" data-action="pw-edit" data-id="' + esc(o.id) + '" aria-label="' + esc(label + ". Change this price") + '">' + inner + "</button>";
-  return '<a class="row" href="' + esc(/^https:\/\//i.test(o.url || "") ? o.url : "#") + '" target="_blank" rel="noopener" aria-label="' + esc(label + ". Open on " + o.shop) + '">' + inner + "</a>";
+function pwRowHtml(tag, attrs, cls, name, sub, price, note) {
+  return "<" + tag + ' class="pwr' + (cls ? " " + cls : "") + '"' + attrs + '><span class="pwr-t"><b>' + name + '</b><span class="pwr-s">' + esc(sub) + "</span></span>" +
+    '<span class="pwr-r"><b class="num">' + esc(price) + "</b>" + (note ? '<span class="pwr-n">' + esc(note) + "</span>" : "") + "</span></" + tag + ">";
 }
-function pwMineRow(g, rank, mine) {
+function pwRow(o, mine) {
+  const out = o.stock === "out_of_stock";
+  const note = out ? "Out of stock" : pwVs(o.price_aud, mine);
+  const label = o.shop + ", " + money(o.price_aud) + (note ? ", " + note : "");
+  if (o.source === "typed") {
+    return pwRowHtml("button", ' type="button" data-action="pw-edit" data-id="' + esc(o.id) + '" aria-label="' + esc(label + ". Change this price") + '"', out ? "off" : "", esc(o.shop), pwSub(o), money(o.price_aud), note);
+  }
+  const href = /^https:\/\//i.test(o.url || "") ? o.url : "#";
+  return pwRowHtml("a", ' href="' + esc(href) + '" target="_blank" rel="noopener" aria-label="' + esc(label + ". Open on " + o.shop) + '"', out ? "off" : "", esc(o.shop), pwSub(o), money(o.price_aud), note);
+}
+function pwMineRow(g, mine) {
   const v = varietyOf(g);
   const p = (PW.mine && PW.mine.prices) || {};
-  const more = [];
+  const parts = [];
+  const n = pwMyStock(g);
+  if (n != null) parts.push(n > 0 ? plural(n, unitWord(v, 1), unitWord(v, 2)) + " in stock" : v.main ? "Sold out" : "None in stock");
   if (v.format === "tray") {
     const two = p[v.main ? "tray2" : g + "-2"], box = p[v.main ? "box" : g + "-box"];
-    if (two > 0) more.push("2 for " + money(two));
-    if (box > 0) more.push("6 for " + money(box));
-  } else if (p[g + "case"] > 0) more.push("case of 15 " + money(p[g + "case"]));
-  const n = pwMyStock(g);
-  const stock = n == null ? "" : n > 0 ? plural(n, unitWord(v, 1), unitWord(v, 2)) + " in stock" : v.main ? "Sold out" : "Not on the shop, none in stock";
-  const what = v.main ? "Pace Farm extra large cage eggs, tray of 30" : "Your " + v.name.charAt(0).toLowerCase() + v.name.slice(1) + (v.format === "dozen" ? " dozen" : v.eggs === 30 ? " tray" : "");
-  return '<div class="row me"><span class="av">' + rank + '</span><span class="min0"><span class="nm"><b>You</b></span><span class="mt">' + esc(what) + '</span><span class="mt2">' +
-    esc([stock].concat(more).filter(Boolean).join(" · ")) + '</span></span><span class="rt"><span class="pr num">' + esc(money(mine)) + '</span><span class="tm">' + esc(pwCents(mine / v.eggs) + " an egg") + "</span></span></div>";
+    if (two > 0) parts.push("2 for " + money(two));
+    if (box > 0) parts.push("6 for " + money(box));
+  } else if (p[g + "case"] > 0) parts.push("15 for " + money(p[g + "case"]));
+  return pwRowHtml("div", "", "me", 'YOLKO <i class="tagm">You</i>', parts.join(" · "), money(mine), "");
 }
-function pwAddRow(shop) {
-  return '<button type="button" class="row add" data-action="pw-add" data-shop="' + esc(shop) + '"><span class="av">' + ic("plus", 18) + '</span><span class="min0"><span class="nm"><b>' + esc(shop) + '</b></span><span class="mt">Blocks automatic checks</span><span class="mt2">Type in the price you see</span></span><span class="rt"><span class="chip plain">Add price</span></span></button>';
-}
-/** Every group for Trays or Dozens: YOLKO's price ranked among the shops selling the same thing. */
+/** Every group for Trays or Dozens that at least one other shop sells. */
 function pwGroups(format) {
   const map = {};
   pwAllRows().filter(function (o) { return o.format === format; }).forEach(function (o) { (map[o.variety] = map[o.variety] || []).push(o); });
-  // The main tray always shows, even when no shop lists that size.
-  if (format === "tray" && !map[MAIN_V]) map[MAIN_V] = [];
   return Object.keys(map).sort(function (a, b) { return pwGroupOrder(a) - pwGroupOrder(b) || a.localeCompare(b); }).map(function (g) { return { id: g, rows: map[g] }; });
 }
+/** One card per group: cheapest first, YOLKO in its place among them, sold-out shops last. */
 function pwGroupHtml(grp) {
   const mine = varietyOf(grp.id) ? pwMyPrice(grp.id) : null;
   const live = grp.rows.filter(function (o) { return o.stock !== "out_of_stock"; }).sort(function (a, b) { return a.price_aud - b.price_aud; });
-  const out = grp.rows.filter(function (o) { return o.stock === "out_of_stock"; });
-  let html = "", rank = 0, placed = mine == null, rk = "";
+  const out = grp.rows.filter(function (o) { return o.stock === "out_of_stock"; }).sort(function (a, b) { return a.price_aud - b.price_aud; });
+  let html = "", placed = mine == null, rk = "";
   live.forEach(function (o) {
-    if (!placed && mine <= o.price_aud + 0.004) { html += pwMineRow(grp.id, ++rank, mine); placed = true; }
-    html += pwRow(o, ++rank, mine);
+    if (!placed && mine <= o.price_aud + 0.004) { html += pwMineRow(grp.id, mine); placed = true; }
+    html += pwRow(o, mine);
   });
-  if (!placed) html += pwMineRow(grp.id, ++rank, mine);
-  out.forEach(function (o) { html += pwRow(o, 0, mine); });
-
-  if (mine != null && live.length) {
+  if (!placed) html += pwMineRow(grp.id, mine);
+  out.forEach(function (o) { html += pwRow(o, mine); });
+  if (mine != null) {
     const cheaper = live.filter(function (o) { return o.price_aud < mine - 0.004; }).length;
-    rk = cheaper ? "You're " + pwNth(cheaper + 1) + " of " + (live.length + 1) : "You're cheapest";
+    rk = !live.length ? "Only you in stock" : cheaper ? "You're " + pwNth(cheaper + 1) + " of " + (live.length + 1) : "You're cheapest";
   }
-  return '<section class="pwg"><div class="pwg-h"><div class="min0"><b>' + esc(pwGroupName(grp.id)) + '</b><span>' + esc(pwGroupEggs(grp.id)) + '</span></div><span class="pwg-rk">' + esc(rk) + "</span></div>" +
-    '<div class="pwl">' + html + "</div>" + (grp.rows.length ? "" : '<p class="csub pwg-none">No shop we check lists this size right now.</p>') + "</section>";
+  return '<div class="card pwg"><div class="chead"><div><h2>' + esc(pwGroupName(grp.id)) + '<span class="h2x"> · ' + esc(pwGroupEggs(grp.id)) + "</span></h2></div>" +
+    '<span class="vr-count">' + esc(rk) + "</span></div>" +
+    '<div class="pwl">' + html + "</div></div>";
 }
 function pwListHtml() {
   const groups = pwGroups(PW_FORMAT);
-  let html = groups.map(pwGroupHtml).join("");
-  if (!groups.length) html = '<p class="csub pwg-none">No shop we check has ' + (PW_FORMAT === "dozen" ? "dozens" : "trays") + " right now.</p>";
-  const missing = PW_TYPED_SHOPS.filter(function (shop) { return !(PW.typed || []).some(function (o) { return o.shop.toLowerCase() === shop.toLowerCase(); }); });
-  if (missing.length) html += '<section class="pwg"><div class="pwl">' + missing.map(pwAddRow).join("") + "</div></section>";
-  return html;
+  if (!groups.length) {
+    return '<div class="card"><div class="empty-state">' + ic("trend", 28) + "<b>No " + (PW_FORMAT === "dozen" ? "dozens" : "trays") + " to compare yet</b><p>None of the shops we check has them right now.</p></div></div>";
+  }
+  return '<div class="stock-grid pw-grid">' + groups.map(pwGroupHtml).join("") + "</div>";
+}
+
+/* ---- history: real price and stock changes only, newest first ---- */
+let PW_ALL_CHANGES = false;
+const PW_CHANGES_SHOWN = 6;
+/** Price and stock changes, with a stock flip-flop (out, back, out) kept only as its latest state. */
+function pwChanges() {
+  const seenStock = {};
+  return (PW.events || []).filter(function (ch) {
+    if (ch.type === "price") return true;
+    if (ch.type !== "stock") return false;
+    if (seenStock[ch.id]) return false;
+    seenStock[ch.id] = true;
+    return true;
+  });
 }
 function pwChange(ch) {
-  let line = "";
-  if (ch.type === "price") line = money2(ch.from && ch.from.price_aud) + " to " + money2(ch.to && ch.to.price_aud);
-  else if (ch.type === "stock") line = ch.to && ch.to.stock === "out_of_stock" ? "Out of stock" : "Back in stock";
-  else if (ch.type === "added") line = "New on the list at " + money2(ch.to && ch.to.price_aud);
-  else if (ch.type === "removed") line = "Off the list";
-  return "<div><b>" + esc(ch.shop || "") + "</b> · " + esc(line) + '<div class="m">' + esc((ch.title || "") + (ch.typed ? " · typed in" : "") + " · " + fmtWhen(ch.at)) + "</div></div>";
+  const day = sydDate(Date.parse(ch.at));
+  const when = day === sydDate(Date.now()) ? "Today" : day === sydDate(Date.now() - 864e5) ? "Yesterday" : fmtDay(ch.at);
+  const what = [ch.variety ? pwShortName(ch.variety) : pwName(ch.title), when].filter(Boolean).join(" · ");
+  let price = "", note = "";
+  if (ch.type === "price") {
+    const from = ch.from && ch.from.price_aud, to = ch.to && ch.to.price_aud;
+    price = money(to);
+    note = from > 0 ? "was " + money(from) : "";
+  } else {
+    const out = ch.to && ch.to.stock === "out_of_stock";
+    price = money((ch.to && ch.to.price_aud) || (ch.from && ch.from.price_aud));
+    note = out ? "Out of stock" : "Back in stock";
+  }
+  return pwRowHtml("div", "", "chg", esc(ch.shop || ""), what, price, note);
+}
+function pwChangesHtml() {
+  const list = pwChanges();
+  if (!list.length) return '<p class="csub">Price changes show here after the next checks.</p>';
+  const shown = PW_ALL_CHANGES ? list : list.slice(0, PW_CHANGES_SHOWN);
+  return '<div class="pwl">' + shown.map(pwChange).join("") + "</div>" +
+    (list.length > PW_CHANGES_SHOWN ? '<button type="button" class="btn ghost sm pw-more" data-action="pw-more">' + (PW_ALL_CHANGES ? "Show fewer" : "Show all " + list.length) + "</button>" : "");
+}
+function pwMore() {
+  PW_ALL_CHANGES = !PW_ALL_CHANGES;
+  const box = $("pw-changes");
+  if (box) box.innerHTML = pwChangesHtml();
 }
 function renderPwSub() {
   const el = $("pw-sub");
@@ -4390,24 +4434,20 @@ function renderPriceWatch() {
   const costco = (PW.typed || []).filter(function (o) { return o.shop.toLowerCase() === "costco"; })[0];
   // The cheapest cage tray of 30 anywhere, whatever its weight: what a shopper sets a YOLKO tray against.
   const low = pwAllRows().filter(function (o) { return o.kind === "cage" && o.pack_eggs === 30 && o.stock !== "out_of_stock" && !o.stale; }).sort(function (a, b) { return a.price_aud - b.price_aud; })[0];
-  const events = PW.events || [];
   const seg = [["tray", "Trays"], ["dozen", "Dozens"]].map(function (f) {
     const n = pwGroups(f[0]).length;
     return '<button type="button" role="tab" aria-selected="' + (PW_FORMAT === f[0]) + '" class="' + (PW_FORMAT === f[0] ? "on" : "") + '" data-action="pw-filter" data-f="' + f[0] + '">' + f[1] + ' <span class="c">' + n + "</span></button>";
   }).join("");
   body.innerHTML =
     '<div class="kpis three">' +
-      kpi("Your tray", mine == null ? "-" : money(mine), mine == null ? "" : "Cage 1.75kg · " + pwCents(mine / 30) + " an egg", "", "", "tag") +
-      kpi("Costco", costco ? money2(costco.price_aud) : "-", costco ? (costco.member_price_aud ? "Members " + money2(costco.member_price_aud) : "30 pack on DoorDash") : "Not typed in yet", "", "", "receipt") +
-      kpi("Cheapest", low ? money2(low.price_aud) : "-", low ? "Cage tray, " + low.shop + (low.pack_weight_g ? " " + weightText(low.pack_weight_g) : "") : "", "", "", "trend") +
+      kpi("Your tray", mine == null ? "-" : money(mine), mine == null ? "" : "Cage 1.75kg, " + pwCents(mine / 30) + " an egg", "", "", "tag") +
+      kpi("Cheapest", low ? money(low.price_aud) : "-", low ? "Cage tray, " + low.shop + (low.pack_weight_g ? " " + weightText(low.pack_weight_g) : "") : "", "", "", "trend") +
+      kpi("Costco", costco ? money(costco.price_aud) : "-", costco ? (costco.member_price_aud ? "Members " + money(costco.member_price_aud) : "Typed " + pwDate(costco.checked_at)) : "Not typed in yet", "", "", "receipt") +
     "</div>" +
-    '<div class="card"><div class="chead pw-head"><div><h2>Same eggs at each shop</h2></div><div class="seg" role="tablist" aria-label="Trays or dozens">' + seg + "</div></div>" +
-      '<div class="cascade" id="pw-list">' + pwListHtml() + "</div>" +
-      '<p class="csub pw-note">Coles, Aldi, IGA and Umall update by themselves every 6 hours. Costco and Woolworths block that, so their prices are typed in.</p>' +
-    "</div>" +
-    '<div class="card"><div class="chead"><div><h2>Recent changes</h2></div></div><div class="feed">' +
-      (events.length ? events.map(pwChange).join("") : '<p class="csub">Price changes show here after the next checks.</p>') +
-    "</div></div>";
+    '<div class="st-bar"><div class="seg" role="tablist" aria-label="Trays or dozens">' + seg + "</div></div>" +
+    '<div id="pw-list" class="cascade">' + pwListHtml() + "</div>" +
+    '<p class="csub pw-note">Coles, Aldi, IGA and Umall update by themselves every 6 hours. Costco and Woolworths block that, so type their prices in.</p>' +
+    '<div class="card pw-hist"><div class="chead"><div><h2>Price changes</h2></div></div><div id="pw-changes">' + pwChangesHtml() + "</div></div>";
 }
 async function loadPriceWatch() {
   const body = $("pw-body");
@@ -5276,6 +5316,7 @@ const ACTIONS = {
   },
   "pw-poll": pollPriceWatchNow,
   "pw-filter": pwFilter,
+  "pw-more": pwMore,
   "pw-add": function (t) { pwSheet(null, t.getAttribute("data-shop") || ""); },
   "pw-new": function () { pwSheet(null, ""); },
   "pw-edit": function (t) { const o = PW && (PW.typed || []).filter(function (x) { return x.id === t.getAttribute("data-id"); })[0]; if (o) pwSheet(o); },
