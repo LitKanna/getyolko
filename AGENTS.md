@@ -184,7 +184,7 @@ cloud servers) and Costco only sells eggs through DoorDash, which blocks bots an
 their prices are typed in from the admin (`pricewatch:v2:typed`, `POST /api/price-watch/typed`);
 Costco starts with what Kanna saw on 3 Nov 2026 ($14.79, members $12.99), weight not shown. The
 page (redesigned 6 Nov 2026 after Kanna called it ugly) is built like Stock & prices: three KPIs,
-Trays / Dozens, then one card per size and kind that another shop sells, each a plain list
+Trays / Dozens, then one card per kind (Cage, Free range, Cage free · barn laid, in that order, 6 Nov: Kanna asked to sort by variety) with its sizes inside in catalogue order, each size a plain list
 cheapest first with YOLKO's own price for that variety in its place (a "You" tag, same row style,
 no rank circles, no filler rows). Rows show shop, product name without the pack size, and price
 with "$1.00 dearer" or "Out of stock" under it. Price changes below show 6 at a time, keep only the

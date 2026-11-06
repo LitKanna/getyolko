@@ -929,10 +929,19 @@ body:has(#savebar) .toasts { bottom:84px; }
 /* Built like Stock & prices: Trays / Dozens, then one card per size and kind (Cage 1.5kg, Free
    range 700g), each a plain list, cheapest first. YOLKO sits in its place among the shops with a
    small You tag, in the same row style as everyone else. */
-.pw-grid { align-items:start; }
+.pw-cols { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+.pw-cols.one { grid-template-columns:minmax(0,1fr); }
+.pw-col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.pw-slot { min-width:0; }
 .pwg .chead { align-items:center; margin-bottom:4px; }
 .pwg h2 .h2x, .pw-hist h2 .h2x { color:var(--muted); font-weight:400; }
 .pwl { display:flex; flex-direction:column; }
+/* A size inside a kind's card: a small heading ("1.5kg  30 eggs", where you stand on the right), then its shops. */
+.pws + .pws { margin-top:14px; padding-top:12px; box-shadow:inset 0 .5px 0 var(--line); }
+.pws-h { display:flex; align-items:baseline; gap:8px; padding:4px 0 2px; }
+.pws-h b { font-size:15px; line-height:20px; font-weight:600; }
+.pws-h span, .pws-h em { color:var(--muted); font-size:13px; line-height:18px; font-style:normal; }
+.pws-h em { margin-left:auto; white-space:nowrap; }
 .pwr { display:flex; align-items:center; gap:12px; min-height:60px; margin:0 -10px; padding:8px 10px; border-radius:14px; text-align:left; color:inherit; text-decoration:none; position:relative; transition:background .12s; }
 .pwr + .pwr::before { content:""; position:absolute; top:0; left:10px; right:10px; height:.5px; background:var(--line); }
 a.pwr:hover, button.pwr:hover { background:var(--hover); }
@@ -1168,6 +1177,8 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
   .dp-top { display:flex; }
   .kpi .v { font-size:24px; line-height:30px; }
   .stock-grid { grid-template-columns:minmax(0,1fr); }
+  .pw-cols { display:flex; flex-direction:column; align-items:stretch; }
+  .pw-col { display:contents; }
   .vgrid { grid-template-columns:repeat(2, minmax(0,1fr)); }
   .run { grid-template-columns:minmax(0,1fr) 300px; }
 }
@@ -4265,13 +4276,6 @@ function pwAllRows() {
   if (!PW) return [];
   return (PW.offers || []).concat(PW.typed || []).filter(function (o) { return o.price_aud > 0 && o.variety; });
 }
-/** Heading for a group: "Cage 1.5kg", "Cage free 18 pack, 1kg", "Cage, other weights". */
-function pwGroupName(g) {
-  const v = varietyOf(g);
-  if (v) return v.format === "tray" && v.eggs !== 30 ? KIND_NAME[v.kind] + " " + v.eggs + " pack, " + v.weight : v.name;
-  const m = /^(cage|fr|cf)-(tray|dozen)(x18)?$/.exec(g) || [];
-  return (KIND_NAME[m[1]] || "Eggs") + (m[3] ? " 18 pack" : "") + ", other weights";
-}
 function pwGroupEggs(g) { const v = varietyOf(g); if (v) return v.eggs + " eggs"; return /x18$/.test(g) ? "18 eggs" : /-dozen/.test(g) ? "12 eggs" : "30 eggs"; }
 /** The order groups show in: kind, then YOLKO's own weights, then other weights. */
 function pwGroupOrder(g) {
@@ -4361,16 +4365,42 @@ function pwGroupHtml(grp) {
     const cheaper = live.filter(function (o) { return o.price_aud < mine - 0.004; }).length;
     rk = !live.length ? "Only you in stock" : cheaper ? "You're " + pwNth(cheaper + 1) + " of " + (live.length + 1) : "You're cheapest";
   }
-  return '<div class="card pwg"><div class="chead"><div><h2>' + esc(pwGroupName(grp.id)) + '<span class="h2x"> · ' + esc(pwGroupEggs(grp.id)) + "</span></h2></div>" +
-    '<span class="vr-count">' + esc(rk) + "</span></div>" +
-    '<div class="pwl">' + html + "</div></div>";
+  return '<section class="pws"><div class="pws-h"><b>' + esc(pwSizeName(grp.id)) + "</b><span>" + esc(pwGroupEggs(grp.id)) + "</span>" +
+    (rk ? "<em>" + esc(rk) + "</em>" : "") + '</div><div class="pwl">' + html + "</div></section>";
+}
+/** A size inside its kind's card: "1.5kg", "1kg, 18 pack", "600g", "Other weights". */
+function pwSizeName(g) {
+  const v = varietyOf(g);
+  if (v) return v.format === "tray" && v.eggs !== 30 ? v.weight + ", " + v.eggs + " pack" : v.weight;
+  return /x18$/.test(String(g)) ? "18 pack, other weights" : "Other weights";
+}
+function pwKindOf(g) { const v = varietyOf(g); return v ? v.kind : (/^(cage|fr|cf)/.exec(String(g)) || [])[1]; }
+/** One card per kind, as Stock & prices has them: Cage, Free range, Cage free (barn laid). */
+function pwKindCard(kind, groups) {
+  const mine = groups.filter(function (g) { return varietyOf(g.id) && pwMyPrice(g.id) != null; }).length;
+  return '<div class="card pwg"><div class="chead"><div><h2>' + esc(KIND_NAME[kind]) + (kind === "cf" ? '<span class="h2x"> · barn laid</span>' : "") + "</h2></div>" +
+    '<span class="vr-count">' + esc(plural(groups.length, "size") + (mine ? ", " + mine + " you sell" : "")) + "</span></div>" +
+    groups.map(pwGroupHtml).join("") + "</div>";
 }
 function pwListHtml() {
   const groups = pwGroups(PW_FORMAT);
   if (!groups.length) {
     return '<div class="card"><div class="empty-state">' + ic("trend", 28) + "<b>No " + (PW_FORMAT === "dozen" ? "dozens" : "trays") + " to compare yet</b><p>None of the shops we check has them right now.</p></div></div>";
   }
-  return '<div class="stock-grid pw-grid">' + groups.map(pwGroupHtml).join("") + "</div>";
+  // Cage, Free range, Cage free in that order. Two columns on a wide screen with no gaps: the third
+  // card goes under whichever of the first two is shorter. On a phone they stack in order.
+  const cards = KIND_ORDER.map(function (k) {
+    const mine = groups.filter(function (g) { return pwKindOf(g.id) === k; });
+    return mine.length ? { html: pwKindCard(k, mine), h: mine.reduce(function (n, g) { return n + g.rows.length + 1.5; }, 1) } : null;
+  }).filter(Boolean);
+  if (cards.length < 2) return '<div class="pw-cols one">' + cards.map(function (c) { return c.html; }).join("") + "</div>";
+  const cols = [[], []], h = [0, 0];
+  cards.forEach(function (c, i) {
+    const col = i < 2 ? i : h[0] <= h[1] ? 0 : 1;
+    cols[col].push('<div class="pw-slot" style="order:' + i + '">' + c.html + "</div>");
+    h[col] += c.h;
+  });
+  return '<div class="pw-cols">' + cols.map(function (c) { return '<div class="pw-col">' + c.join("") + "</div>"; }).join("") + "</div>";
 }
 
 /* ---- history: real price and stock changes only, newest first ---- */
