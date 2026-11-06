@@ -4232,7 +4232,7 @@ function renderCustomers() {
 }
 
 /* ============================== competitors ============================== */
-// Other shops' egg prices. The Worker reads Coles, Aldi, IGA, Umall and Gourmet Grocer every
+// Other shops' egg prices. The Worker reads Coles, Aldi, IGA and Umall every
 // 6 hours; Costco and Woolworths block that, so their prices are typed in here. Every egg is filed
 // as Stock & prices files YOLKO's own (Trays or Dozens, then kind, then weight) and set against
 // YOLKO's price for the same thing, pack for pack. Nothing here changes YOLKO's prices.
@@ -4403,7 +4403,7 @@ function renderPriceWatch() {
     "</div>" +
     '<div class="card"><div class="chead pw-head"><div><h2>Same eggs at each shop</h2></div><div class="seg" role="tablist" aria-label="Trays or dozens">' + seg + "</div></div>" +
       '<div class="cascade" id="pw-list">' + pwListHtml() + "</div>" +
-      '<p class="csub pw-note">Coles, Aldi, IGA, Umall and Gourmet Grocer update by themselves every 6 hours. Costco and Woolworths block that, so their prices are typed in.</p>' +
+      '<p class="csub pw-note">Coles, Aldi, IGA and Umall update by themselves every 6 hours. Costco and Woolworths block that, so their prices are typed in.</p>' +
     "</div>" +
     '<div class="card"><div class="chead"><div><h2>Recent changes</h2></div></div><div class="feed">' +
       (events.length ? events.map(pwChange).join("") : '<p class="csub">Price changes show here after the next checks.</p>') +

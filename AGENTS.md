@@ -166,13 +166,16 @@ per A4 sheet with print CSS; the `?m=card` tag shows card scans as `utm_medium=c
 No Australian supermarket has a price API. `infra/price-watch.mjs` reads public pages that the
 shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
 `/browse/dairy-eggs-fridge/eggs` (Next.js `__NEXT_DATA__`, every egg on one page), Aldi
-`/products/dairy-eggs-fridge/eggs/k/1111111162` (server-rendered product tiles), one IGA and one
-Gourmet Grocer product page (JSON-LD) and Umall (Shopify `/products/<handle>.js`). Never read Coles
+`/products/dairy-eggs-fridge/eggs/k/1111111162` (server-rendered product tiles), one IGA product
+page (JSON-LD) and Umall (Shopify `/products/<handle>.js`). Gourmet Grocer was dropped on 6 Nov 2026:
+its domain gourmetgroceronline.com.au no longer exists (NXDOMAIN). Never read Coles
 `/search/` or Aldi `/results` (robots.txt disallows them). Every egg is filed like YOLKO's own
 catalogue (`groupOf`: dozen or tray, then cage / free range / cage free, then weight class; barn
 laid is cage free), and from Coles and Aldi it keeps the cheapest egg in each group. The cron asks every 15
-minutes but the shops are only read once every 6 hours (30 minutes after a shop failed; Umall's
-Shopify sometimes answers 429 to Cloudflare) (`pricewatch:v2:latest`); Check now in the
+minutes but the shops are only read once every 6 hours. A shop that failed is read once more, on
+its own, 30 minutes later (Umall's Shopify sometimes answers 429, Coles sometimes a bot check), then
+waits for the next 6-hourly read. Never re-read every shop on every retry: that most likely got Coles to
+bot-check us on 6 Nov while a dead shop kept the old rule retrying every 30 minutes (`pricewatch:v2:latest`); Check now in the
 admin reads them at once (at most once a minute). A shop that fails keeps its last prices, marked
 stale, and the page says so under the heading. Changes go to `pricewatch:v2:events`.
 Woolworths blocks every automated request (Akamai 403, even robots.txt, from Cloudflare and from

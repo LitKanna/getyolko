@@ -4899,7 +4899,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "226",
+      "X-Yolko-Build": "227",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
