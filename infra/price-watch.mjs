@@ -8,7 +8,8 @@
  *   Aldi            /products/dairy-eggs-fridge/eggs  every egg on one page (product tiles)
  *   IGA             one product page (JSON-LD)
  *   Umall           Shopify /products/<handle>.js
- *   Gourmet Grocer  WooCommerce product page (JSON-LD)
+ * (Gourmet Grocer was read too until its domain gourmetgroceronline.com.au stopped existing on
+ * 6 Nov 2026; the .com.au registry answers NXDOMAIN, so it was taken off the list.)
  * Woolworths blocks every automated request (Akamai "Access Denied", even for robots.txt) and
  * Costco only sells eggs through DoorDash, which blocks bots and bans scraping in its terms.
  * Those two are typed in by the owner (TYPED_KEY) and shown with the date they were typed.
@@ -40,7 +41,6 @@ const ALDI_URL = "https://www.aldi.com.au/products/dairy-eggs-fridge/eggs/k/1111
 const PRODUCTS = [
   { shop: "IGA", kind: "jsonld", housing: "caged", url: "https://www.igashop.com.au/product/canabolas-eggs-30-pack-20000005474" },
   { shop: "Umall", kind: "shopify", housing: "caged", url: "https://www.umall.com.au/products/pace-farm-caged-eggs-large-30-pack-1-5kg" },
-  { shop: "Gourmet Grocer", kind: "jsonld", housing: "caged", url: "https://gourmetgroceronline.com.au/product/pace-farm-caged-eggs-large-30-pack-1-5kg/" },
 ];
 
 // What Kanna saw on DoorDash on 3 Nov 2026, so the page starts with Costco filled in.
@@ -340,14 +340,21 @@ async function readProduct(p) {
   return [row];
 }
 
-/** Every source in parallel. A shop that fails keeps its last prices, marked stale. */
-async function checkAll(prevOffers) {
-  const checkedAt = new Date().toISOString();
-  const jobs = [
+function allJobs() {
+  return [
     { key: "coles", shop: "Coles", run: readColes },
     { key: "aldi", shop: "Aldi", run: readAldi },
     ...PRODUCTS.map((p) => ({ key: slug(p.shop), shop: p.shop, url: p.url, run: () => readProduct(p) })),
   ];
+}
+
+/**
+ * Every source in parallel, or only the ones named in `onlyKeys` (a retry). A shop that fails
+ * keeps its last prices, marked stale.
+ */
+async function checkAll(prevOffers, onlyKeys = null) {
+  const checkedAt = new Date().toISOString();
+  const jobs = allJobs().filter((j) => !onlyKeys || onlyKeys.includes(j.key));
   const settled = await Promise.allSettled(jobs.map((j) => j.run()));
   const offers = [];
   const sources = {};
@@ -360,6 +367,7 @@ async function checkAll(prevOffers) {
       return;
     }
     src.ok = false;
+    src.tries = 1;
     src.error = String(res.reason?.message || res.reason || "failed").slice(0, 160);
     const keepOld = (prevOffers || []).filter((o) => o.shop === job.shop && (!job.url || o.url === job.url));
     for (const o of keepOld) offers.push({ ...o, stale: true });
@@ -534,14 +542,44 @@ async function runPoll(env, { force = false } = {}) {
   return { ran: true, changeCount: changes.length };
 }
 
-/** Cron: every 15 minutes the Worker asks; the shops are only checked once every 6 hours, or
- *  after 30 minutes when a shop didn't answer last time (Umall's Shopify sometimes says 429). */
+/**
+ * Read again only the shops that failed, keeping everyone else's prices and the time of the last
+ * full check (so the next full check stays 6 hours after it).
+ */
+async function retryFailed(env, prev, keys) {
+  const { offers: got, sources: gotSources } = await checkAll(prev.offers || [], keys);
+  const shops = new Set(keys.map((k) => prev.sources?.[k]?.shop).filter(Boolean));
+  // A shop taken off the list (like Gourmet Grocer) goes now, not at the next full check.
+  const listed = new Set(allJobs().map((j) => j.shop));
+  const offers = (prev.offers || []).filter((o) => listed.has(o.shop) && !shops.has(o.shop)).concat(got);
+  const sources = Object.fromEntries(Object.entries(prev.sources || {}).filter(([, src]) => listed.has(src?.shop)));
+  for (const [k, src] of Object.entries(gotSources)) {
+    sources[k] = src.ok ? src : { ...src, tries: (Number(prev.sources?.[k]?.tries) || 1) + 1 };
+  }
+  const sameRules = prev.v === PICK_V;
+  const changes = diffOffers(prev.offers || [], offers).filter((c) => sameRules || c.type === "price" || c.type === "stock");
+  await env.DATA.put(LATEST_KEY, JSON.stringify({ v: PICK_V, updatedAt: prev.updatedAt, sources, offers }));
+  await pushEvents(env, changes);
+  await notifyWebhook(env, changes);
+  return { ran: true, retried: keys, changeCount: changes.length };
+}
+
+/**
+ * Cron: every 15 minutes the Worker asks. Every shop is read once every 6 hours. A shop that
+ * failed is read once more, alone, 30 minutes later (Umall's Shopify sometimes says 429, Coles
+ * sometimes answers with a bot check); after that it waits for the next 6-hourly check, so a shop
+ * that stays down never makes the Worker ask the others every 30 minutes.
+ */
 async function runScheduledPoll(env) {
   const prev = await getLatest(env);
   const age = prev?.updatedAt ? Date.now() - Date.parse(prev.updatedAt) : Infinity;
-  const failed = Object.values(prev?.sources || {}).some((s) => s && !s.ok);
-  if (age < (failed ? RETRY_MS : EVERY_MS - 5 * 60 * 1000)) return { ran: false };
-  return runPoll(env, { force: true });
+  if (age >= EVERY_MS - 5 * 60 * 1000) return runPoll(env, { force: true });
+  const known = new Set(allJobs().map((j) => j.key));
+  const due = Object.entries(prev?.sources || {}).filter(
+    ([k, s]) => known.has(k) && s && !s.ok && (Number(s.tries) || 1) < 2 && Date.now() - Date.parse(s.checked_at || 0) >= RETRY_MS
+  );
+  if (!due.length) return { ran: false };
+  return retryFailed(env, prev, due.map(([k]) => k));
 }
 
 export {
