@@ -35,6 +35,12 @@ const MAP_V = "1";
 const PHONE = "+61433975055";
 const WHATSAPP = "https://wa.me/61433975055";
 const EMAIL = "orders@getyolko.com";
+// Public directory listings of this same business, for JSON-LD sameAs. Add a
+// listing only once it shows publicly, and never one that shows a street address.
+const SAME_AS = [
+  "https://www.yellowpages.com.au/homebush-west-nsw/bpp/yolko-583161274",
+  "https://www.truelocal.com.au/homebush-west-nsw/tlp/yolko-583161274",
+];
 const PRICE = { tray1: 13, tray2: 25, box: 72, delivery: 5 };
 const PACKS = {
   tray1: { name: "1 tray", label: "1 tray · 30 eggs", eggs: 30, price: PRICE.tray1 },
@@ -238,6 +244,7 @@ const BUSINESS = {
   url: `${SITE}/`,
   telephone: PHONE,
   email: EMAIL,
+  sameAs: SAME_AS,
   logo: { "@type": "ImageObject", url: LOGO, width: 1024, height: 1024 },
   image: [HERO_IMG],
   priceRange: `$${PRICE.tray1}-$${PRICE.box}`,
