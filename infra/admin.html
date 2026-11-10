@@ -2405,7 +2405,7 @@ function statusFooter(o) {
   return b("new", "Reopen order", "ghost", "undo");
 }
 // Why an order's delivery was free (see the referral rules in the Worker).
-const FREE_DELIVERY_WHY = { friend: "Free, friend's link", building: "Free, same building", credit: "Free, earned" };
+const FREE_DELIVERY_WHY = { friend: "Free, friend's link", offer: "Free, first order", building: "Free, same building", credit: "Free, earned" };
 function detailHtml(o) {
   const sig = orderSignals(o);
   const isDelivery = o.fulfillment === "delivery";
@@ -2420,7 +2420,7 @@ function detailHtml(o) {
   if (o.status === "new" && !isOpenCheckout(o)) chips.push(chip("waiting dot", "Waiting"));
   else if (!track) chips.push({ confirmed: chip("confirmed dot", "Confirmed"), done: chip("delivered", "Delivered"), cancelled: chip("cancelled", "Cancelled") }[o.status] || "");
   if (sig.suspicious) chips.push(chip("warn", "Check this order"));
-  if (o.refFrom) chips.push(chip("plain", o.refBy ? "Sent by " + o.refBy : "Friend's link"));
+  if (o.refFrom) chips.push(chip("plain", o.refHouse ? "First order offer" : o.refBy ? "Sent by " + o.refBy : "Friend's link"));
   const addr = isDelivery ? addressLine(o) : "";
   const phone = fmtPhone(o.phone);
   const email = orderEmail(o);
