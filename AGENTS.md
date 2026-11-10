@@ -157,6 +157,11 @@ made on the paid screen (`/api/confirm-payment` returns `share`) and in reminder
 a first order, or an earned credit (`ref:cust:<phone>`). `noteReferralOrder` (on paid) counts the
 order, uses a credit, and gives one credit to the friend and to everyone who paid for delivery to a
 shared building. A cron backfill (`ref:backfill`) counts orders paid before this existed.
+Shop-wide offer (Kanna, 10 Nov 2026): `HOUSE_REF_CODES` in the Worker (`FRESH5`) works like a
+friend's code on a first order (perk `offer`, order gets `refHouse: true`) but has no KV record and
+earns nobody a credit. Share it as `getyolko.com/?ref=FRESH5&utm_source=<where>` so each channel
+shows up separately in the visit log; `/api/referral` answers `house: true` so the shop words the
+note as an offer.
 Box cards: Admin > Delivery run > "Print box cards" calls `POST /api/admin/ref-cards {ids}`, which
 makes a share code for each customer still to deliver and returns a QR code as SVG (built in the
 Worker with the `qrcode-generator` package) for `/r/<CODE>?m=card`. The admin prints four A6 cards

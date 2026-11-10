@@ -2198,6 +2198,10 @@ const REF_BACKFILL = "ref:backfill";
 const refCustKey = (phone) => `ref:cust:${phone}`;
 const refMineKey = (phone) => `ref:mine:${phone}`;
 const refCodeKey = (code) => `ref:code:${code}`;
+// Shop-wide link (Kanna, 10 Nov 2026): getyolko.com/?ref=FRESH5 (or /r/FRESH5) makes a new
+// customer's first delivery free, like a friend's link, but nobody earns a credit from it.
+// Add utm_source wherever it is shared, so the visit log shows which place brings orders.
+const HOUSE_REF_CODES = new Set(["FRESH5"]);
 const bldgKey = (date, h) => `bldg:${date}:${h}`;
 const AU_MOBILE_RE = /^04\d{8}$/;
 const STREET_TYPES = {
@@ -2230,7 +2234,7 @@ async function ensureRefCode(env, phone, name) {
   const mine = await env.DATA.get(refMineKey(phone));
   if (mine) return mine;
   let code = newRefCode();
-  for (let i = 0; i < 3 && (await env.DATA.get(refCodeKey(code))); i++) code = newRefCode();
+  for (let i = 0; i < 3 && (HOUSE_REF_CODES.has(code) || (await env.DATA.get(refCodeKey(code)))); i++) code = newRefCode();
   await env.DATA.put(refCodeKey(code), JSON.stringify({ phone, name: firstNameOf(name), createdAt: new Date().toISOString() }));
   await env.DATA.put(refMineKey(phone), code);
   return code;
@@ -2254,25 +2258,27 @@ function buildingAddress(street, postcode, suburb) {
 
 /**
  * Whether this order ships free and why: another order to the same building that
- * Saturday, a friend's link on a first order, or a free delivery already earned.
- * `refFrom` is the friend's code whenever the order should earn them a credit.
+ * Saturday, a friend's link or the shop-wide link on a first order, or a free delivery
+ * already earned. `refFrom` is the link's code on a first order; only a friend's code
+ * earns its owner a credit (`house` marks the shop-wide one).
  */
 async function deliveryPerk(env, { phone, ref, street, postcode, suburb, pickupDate }) {
   const addr = buildingAddress(street, postcode, suburb);
   const building = addr ? (await sha256Hex(addr)).slice(0, 24) : null;
   const code = cleanRefCode(ref);
+  const house = !!code && HOUSE_REF_CODES.has(code);
   const [cust, bldg, friend] = await Promise.all([
     env.DATA.get(refCustKey(phone), "json").catch(() => null),
     building && pickupDate ? env.DATA.get(bldgKey(pickupDate, building), "json").catch(() => null) : null,
-    code ? env.DATA.get(refCodeKey(code), "json").catch(() => null) : null,
+    code && !house ? env.DATA.get(refCodeKey(code), "json").catch(() => null) : null,
   ]);
   const firstOrder = !(Number(cust?.paidOrders) > 0);
-  const refFrom = friend?.phone && friend.phone !== phone && firstOrder ? code : null;
+  const refFrom = firstOrder && (house || (friend?.phone && friend.phone !== phone)) ? code : null;
   let perk = null;
   if (bldg?.orders?.length) perk = "building";
-  else if (refFrom) perk = "friend";
+  else if (refFrom) perk = house ? "offer" : "friend";
   else if (Number(cust?.credits) > 0) perk = "credit";
-  return { perk, refFrom, refBy: refFrom ? friend.name || "" : "", building };
+  return { perk, refFrom, refBy: refFrom && !house ? friend.name || "" : "", house: !!refFrom && house, building };
 }
 
 /**
@@ -2299,12 +2305,13 @@ function perkInput(order, body) {
 }
 
 function applyDeliveryPerk(order, p) {
-  for (const k of ["deliveryPerk", "refFrom", "refBy", "building"]) delete order[k];
+  for (const k of ["deliveryPerk", "refFrom", "refBy", "refHouse", "building"]) delete order[k];
   if (order.fulfillment !== "delivery" || !p) return;
   if (p.building) order.building = p.building;
   if (p.refFrom) {
     order.refFrom = p.refFrom;
     order.refBy = p.refBy;
+    if (p.house) order.refHouse = true;
   }
   if (p.perk) {
     order.deliveryPerk = p.perk;
@@ -2339,7 +2346,7 @@ async function noteReferralOrder(env, order) {
   };
   if (order.deliveryPerk === "credit") next.credits = Math.max(0, next.credits - 1);
 
-  if (order.refFrom) {
+  if (order.refFrom && !HOUSE_REF_CODES.has(order.refFrom)) {
     const friend = await env.DATA.get(refCodeKey(order.refFrom), "json");
     if (friend?.phone && friend.phone !== phone) await addRefCredit(env, friend.phone, { why: "friend", orderId: order.id, at });
   }
@@ -2993,6 +3000,7 @@ async function handleApi(request, env, url, ctx) {
   if (url.pathname === "/api/referral" && request.method === "GET") {
     if (!(await allowRate(env, `referral:${clientIp(request) || "unknown"}`, 30, 3600))) return json({ error: "rate" }, 429);
     const code = cleanRefCode(url.searchParams.get("code"));
+    if (code && HOUSE_REF_CODES.has(code)) return json({ ok: true, code, name: "", house: true }, 200, { "Cache-Control": "no-store" });
     const rec = code ? await env.DATA.get(refCodeKey(code), "json").catch(() => null) : null;
     if (!rec) return json({ ok: false }, 404, { "Cache-Control": "no-store" });
     return json({ ok: true, code, name: rec.name || "" }, 200, { "Cache-Control": "no-store" });

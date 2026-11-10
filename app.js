@@ -1643,6 +1643,7 @@ if (window.YOLKO_REORDER) {
 /* ---------- Share links: free delivery for a friend's first order ---------- */
 // getyolko.com/r/CODE lands here as ?ref=CODE. Keep it for a while, so a friend who
 // orders next week still gets it. The server decides at checkout (first orders only).
+// The shop-wide code (house: true) reads as an offer rather than a friend's gift.
 const REF_KEY = "yolko.ref";
 const REF_DAYS = 60;
 const REF_RE = /^[A-HJKMNP-Z2-9]{6}$/;
@@ -1661,7 +1662,9 @@ function showReferral(r) {
   referral = r;
   const note = document.getElementById("ref-note");
   if (!note) return;
-  note.textContent = `${r.name ? `${r.name} sent you` : "A friend sent you"} free delivery. It comes off your first order at checkout.`;
+  note.textContent = r.house
+    ? "Free delivery on your first order. It comes off at checkout."
+    : `${r.name ? `${r.name} sent you` : "A friend sent you"} free delivery. It comes off your first order at checkout.`;
   note.hidden = false;
 }
 
@@ -1694,7 +1697,7 @@ function clearReferral() {
         if (saved) showReferral(saved);
         return;
       }
-      const r = { code: d.code, name: d.name || "", at: code === saved?.code ? saved.at : Date.now() };
+      const r = { code: d.code, name: d.name || "", house: !!d.house, at: code === saved?.code ? saved.at : Date.now() };
       try {
         localStorage.setItem(REF_KEY, JSON.stringify(r));
       } catch {
