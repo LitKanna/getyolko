@@ -83,7 +83,9 @@ Stripe's pay page is branded per checkout (`STRIPE_LOOK` in the Worker, sent as
 pictures by their public address, so they must be live before the Worker names them, and a
 changed picture needs a new file name. If Stripe refuses the look, the checkout is made again
 without it: the look must never stop a payment. The receipt page uses the Stripe account's own
-branding (brand colour ink, accent cream), which the Worker also tries to set.
+branding (`STRIPE_ACCOUNT_LOOK`: brand colour cream, accent yolk), set by hand in the Stripe
+dashboard on 12 Nov 2026; the Worker also tries to set the same. Stripe paints the page in the
+brand colour, so never make it ink: the ink logo vanishes on it (Kanna rejected that on sight).
 
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into
@@ -190,9 +192,13 @@ email says orders close tonight. Its look (Kanna, 12 Nov 2026, who called the ol
 opening ugly and picked this from three drawn options): a short hello, then one quiet list
 with a row each for Delivery, Order by, Your order and Total, and a full-width Order again
 button. The hello says "want the same again?" only when the list shows their last order, not
-the one tray offered when that is sold out. Under every customer email: YOLKO and the brand
-line, the site and the shop's address as links, and on the reminder one line on why they got it
-with "Stop reminders". Show Kanna a picture before changing how an email looks. It goes through the Zoho Mail
+the one tray offered when that is sold out. Under every customer email: the site and the shop's
+address as links, nothing else (Kanna did not like a "Saturday morning eggs" line there), and on
+the reminder one line on why they got it with "Stop reminders". The order and refund emails use the same list (`emailList` in the
+Worker): one short line, then Delivery, Address, Your order and Total paid with a full-width
+View receipt button, or Your order, Refunded to and Refund with the bank timing as a quiet line
+under it. Keep list names short (the name column never wraps, so a long name squeezes the
+answers). Show Kanna a picture before changing how an email looks. It goes through the Zoho Mail
 mailbox (never the CPaaS order sender, which forbids marketing). It skips sold-out weeks, people
 who already ordered for that Saturday, and everything while `remind:off` is set (admin Pause).
 "Order again" links to `/#reorder=<token>`: `index.html` lifts the token out of the URL before the

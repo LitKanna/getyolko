@@ -44,6 +44,7 @@ const EMAIL = "orders@getyolko.com";
 const SAME_AS = [
   "https://www.yellowpages.com.au/homebush-west-nsw/bpp/yolko-583161274",
   "https://www.truelocal.com.au/homebush-west-nsw/tlp/yolko-583161274",
+  "https://www.facebook.com/getyolko",
 ];
 const PRICE = { tray1: 13, tray2: 25, box: 72, delivery: 5 };
 const PACKS = {
