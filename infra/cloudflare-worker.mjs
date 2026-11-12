@@ -12,9 +12,10 @@ import { qrcode } from "qrcode-generator";
 import ADMIN_HTML from "./admin.html";
 import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
+import { emailTitlePicture } from "./email-titles.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "75e30db155d9280499614de35aff8512a8d961a8";
+const DEPLOY_SHA = "bfa635e6b627b2174cc6ca39213bf26bb1081d91";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -832,10 +833,12 @@ function orderRef(order) {
 
 // Customer emails wear the brand: the Brush egg logo on a white card, one yolk brush stroke under
 // the word that matters, a yolk button, and a black band to close. Colours and type are the
-// site's. The pictures are small PNGs on getyolko.com (mail apps do not draw SVG): the logo and
-// the egg each sit on their own rounded plate, so they still read when a phone's dark mode
-// recolours the email around them. Bump the number in a file's name if its picture ever changes,
-// because mail apps keep their copy for good.
+// site's. The pictures are small PNGs on getyolko.com (mail apps do not draw SVG): the logo, the
+// egg and the heading each sit on their own rounded plate, so they still read when a phone's dark
+// mode recolours the email around them. Bump the number in a file's name if its picture ever
+// changes, because mail apps keep their copy for good. Gmail never loads a web font, so the rest
+// of an email shows in the phone's own font there; that is why the heading is a picture
+// (infra/email-titles.mjs).
 const EMAIL_C = { canvas: "#faf7f0", paper: "#ffffff", ink: "#14120e", ink2: "#3d3b36", muted: "#6b675e", line: "#e6e0d2", subtle: "#f3eee2", yellow: "#ffd32a" };
 // Single quotes only: this sits inside style="..." attributes.
 const EMAIL_FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
@@ -859,6 +862,12 @@ function emailButton(href, label) {
   return `<tr><td style="padding-top:24px"><a href="${htmlEscape(href)}" style="display:inline-block;background:${C.yellow};color:${C.ink};text-decoration:none;font-weight:700;font-size:15px;line-height:20px;padding:14px 26px;border-radius:999px">${htmlEscape(label)}</a></td></tr>`;
 }
 
+/** The same button across the whole width of its box (HTML, not a table row). */
+function emailWideButton(href, label) {
+  const C = EMAIL_C;
+  return `<a href="${htmlEscape(href)}" style="display:block;text-align:center;background:${C.yellow};color:${C.ink};text-decoration:none;font-weight:700;font-size:16px;line-height:22px;padding:14px 20px;border-radius:999px">${htmlEscape(label)}</a>`;
+}
+
 /**
  * An email's heading with the yolk brush stroke under `mark`, one word of it. The stroke is a
  * background picture, so a mail app that skips those (desktop Outlook) shows the plain heading.
@@ -871,13 +880,21 @@ function emailTitle(title, mark) {
 }
 
 /**
- * A whole customer email: the logo and a small `label` on top, the heading, `rows` (table rows
- * inside the white card), the black band with the help line, then one small line (`small` adds
- * to it, as HTML).
+ * A whole customer email: the logo and a small `label` on top, the heading (a picture in the
+ * brand font when infra/email-titles.mjs has one, text otherwise), `rows` (table rows inside the
+ * white card; the first one needs no space above it), the black band with the help line, then
+ * the sign-off: the name, the site and the shop's address. `why` (HTML) goes under it on emails
+ * that are not about an order: why this person got it and how to stop it.
  */
-function emailFrame({ subject, preheader, label = "", title, mark = "", rows, help, small = "" }) {
+function emailFrame({ subject, preheader, label = "", title, mark = "", rows, help, why = "" }) {
   const C = EMAIL_C;
   const FONT = EMAIL_FONT;
+  const side = `background:${C.paper};border-left:1px solid ${C.line};border-right:1px solid ${C.line}`;
+  const pic = emailTitlePicture(title, mark);
+  // The picture carries 12px of its own room on every side, so its words line up with the rows.
+  const head = pic
+    ? `<tr><td style="${side};padding:16px 12px 0"><img src="${EMAIL_IMG}/${pic.file}" width="${pic.width}" height="${pic.height}" alt="${htmlEscape(title)}" style="display:block;width:100%;max-width:${pic.width}px;height:auto;border:0;outline:none;font-family:${FONT};font-size:26px;line-height:34px;font-weight:800;letter-spacing:-0.8px;color:${C.ink}"></td></tr>`
+    : `<tr><td style="${side};padding:28px 24px 12px;font-family:${FONT};font-size:28px;line-height:34px;font-weight:800;color:${C.ink};letter-spacing:-0.8px">${emailTitle(title, mark)}</td></tr>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${htmlEscape(subject)}</title>
 <style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;src:url(https://getyolko.com/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}</style></head>
 <body style="margin:0;padding:0;background:${C.canvas};font-family:${FONT};-webkit-font-smoothing:antialiased">
@@ -890,9 +907,9 @@ function emailFrame({ subject, preheader, label = "", title, mark = "", rows, he
 <td align="right" style="padding-right:8px;font-family:${FONT};font-size:11px;line-height:16px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${C.muted}">${htmlEscape(label)}</td>
 </tr></table>
 </td></tr>
-<tr><td style="background:${C.paper};border-left:1px solid ${C.line};border-right:1px solid ${C.line};padding:28px 24px 30px">
+${head}
+<tr><td style="${side};padding:${pic ? 4 : 0}px 24px 30px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="font-size:28px;line-height:34px;font-weight:800;color:${C.ink};letter-spacing:-0.8px">${emailTitle(title, mark)}</td></tr>
 ${rows}
 </table>
 </td></tr>
@@ -902,7 +919,9 @@ ${rows}
 <td valign="middle" style="padding-left:12px;font-family:${FONT};font-size:14px;line-height:20px;color:#ffffff">${htmlEscape(help)} Reply to this email or message us on <a href="${EMAIL_WA}" style="color:#ffffff;text-decoration:underline">WhatsApp</a>.</td>
 </tr></table>
 </td></tr>
-<tr><td style="padding:16px 8px 0;font-size:12px;line-height:18px;color:${C.muted}">YOLKO · Saturday morning eggs · <a href="https://getyolko.com" style="color:${C.muted}">getyolko.com</a>${small}</td></tr>
+<tr><td align="center" style="padding:20px 12px 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.ink2}"><strong style="font-weight:800;color:${C.ink}">YOLKO</strong>&nbsp; Saturday morning eggs</td></tr>
+<tr><td align="center" style="padding:2px 12px 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><a href="https://getyolko.com" style="color:${C.muted};text-decoration:underline">getyolko.com</a> &nbsp;·&nbsp; <a href="mailto:${SHOP_EMAIL}" style="color:${C.muted};text-decoration:underline">${SHOP_EMAIL}</a></td></tr>
+${why ? `<tr><td align="center" style="padding:16px 12px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted}">${why}</td></tr>` : ""}
 </table>
 </td></tr></table></body></html>`;
 }
@@ -929,7 +948,7 @@ function buildOrderEmail(order) {
     title: "Your eggs are booked for Saturday",
     mark: "Saturday",
     help: "Need to change something?",
-    rows: `<tr><td style="padding-top:12px;font-size:16px;line-height:24px;color:${C.ink2}">Thanks, ${htmlEscape(first)}. We have your payment, and we will be at your door on ${htmlEscape(when)}, ${DELIVERY_HOURS}.</td></tr>
+    rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Thanks, ${htmlEscape(first)}. We have your payment, and we will be at your door on ${htmlEscape(when)}, ${DELIVERY_HOURS}.</td></tr>
 ${emailPanel("Delivery", `${when}, ${DELIVERY_HOURS}`, [where])}
 <tr><td style="padding-top:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:20px">
 ${row("Order", "#" + ref)}
@@ -991,7 +1010,7 @@ function buildRefundEmail(order, refund) {
     title: "Your refund is on its way",
     mark: "refund",
     help: "Questions about your refund?",
-    rows: `<tr><td style="padding-top:12px;font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}. ${htmlEscape(lead)}</td></tr>
+    rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}. ${htmlEscape(lead)}</td></tr>
 ${emailPanel("Refunded to", card.charAt(0).toUpperCase() + card.slice(1), [timing])}
 <tr><td style="padding-top:18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px;line-height:20px">
 ${emailRow("Order", "#" + ref)}
@@ -2139,15 +2158,18 @@ async function setRemindIndex(env, list) {
 
 /** What a reminder offers: their last order, or one main tray when that isn't on sale this week. */
 function reminderItem(rec, settings, freeDelivery = false) {
-  let bundle = isBundle(rec.bundle) ? rec.bundle : "tray1";
+  let same = isBundle(rec.bundle);
+  let bundle = same ? rec.bundle : "tray1";
   let quantity = Math.min(10, Math.max(1, Math.floor(Number(rec.quantity)) || 1));
   if (stockProblem(settings, bundle, quantity)) {
     bundle = "tray1";
     quantity = 1;
+    same = false;
   }
   const subtotal = (Number(settings.prices?.[bundle]) || 0) * quantity;
   const deliveryFee = freeDelivery ? 0 : SITE_DELIVERY_FEE;
-  return { bundle, quantity, subtotal, deliveryFee, total: subtotal + deliveryFee };
+  // same: this is what they ordered last time, not the one tray offered when that is sold out.
+  return { bundle, quantity, same, subtotal, deliveryFee, total: subtotal + deliveryFee };
 }
 
 /**
@@ -2217,6 +2239,14 @@ function buildReminderEmail(rec, settings, sat, ref = null) {
   const subject = `Eggs this Saturday, ${sat.label}? Order by ${cutoff}`;
   const C = EMAIL_C;
   const preheader = `Orders close ${cutoff} for Saturday ${sat.label}, ${DELIVERY_HOURS}. Your last order is ready to go again.`;
+  // One row of the list: a quiet label on the left, the answer in bold on the right (HTML).
+  const line = (name, value, last = false) => {
+    const rule = last ? "" : `border-bottom:1px solid ${C.line};`;
+    return `<tr><td valign="top" style="padding:11px 0;${rule}font-size:15px;line-height:22px;color:${C.muted};white-space:nowrap">${name}</td><td valign="top" align="right" style="padding:11px 0 11px 12px;${rule}font-size:15px;line-height:22px;font-weight:700;color:${C.ink}">${value}</td></tr>`;
+  };
+  // The plain second line of an answer. No-break spaces keep "+ $5.00 delivery" together, so a
+  // narrow phone that has to wrap the price line breaks it after the first amount.
+  const under = (text) => `<span style="display:block;font-weight:400;color:${C.ink2}">${htmlEscape(text)}</span>`;
   const html = emailFrame({
     subject,
     preheader,
@@ -2224,13 +2254,20 @@ function buildReminderEmail(rec, settings, sat, ref = null) {
     title: "Eggs this Saturday?",
     mark: "Saturday",
     help: "Questions?",
-    rows: `<tr><td style="padding-top:12px;font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}. We deliver on Saturday ${htmlEscape(sat.label)}, ${DELIVERY_HOURS}, and orders close ${htmlEscape(cutoff)}. Want the same again?</td></tr>
-${emailPanel("Your order", item.quantity > 1 ? `${item.quantity} x ${label}` : label, [free ? `${money(item.subtotal)} + free delivery = ${money(item.total)}` : `${money(item.subtotal)} + ${money(item.deliveryFee)} delivery = ${money(item.total)}`])}
+    // One quiet list (Kanna picked it on 12 Nov 2026 over a long opening sentence): the day, the
+    // deadline, the order and the total, each on its own row, then one wide button.
+    rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}, ${item.same ? "want the same again?" : "want eggs this week?"}</td></tr>
+<tr><td style="padding-top:16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.subtle};border-radius:14px"><tr><td style="padding:6px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+${line("Delivery", `Saturday ${htmlEscape(sat.label)}${under(DELIVERY_HOURS)}`)}
+${line("Order by", htmlEscape(cutoff.charAt(0).toUpperCase() + cutoff.slice(1)))}
+${line("Your order", `${htmlEscape(item.quantity > 1 ? `${item.quantity} x ${label}` : label)}${under(free ? `${money(item.subtotal)} +\u00a0free\u00a0delivery` : `${money(item.subtotal)} +\u00a0${money(item.deliveryFee)}\u00a0delivery`)}`)}
+${line("Total", `<span style="font-size:18px;font-weight:800;letter-spacing:-0.3px">${money(item.total)}</span>`, true)}
+</table></td></tr></table></td></tr>
 ${free ? `<tr><td style="padding-top:14px;font-size:15px;line-height:22px;color:${C.ink2}">You've earned a free delivery, so this one is on us. It comes off at checkout.</td></tr>` : ""}
-${emailButton(links.reorder, "Order again")}
+<tr><td style="padding-top:16px">${emailWideButton(links.reorder, "Order again")}</td></tr>
 <tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">It opens your order filled in, ready to pay. Not this week? Just ignore this email.</td></tr>
 ${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid ${C.line};padding-top:18px;font-size:15px;line-height:22px;font-weight:700;color:${C.ink}">Free delivery for a neighbour</td></tr><tr><td style="padding-top:4px;font-size:14px;line-height:21px;color:${C.ink2}">Send them your link. Their first delivery is free, and so is your next one.</td></tr><tr><td style="padding-top:8px;font-size:15px;line-height:22px"><a href="${htmlEscape(ref.link)}" style="font-weight:600;color:${C.ink};text-decoration:underline">${htmlEscape(ref.link.replace("https://", ""))}</a></td></tr></table></td></tr>` : ""}`,
-    small: ` · ${SHOP_EMAIL}<br>You asked for a Thursday reminder when you ordered. <a href="${htmlEscape(links.stop)}" style="color:${C.muted};text-decoration:underline">Unsubscribe</a>`,
+    why: `Sent each Thursday because you asked.<br><a href="${htmlEscape(links.stop)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Stop reminders</a>`,
   });
   return { subject, html };
 }
@@ -5085,7 +5122,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "237",
+      "X-Yolko-Build": "238",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
