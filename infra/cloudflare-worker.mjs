@@ -1080,6 +1080,19 @@ async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
   return sendCustomerEmail(env, order, buildOrderEmail(order), { test });
 }
 
+/**
+ * Subject of an admin sample: "[Test 9:31pm] ...", Sydney time. The time makes each sample its
+ * own conversation in Gmail. With a bare "[Test]" a second sample landed under the first one,
+ * and Gmail folded its whole body away as a repeat ("Show trimmed content").
+ */
+function testSubject(subject, now = new Date()) {
+  const time = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", hour: "numeric", minute: "2-digit", hour12: true })
+    .format(now)
+    .replace(/\s+/g, "")
+    .toLowerCase();
+  return `[Test ${time}] ${subject}`;
+}
+
 /** Send one YOLKO email to the order's customer through Zoho CPaaS (the ZeptoMail API). */
 async function sendCustomerEmail(env, order, { subject, html, text }, { test = false } = {}) {
   const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
@@ -1092,7 +1105,7 @@ async function sendCustomerEmail(env, order, { subject, html, text }, { test = f
     from: { address: from, name: STRIPE_BRAND },
     to: [{ email_address: { address: to, name: order.name || "" } }],
     reply_to: [{ address: SHOP_EMAIL, name: STRIPE_BRAND }],
-    subject: test ? `[Test] ${subject}` : subject,
+    subject: test ? testSubject(subject) : subject,
     htmlbody: html,
     textbody: text,
   };
@@ -2310,7 +2323,7 @@ async function sendReminderEmail(env, auth, rec, settings, sat, { test = false }
     await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
       fromAddress: acct.address || SHOP_EMAIL,
       toAddress: rec.email,
-      subject: test ? `[Test] ${subject}` : subject,
+      subject: test ? testSubject(subject) : subject,
       content: html,
       mailFormat: "html",
     });
@@ -5147,7 +5160,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "241",
+      "X-Yolko-Build": "242",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
