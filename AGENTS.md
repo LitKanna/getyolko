@@ -63,6 +63,14 @@ printed box cards follow the brand guide's delivery card, with the yolk dot in t
 on black, all black on yellow; never stretch, tilt or recolour it; never under 24px tall. The
 site photos stay exactly as they are.
 
+Stripe's pay page is branded per checkout (`STRIPE_LOOK` in the Worker, sent as
+`branding_settings`): cream background, yolk button, rounded corners, the logo from
+`assets/brand/pay/logo-1.png` and the icon from `assets/brand/icon-512.png`. Stripe reads those
+pictures by their public address, so they must be live before the Worker names them, and a
+changed picture needs a new file name. If Stripe refuses the look, the checkout is made again
+without it: the look must never stop a payment. The receipt page uses the Stripe account's own
+branding (brand colour ink, accent cream), which the Worker also tries to set.
+
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into
 `--vvh` / `--app-height` before paint. Hero/showcase CSS uses `--frame-h` from that,
