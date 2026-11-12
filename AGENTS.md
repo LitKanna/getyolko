@@ -60,7 +60,11 @@ use PNGs in `assets/brand/email/` because mail apps do not draw SVG; a changed p
 new file name. Gmail never loads a web font (it shows the phone's own font), so each email's
 heading is a picture too: `infra/email-titles.mjs` lists the three headings and
 `node infra/build-email-titles.mjs` draws them in Plus Jakarta Sans ExtraBold on a white plate
-(`npm run test:email-titles`). A heading that is not in that list goes out as text. New words
+(`npm run test:email-titles`). A heading that is not in that list goes out as text. The words
+under the heading use `EMAIL_FONT`: the brand font first (Apple Mail loads it), then `ui-rounded`,
+Apple's rounded font, for Gmail on iPhone, iPad and Mac (Kanna picked Rounded from four drawn
+options on 12 Nov 2026), then each device's own font. Only fonts a device already has can show
+in Gmail, so a font change means a new name in that list, not a new font file. New words
 need a new entry, a new file name and a merge before the Worker names the file, because the site
 serves files from the pinned commit. The admin shows the logo in one colour (it stays black, white and greys); its
 printed box cards follow the brand guide's delivery card, with the egg logo in the QR code. Rules: ink logo with a yellow yolk on white or cream, white with the same yolk

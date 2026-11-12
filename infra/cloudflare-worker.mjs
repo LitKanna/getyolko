@@ -843,7 +843,11 @@ function orderRef(order) {
 // (infra/email-titles.mjs).
 const EMAIL_C = { canvas: "#faf7f0", paper: "#ffffff", ink: "#14120e", ink2: "#3d3b36", muted: "#6b675e", line: "#e6e0d2", subtle: "#f3eee2", yellow: "#ffd32a" };
 // Single quotes only: this sits inside style="..." attributes.
-const EMAIL_FONT = `'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
+// The words: the brand font where a mail app loads it (Apple Mail). Gmail never does, and only
+// shows fonts the device already has, so next comes Apple's rounded font (`ui-rounded`: iPhone,
+// iPad and Mac), which Kanna picked on 12 Nov 2026 from four drawn options. Other devices fall
+// through to their own font, as before.
+const EMAIL_FONT = `'Plus Jakarta Sans',ui-rounded,'SF Pro Rounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
 const EMAIL_WA = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
 const EMAIL_IMG = "https://getyolko.com/assets/brand/email";
 
@@ -5143,7 +5147,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "240",
+      "X-Yolko-Build": "241",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
