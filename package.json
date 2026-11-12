@@ -12,6 +12,7 @@
                     "test:prices":  "node infra/prices-page-test.mjs",
                     "test:stripe-look":  "node infra/stripe-look-test.mjs",
                     "test:brand-qr":  "node infra/brand-qr-test.mjs",
+                    "test:mail-from":  "node infra/mail-from-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {

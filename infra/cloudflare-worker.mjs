@@ -1435,6 +1435,8 @@ const ZOHO_PAUSE_MS = 60000;
 // This isolate's copy, keyed to the login it came from.
 let zohoToken = null;
 let zohoAccount = null;
+// Set once Zoho has refused a sender name in fromAddress, see zohoMailSend.
+let zohoPlainFromOnly = false;
 // A refresh in flight, per request: each request builds its own auth object, so a
 // promise is never awaited by a request other than the one that started it.
 const zohoAsking = new WeakMap();
@@ -1572,11 +1574,35 @@ async function zohoMailFetch(env, auth, path, { method = "GET", body, raw = fals
   const data = await resp.json().catch(() => null);
   if (!resp.ok) {
     const err = new Error(String(data?.data?.moreInfo || data?.status?.description || `Zoho Mail said HTTP ${resp.status}`).slice(0, 300));
+    err.status = resp.status;
     // A turned-down token is a sign-in problem; the next call signs in again.
     if (resp.status === 401) err.signin = true;
     throw err;
   }
   return data;
+}
+
+/**
+ * Send from the Zoho mailbox under the shop's name, so mail apps show "YOLKO" and not the bare
+ * address (Gmail draws its sender circle from the first letter of that name, and "orders" gave
+ * an O). Zoho's docs only promise a plain address in fromAddress. So if Zoho answers the named
+ * form with an error, the same email goes out again with the plain address: the name can never
+ * stop an email. A sign-in problem, a rate limit or a timeout is not about the name and is not
+ * retried here (after a timeout the first try may have been sent).
+ */
+async function zohoMailSend(env, auth, path, mail) {
+  if (!zohoPlainFromOnly) {
+    try {
+      return await zohoMailFetch(env, auth, path, { method: "POST", body: { ...mail, fromAddress: `${STRIPE_BRAND} <${mail.fromAddress}>` } });
+    } catch (err) {
+      if (!err?.status || err.status === 401 || err.status === 429) throw err;
+      const data = await zohoMailFetch(env, auth, path, { method: "POST", body: mail });
+      // The plain form went through, so it was the name Zoho refused. Stop trying it.
+      zohoPlainFromOnly = true;
+      return data;
+    }
+  }
+  return zohoMailFetch(env, auth, path, { method: "POST", body: mail });
 }
 
 /** The mailbox account plus its Inbox and Sent folder ids. */
@@ -2219,9 +2245,12 @@ async function sendReminderEmail(env, auth, rec, settings, sat, { test = false }
   const { subject, html } = buildReminderEmail(rec, settings, sat, ref);
   try {
     const acct = await zohoMailAccount(env, auth);
-    await zohoMailFetch(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
-      method: "POST",
-      body: { fromAddress: acct.address || SHOP_EMAIL, toAddress: rec.email, subject: test ? `[Test] ${subject}` : subject, content: html, mailFormat: "html" },
+    await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+      fromAddress: acct.address || SHOP_EMAIL,
+      toAddress: rec.email,
+      subject: test ? `[Test] ${subject}` : subject,
+      content: html,
+      mailFormat: "html",
     });
     return { ok: true };
   } catch (err) {
@@ -4213,7 +4242,7 @@ async function handleApi(request, env, url, ctx) {
       const path = replyId
         ? `/accounts/${encodeURIComponent(acct.accountId)}/messages/${replyId}`
         : `/accounts/${encodeURIComponent(acct.accountId)}/messages`;
-      const data = await zohoMailFetch(env, auth, path, { method: "POST", body: replyId ? { ...mail, action: "reply" } : mail });
+      const data = await zohoMailSend(env, auth, path, replyId ? { ...mail, action: "reply" } : mail);
       return json({ ok: true, to, messageId: data?.data?.messageId ? String(data.data.messageId) : null });
     } catch (err) {
       return json({ ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
@@ -5056,7 +5085,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "236",
+      "X-Yolko-Build": "237",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
