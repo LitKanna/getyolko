@@ -25,6 +25,7 @@ import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 import { buildCoverageMap } from "./coverage-map.mjs";
 import { pricesBlocks, slot, PRICES_PATH } from "./prices-page.mjs";
 import { logoMaster, logoReuse, logoAlone, LOGO_MOTION, iconLinks } from "./brand.mjs";
+import { shareImage, SHARE_IMG_PX } from "./share-preview.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://getyolko.com";
@@ -55,6 +56,8 @@ const PACKS = {
 const MAP = buildCoverageMap();
 
 const HERO_IMG = `${SITE}/assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}`;
+// The picture a shared link shows: the same photo, small enough for WhatsApp (share-preview.mjs).
+const SHARE_IMG = shareImage(PRICE.tray1);
 const HERO_ALT = `Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $${PRICE.tray1} a tray`;
 const LOGO = `${SITE}/assets/yolko-app-icon-1024.png`;
 
@@ -413,17 +416,17 @@ function head({ path, title, description, graph, index = true, hero = true }) {
   <meta property="og:locale" content="en_AU">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
-  <meta property="og:image" content="${HERO_IMG}">
+  <meta property="og:image" content="${SHARE_IMG}">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:width" content="1536">
-  <meta property="og:image:height" content="1536">
+  <meta property="og:image:width" content="${SHARE_IMG_PX}">
+  <meta property="og:image:height" content="${SHARE_IMG_PX}">
   <meta property="og:image:alt" content="${esc(HERO_ALT)}">
   <meta property="og:url" content="${url}">
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${esc(title)}">
   <meta name="twitter:description" content="${esc(description)}">
-  <meta name="twitter:image" content="${HERO_IMG}">
+  <meta name="twitter:image" content="${SHARE_IMG}">
   <meta name="twitter:image:alt" content="${esc(HERO_ALT)}">
 ${index ? `\n  <link rel="canonical" href="${url}">` : ""}
   <link rel="sitemap" type="application/xml" href="/sitemap.xml">

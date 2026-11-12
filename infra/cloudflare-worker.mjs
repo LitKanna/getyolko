@@ -13,6 +13,7 @@ import ADMIN_HTML from "./admin.html";
 import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
+import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
 const DEPLOY_SHA = "f8049105eb7c3c0817bbadf74e2731190beb647f";
@@ -2469,6 +2470,25 @@ function shareLink(code) {
   return `https://getyolko.com/r/${code}`;
 }
 
+/**
+ * The card for a share link (see share-preview.mjs), only for an app that reads links to
+ * draw their cards, and only for a code that really gives a free first delivery.
+ */
+async function shareLinkCard(request, env, rawCode) {
+  if (!isLinkPreviewAgent(request.headers.get("User-Agent"))) return null;
+  const code = cleanRefCode(rawCode);
+  if (!code) return null;
+  if (!HOUSE_REF_CODES.has(code) && !(await env.DATA.get(refCodeKey(code)))) return null;
+  const settings = await getSettings(env);
+  const trayPrice = Number(settings.prices.tray1);
+  if (!(trayPrice > 0)) return null;
+  const card = referralCard({ code, trayPrice, deliveryFee: SITE_DELIVERY_FEE });
+  return new Response(request.method === "HEAD" ? null : card.html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "X-Robots-Tag": "noindex", "Cache-Control": "no-store" },
+  });
+}
+
 /** The customer's share code, made the first time it's needed. */
 async function ensureRefCode(env, phone, name) {
   if (!AU_MOBILE_RE.test(phone || "")) return null;
@@ -2929,11 +2949,16 @@ async function syncMetaAdsForStock(env, traysAvailable) {
   return { ok: true, action: "noop", trays, wePaused: !!wePaused };
 }
 
-/** Public Meta Pixel ID (Events Manager → YOLKO). Override with env.META_PIXEL_ID. */
-const DEFAULT_META_PIXEL_ID = "2008953469766472";
+/**
+ * Public Meta Pixel ID (Events Manager → YOLKO), the same id the pages carry in their pixel
+ * snippet. A sale only pairs its browser event with its server event on one pixel, so the
+ * server always uses this id. The old META_PIXEL_ID secret is no longer read: it still held
+ * the pixel of an ad account nobody can open, and would have split the two again.
+ */
+const META_PIXEL_ID = "2008953469766472";
 
-function metaPixelId(env) {
-  return String(env.META_PIXEL_ID || DEFAULT_META_PIXEL_ID).trim();
+function metaPixelId() {
+  return META_PIXEL_ID;
 }
 
 async function sha256Hex(value) {
@@ -5082,6 +5107,12 @@ export default {
 
     // A customer's share link → the shop, with their code for the free delivery.
     const refPath = /^\/r\/([A-Za-z0-9]{6})\/?$/.exec(url.pathname);
+    // An app reading a share link to draw its card gets the "first delivery is free" card.
+    const shared = refPath ? refPath[1] : url.pathname === "/" ? url.searchParams.get("ref") : null;
+    if (shared && (request.method === "GET" || request.method === "HEAD")) {
+      const card = await shareLinkCard(request, env, shared).catch(() => null);
+      if (card) return card;
+    }
     if (refPath) {
       const dest = new URL(url.origin + "/");
       const code = cleanRefCode(refPath[1]);
