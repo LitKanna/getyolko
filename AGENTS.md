@@ -146,6 +146,13 @@ admin calls `POST /api/admin/zoho/connect`, and the callback stores the refresh 
 `GET /api/admin/mail/attachment`, `POST /api/admin/mail/flag {messageId, read}`,
 `POST /api/admin/mail/send {to, subject, text, replyTo?, quote?}`. Optional `ZOHO_ACCOUNTS_URL` /
 `ZOHO_MAIL_URL` override the Zoho hosts (used for local tests against a fake Zoho).
+Sender name on mailbox emails (12 Nov 2026): the Thursday reminder and admin replies used to go out
+as a bare `orders@getyolko.com`, so Gmail drew an "O" in its sender circle. `zohoMailSend` now sends
+them as `YOLKO <orders@getyolko.com>`. Zoho's docs only promise a plain address in `fromAddress`,
+so if Zoho answers the named form with an error the same email is sent again with the plain
+address (`npm run test:mail-from`). Send every mailbox email through `zohoMailSend`, never straight
+through `zohoMailFetch`. The picture in Gmail's sender circle is not ours to set from code: it
+comes from a Google account made for the address, or from a paid logo certificate (BIMI).
 Pictures and attachments in the mailbox (Nov 2026): Zoho's message HTML points inline pictures at
 its own web app (`/mail/ImageDisplay?...&cid=`), which 404s on getyolko.com. `/api/admin/mail/message`
 rewrites every picture (`<img src/srcset>`, `background=`, `url()` in styles) to the site:
