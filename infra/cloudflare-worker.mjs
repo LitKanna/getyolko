@@ -11,6 +11,7 @@ import { qrcode } from "qrcode-generator";
 // The admin page lives in its own file; wrangler bundles .html as a text module.
 import ADMIN_HTML from "./admin.html";
 import { logoAlone, iconLinks } from "./brand.mjs";
+import { brandQr } from "./brand-qr.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
 const DEPLOY_SHA = "75e30db155d9280499614de35aff8512a8d961a8";
@@ -2516,30 +2517,11 @@ async function referralFor(env, phone, name) {
 }
 
 /**
- * A QR code as a scalable SVG: black runs on white, with the 4-module quiet zone scanners need,
- * and the brand's yolk dot in the middle. The dot hides about 5% of the code, so the code is made
- * at error level H (it can lose 30% and still scan).
+ * The shop's QR code as a scalable SVG: soft squares, rounded eyes and the egg logo in the
+ * middle, at error level H with the 4-module quiet zone scanners need. Drawn by brand-qr.mjs.
  */
 function qrSvg(text) {
-  const qr = qrcode(0, "H");
-  qr.addData(text);
-  qr.make();
-  const n = qr.getModuleCount();
-  const size = n + 8;
-  let d = "";
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      if (!qr.isDark(r, c)) continue;
-      let w = 1;
-      while (c + w < n && qr.isDark(r, c + w)) w++;
-      d += `M${c + 4} ${r + 4}h${w}v1h-${w}z`;
-      c += w - 1;
-    }
-  }
-  const mid = size / 2;
-  const ring = Math.round(n * 0.125 * 100) / 100;
-  const yolk = Math.round(n * 0.1 * 100) / 100;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" role="img" aria-label="QR code"><path fill="#fff" d="M0 0h${size}v${size}H0z"/><path fill="#14120e" shape-rendering="crispEdges" d="${d}"/><circle cx="${mid}" cy="${mid}" r="${ring}" fill="#fff"/><circle cx="${mid}" cy="${mid}" r="${yolk}" fill="#ffd32a"/></svg>`;
+  return brandQr(qrcode, text);
 }
 
 /**
@@ -5074,7 +5056,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "235",
+      "X-Yolko-Build": "236",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
