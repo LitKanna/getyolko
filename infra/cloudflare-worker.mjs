@@ -13,7 +13,7 @@ import ADMIN_HTML from "./admin.html";
 import { logoAlone, iconLinks } from "./brand.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "1ba124d23f847704c09b5df95d78d03d49ad537b";
+const DEPLOY_SHA = "75e30db155d9280499614de35aff8512a8d961a8";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -434,7 +434,108 @@ const SHOP_EMAIL = "orders@getyolko.com";
 const STRIPE_SUPPORT_EMAIL = SHOP_EMAIL;
 const STRIPE_SUPPORT_PHONE = "+61433975055";
 // Bump the version when the business profile above changes, so Stripe gets it again.
-const STRIPE_BRAND_FLAG = "stripe:branded:yolko:2";
+const STRIPE_BRAND_FLAG = "stripe:branded:yolko:3";
+
+// Stripe's pay page in the shop's own look: cream page, yolk button, the logo. Stripe reads the
+// pictures by their public address, so they must be live before they are named here, and a
+// changed picture needs a new file name.
+const STRIPE_LOOK = {
+  "branding_settings[display_name]": STRIPE_BRAND,
+  "branding_settings[background_color]": "#faf7f0",
+  "branding_settings[button_color]": "#ffd32a",
+  "branding_settings[border_style]": "rounded",
+  "branding_settings[font_family]": "be_vietnam_pro",
+  "branding_settings[logo][type]": "url",
+  "branding_settings[logo][url]": "https://getyolko.com/assets/brand/pay/logo-1.png",
+  "branding_settings[icon][type]": "url",
+  "branding_settings[icon][url]": "https://getyolko.com/assets/brand/icon-512.png",
+};
+const STRIPE_LOOK_NOTE = "stripe:look:refused";
+// The Stripe account's own branding, which its receipt page uses.
+const STRIPE_ACCOUNT_LOOK = { primary: "#14120e", secondary: "#faf7f0" };
+const STRIPE_ACCOUNT_PICTURES = {
+  icon: ["business_icon", "assets/brand/icon-512.png"],
+  logo: ["business_logo", "assets/brand/pay/logo-1.png"],
+};
+
+/** Create a Checkout Session. The look is optional: if Stripe refuses it, the payment still goes ahead without it. */
+async function postCheckoutSession(env, params) {
+  const send = () =>
+    fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.STRIPE_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    }).then((r) => r.json());
+  const session = await send();
+  const looks = [...params.keys()].filter((k) => k.startsWith("branding_settings"));
+  if (!session?.error || !looks.length) return session;
+  for (const k of looks) params.delete(k);
+  const plain = await send();
+  if (!plain?.error) {
+    // It worked without the look, so the look was the problem. Leave a note the admin can read.
+    const note = `${session.error.param || ""} ${session.error.message || "refused"}`.trim().slice(0, 300);
+    console.log("stripe refused the pay page look", note);
+    await env.DATA.put(STRIPE_LOOK_NOTE, JSON.stringify({ at: new Date().toISOString(), note }), { expirationTtl: 30 * 24 * 3600 }).catch(() => null);
+  }
+  return plain;
+}
+
+/** Hand Stripe one of the shop's pictures and return its file id. Kept, so each picture is sent once. */
+async function stripeBrandFile(env, purpose, path) {
+  const key = `stripe:file:${purpose}:${path}`;
+  const have = await env.DATA.get(key).catch(() => null);
+  if (have) return have;
+  const img = await fetch(`${UPSTREAM_ASSETS}/${path}`);
+  if (!img.ok) return null;
+  const form = new FormData();
+  form.set("purpose", purpose);
+  form.set("file", new File([await img.arrayBuffer()], path.split("/").pop(), { type: "image/png" }));
+  const resp = await fetch("https://files.stripe.com/v1/files", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
+    body: form,
+  });
+  const file = await resp.json().catch(() => null);
+  if (!file?.id) return null;
+  await env.DATA.put(key, file.id).catch(() => null);
+  return file.id;
+}
+
+/** Colours, icon and logo on the Stripe account, for its receipt page. Its own request, so a refusal here never undoes the business name. */
+async function ensureStripeAccountLook(env) {
+  const body = new URLSearchParams({
+    "settings[branding][primary_color]": STRIPE_ACCOUNT_LOOK.primary,
+    "settings[branding][secondary_color]": STRIPE_ACCOUNT_LOOK.secondary,
+  });
+  for (const [field, [purpose, path]] of Object.entries(STRIPE_ACCOUNT_PICTURES)) {
+    const id = await stripeBrandFile(env, purpose, path).catch(() => null);
+    if (id) body.set(`settings[branding][${field}]`, id);
+  }
+  const resp = await fetch("https://api.stripe.com/v1/account", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+  const account = await resp.json().catch(() => null);
+  if (!account || account.error) return { ok: false, error: account?.error?.message || "stripe error" };
+  return { ok: true, ...stripeAccountLook(account) };
+}
+
+function stripeAccountLook(account) {
+  const b = account?.settings?.branding || {};
+  return {
+    icon: Boolean(b.icon),
+    logo: Boolean(b.logo),
+    primaryColor: b.primary_color || null,
+    secondaryColor: b.secondary_color || null,
+  };
+}
 
 /** Ensure Checkout / receipts show YOLKO. not the personal Stripe account email. */
 async function ensureStripeBranding(env) {
@@ -457,9 +558,12 @@ async function ensureStripeBranding(env) {
   });
   const account = await resp.json();
   if (account.error) return { ok: false, error: account.error.message || "stripe error", account };
-  await env.DATA.put(STRIPE_BRAND_FLAG, "1", { expirationTtl: 30 * 24 * 3600 }).catch(() => null);
+  const look = await ensureStripeAccountLook(env).catch((err) => ({ ok: false, error: String(err?.message || err) }));
+  // If the look did not take, try again tomorrow rather than on every checkout.
+  await env.DATA.put(STRIPE_BRAND_FLAG, "1", { expirationTtl: (look.ok ? 30 : 1) * 24 * 3600 }).catch(() => null);
   return {
     ok: true,
+    look,
     name: account.business_profile?.name || null,
     statementDescriptor: account.settings?.payments?.statement_descriptor || null,
     supportEmail: account.business_profile?.support_email || null,
@@ -522,6 +626,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
     ...(order.deliveryPerk ? { "metadata[deliveryPerk]": order.deliveryPerk } : {}),
     success_url: "https://getyolko.com/?paid={CHECKOUT_SESSION_ID}",
     cancel_url: "https://getyolko.com/#order",
+    ...STRIPE_LOOK,
   });
   if (deliveryFee > 0) {
     params.set("line_items[1][price_data][currency]", "aud");
@@ -537,14 +642,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   const prevId = String(order.sessionId || "").startsWith("cs_") ? order.sessionId : null;
   const [prev, session] = await Promise.all([
     prevId ? fetchStripeSession(env, prevId).catch(() => null) : null,
-    fetch("https://api.stripe.com/v1/checkout/sessions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.STRIPE_KEY}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: params.toString(),
-    }).then((r) => r.json()),
+    postCheckoutSession(env, params),
   ]);
   const prevGone = prev?.error?.code === "resource_missing";
   if (prevId && !prevGone && (!prev || prev.error)) {
@@ -4300,6 +4398,8 @@ async function handleApi(request, env, url, ctx) {
         supportUrl: account.business_profile?.support_url || null,
         url: account.business_profile?.url || null,
         accountEmail: account.email || null,
+        look: stripeAccountLook(account),
+        payPageRefused: await env.DATA.get(STRIPE_LOOK_NOTE, "json").catch(() => null),
       });
     }
 
@@ -4974,7 +5074,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "234",
+      "X-Yolko-Build": "235",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
