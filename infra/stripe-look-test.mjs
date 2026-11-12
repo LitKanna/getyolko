@@ -39,13 +39,13 @@ calls = []; globalThis.fetch = async (u, o) => {
   calls.push([String(u), o?.body]);
   if (String(u).startsWith('https://raw.example')) return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
   if (String(u).startsWith('https://files.stripe.com')) return { ok: true, json: async () => ({ id: 'file_' + o.body.get('purpose') }) };
-  return { ok: true, json: async () => ({ settings: { branding: { icon: 'file_a', logo: 'file_b', primary_color: '#14120e', secondary_color: '#faf7f0' } } }) };
+  return { ok: true, json: async () => ({ settings: { branding: { icon: 'file_a', logo: 'file_b', primary_color: '#faf7f0', secondary_color: '#ffd32a' } } }) };
 };
 env = { STRIPE_KEY: 'sk_x', DATA: kv() };
 r = await mod.ensureStripeAccountLook(env);
 const acct = calls.find((c) => c[0] === 'https://api.stripe.com/v1/account');
-ok(r.ok && r.icon && r.logo && r.primaryColor === '#14120e', 'account look reported back');
-ok(acct && String(acct[1]).includes('icon%5D=file_business_icon') && String(acct[1]).includes('logo%5D=file_business_logo') && String(acct[1]).includes('primary_color%5D=%2314120e'), 'account gets colours and both file ids');
+ok(r.ok && r.icon && r.logo && r.primaryColor === '#faf7f0' && r.secondaryColor === '#ffd32a', 'account look reported back');
+ok(acct && String(acct[1]).includes('icon%5D=file_business_icon') && String(acct[1]).includes('logo%5D=file_business_logo') && String(acct[1]).includes('primary_color%5D=%23faf7f0') && String(acct[1]).includes('secondary_color%5D=%23ffd32a'), 'account gets a cream page, a yolk accent and both file ids');
 const up = calls.find((c) => c[0].startsWith('https://files.stripe.com')); const f = up[1].get('file');
 ok(f.name === 'icon-512.png' && f.type === 'image/png' && f.size === 3, 'picture uploaded as a PNG file');
 const n = calls.length; await mod.ensureStripeAccountLook(env);
