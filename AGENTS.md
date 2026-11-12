@@ -24,7 +24,7 @@ Then open http://localhost:8080. No install is required just to view/use the sit
 
 ### Generated pages (non-obvious)
 The suburb pages (`egg-delivery-*.html`), `egg-delivery-sydney.html`, `bulk-eggs-sydney.html`,
-`egg-delivery-areas.html`, `404.html`, `sitemap.xml`, `assets/coverage-map.svg`, and the
+`egg-prices-sydney.html`, `egg-delivery-areas.html`, `404.html`, `sitemap.xml`, `assets/coverage-map.svg`, and the
 JSON-LD, FAQ, delivery map and next-delivery-date blocks inside `index.html` (between
 `<!-- name:start -->` / `<!-- name:end -->` markers) are generated. Edit `infra/build-pages.mjs`
 (copy, prices, `CSS_V`, structured data), `infra/coverage-map.mjs` (the dot map, drawn from the
@@ -196,6 +196,22 @@ with "$1.00 dearer" or "Out of stock" under it. Price changes below show 6 at a 
 latest stock flip per egg, and name the egg by its group ("Cage 1.5kg tray"). This is comparison only: nothing here may ever
 change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
 admin only.
+
+### Public egg price page (/egg-prices-sydney, 12 Nov 2026; Kanna approved naming the shops)
+The same price check, shown to shoppers: a tray table (YOLKO's tray in its place by price per
+egg), a dozens and 18 packs table, an egg sizes guide and FAQ. `infra/build-pages.mjs` writes
+`egg-prices-sydney.html` with empty tables between `<!-- prices-trays:start -->` style markers
+(YOLKO's own row and "checking the shops again"), and the Worker fills them on every request from
+`pricewatch:v2:latest` and the live `settings` (`pricesPageHtml`); if KV fails the page goes out
+as built. `infra/prices-page.mjs` holds the rules and is shared by the build, the Worker and
+`infra/prices-page-test.mjs` (`npm run test:prices`), so keep it free of Node and Worker APIs.
+Rules that must hold: only prices the Worker read itself (`source: "auto"`, so never the typed-in
+Woolworths or Costco), only from the last 24 hours (a shop that cannot be read drops off), every
+table says when it was checked in Sydney time, every pack links to the shop's own page (https and
+the shop's own host only), product names are escaped, and the copy never says cheapest, best or
+beats: the numbers are sorted and left to speak, even when a shop is cheaper than YOLKO. The page
+is served without an ETag so nobody gets a stale 304, and `/sitemap.xml` is rewritten on the way
+out so this page's `lastmod` is the day a price or stock last changed (`lastPriceChange`).
 
 ### Egg news (Admin > News, Nov 2026)
 `infra/news-feed.mjs` gathers Australian egg news from public feeds: two Google News searches

@@ -2058,6 +2058,163 @@ section {
   vertical-align: 2px;
 }
 
+/* A plain four-column table that keeps every column on phones (egg sizes). */
+.price-table.all-cols td:nth-child(3) {
+  font-weight: inherit;
+}
+
+/* ---------- Egg prices page: shops side by side ---------- */
+.cmp-table {
+  width: 100%;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  font-size: clamp(15px, 0.3vw + 13px, 17px);
+}
+
+.cmp-table th,
+.cmp-table td {
+  padding: clamp(14px, 1.4vw, 20px) clamp(14px, 2vw, 28px);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cmp-table tbody tr:last-child th,
+.cmp-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cmp-table thead th {
+  color: var(--muted);
+  background: var(--sand);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cmp-table tbody th {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cmp-table .cmp-pack {
+  width: 46%;
+}
+
+.cmp-table .cmp-pack a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.cmp-table .cmp-pack a:hover {
+  text-decoration-color: currentColor;
+}
+
+.cmp-table .cmp-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cmp-table .cmp-out {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.cmp-table .cmp-price {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cmp-table .cmp-num {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* YOLKO's own row. */
+.cmp-table tr.cmp-us th,
+.cmp-table tr.cmp-us td {
+  background: #fff6cf;
+}
+
+.cmp-table tr.cmp-us th::after {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--yolk-deep);
+}
+
+.cmp-table tr.cmp-group th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  color: var(--muted);
+  background: var(--cream);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* "an egg" and "a kilo" only show on phones, where the column headings are gone. */
+.cmp-unit {
+  display: none;
+}
+
+.cmp-checked,
+.cmp-lead,
+.cmp-note {
+  max-width: 68ch;
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.cmp-checked {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cmp-lead {
+  color: var(--ink-soft);
+  font-size: clamp(17px, 0.3vw + 15px, 19px);
+}
+
+.cmp-table + .cmp-note,
+.price-table + .cmp-note {
+  margin: 18px 0 0;
+}
+
+.cmp-sources {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.cmp-sources strong {
+  color: var(--ink);
+}
+
+.panel .cmp-note {
+  margin: 0;
+}
+
 .local-suburbs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2631,6 +2788,108 @@ section {
   .price-table tbody tr.best td:last-child::after {
     display: none;
   }
+
+  .price-table.all-cols th:nth-child(2),
+  .price-table.all-cols td:nth-child(2) {
+    display: table-cell;
+  }
+
+  .price-table.all-cols {
+    font-size: 14px;
+  }
+
+  .price-table.all-cols th,
+  .price-table.all-cols td {
+    padding: 13px 6px;
+    white-space: nowrap;
+  }
+
+  .price-table.all-cols th:first-child {
+    padding-left: 16px;
+  }
+
+  .price-table.all-cols thead th {
+    font-size: 13px;
+  }
+
+  /* Each shop becomes a card: name and price on top, the pack under it, then the two rates. */
+  .cmp-table,
+  .cmp-table tbody {
+    display: block;
+  }
+
+  .cmp-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .cmp-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .cmp-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .cmp-table tbody th,
+  .cmp-table tbody td {
+    padding: 0;
+    border: 0;
+  }
+
+  .cmp-table tbody th {
+    grid-area: 1 / 1;
+    font-size: 17px;
+  }
+
+  .cmp-table .cmp-price {
+    grid-area: 1 / 2;
+    font-size: 18px;
+    text-align: right;
+  }
+
+  .cmp-table .cmp-pack {
+    grid-area: 2 / 1 / 3 / 3;
+    width: auto;
+  }
+
+  .cmp-table .cmp-num {
+    grid-row: 3;
+    padding-top: 4px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .cmp-table .cmp-num + .cmp-num {
+    text-align: right;
+  }
+
+  .cmp-table tr.cmp-us {
+    background: #fff6cf;
+  }
+
+  .cmp-table tbody tr.cmp-group {
+    display: block;
+    padding: 10px 18px;
+    background: var(--cream);
+  }
+
+  .cmp-table tbody tr.cmp-group th {
+    display: block;
+    font-size: 14px;
+  }
+
+  .cmp-unit {
+    display: inline;
+  }
 }
 
 @media (max-width: 380px) {
@@ -2644,5 +2903,24 @@ section {
 
   .bo-price {
     font-size: 20px;
+  }
+
+  /* The egg sizes table on the narrowest phones. */
+  .price-table.all-cols {
+    font-size: 13px;
+  }
+
+  .price-table.all-cols th,
+  .price-table.all-cols td {
+    padding: 12px 4px;
+  }
+
+  .price-table.all-cols th:first-child {
+    padding-left: 12px;
+  }
+
+  .price-table.all-cols thead th {
+    font-size: 12px;
+    white-space: normal;
   }
 }

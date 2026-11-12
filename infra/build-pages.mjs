@@ -5,6 +5,7 @@
  *
  *   egg-delivery-<suburb>.html  (one per entry in SUBURB_PAGES)
  *   egg-delivery-sydney.html, bulk-eggs-sydney.html, egg-delivery-areas.html, 404.html
+ *   egg-prices-sydney.html (tables left empty between markers; the Worker fills them, see prices-page.mjs)
  *   assets/coverage-map.svg (the delivery map, from the same zone data checkout uses)
  *   sitemap.xml
  *   index.html: only the JSON-LD block, the FAQ list, the map and the
@@ -22,13 +23,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 import { buildCoverageMap } from "./coverage-map.mjs";
+import { pricesBlocks, slot, PRICES_PATH } from "./prices-page.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "155";
+const CSS_V = "156";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -685,6 +687,7 @@ function footer(path) {
           <p class="foot-h">Shop</p>
           <a href="/#order">Order eggs</a>
           <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
+          <a href="${PRICES_PATH}"${cur(PRICES_PATH)}>Egg prices</a>
         </nav>
         <nav class="foot-col" aria-label="Delivery">
           <p class="foot-h">Delivery</p>
@@ -982,6 +985,103 @@ ${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 box
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
 
+/**
+ * Supermarket egg prices next to YOLKO's. The three slots are filled by the Worker on every
+ * request (infra/prices-page.mjs) from the prices Admin > Competitors reads every 6 hours; what is
+ * written here is only what shows if that read fails. Everything else on the page is fixed text.
+ */
+function pricesPage() {
+  const path = PRICES_PATH;
+  const title = "Egg Prices in Sydney | Coles, Aldi and IGA Compared | YOLKO";
+  const description = `What a tray of 30 eggs or a dozen costs at Coles, Aldi and IGA in Sydney, checked every 6 hours, with the price per egg and per kilo. YOLKO delivers 30 for $${PRICE.tray1}.`;
+  const trail = [["Home", "/"], ["Egg prices Sydney", path]];
+  const faqs = [
+    ["How much is a tray of 30 eggs in Sydney?", `It depends on the kind and the size. Cage and barn laid trays usually cost the least, and free range trays cost the most. The table at the top of this page shows what each shop charges now. YOLKO's tray of 30 extra-large cage eggs is <strong>$${PRICE.tray1}</strong>, delivered on Saturday.`],
+    ["What is the cheapest way to buy eggs?", `Buy a bigger pack, and compare the price per kilo as well as the price per egg. A tray of 30 usually costs less per egg than a dozen, and a box of 180 costs less again. At YOLKO a box works out at $${PRICE.box / 6} a tray, about ${perEgg(PRICE.box, 180)}¢ an egg.`],
+    ["Why compare eggs by the kilo?", "Eggs come in sizes. A tray of 30 large eggs weighs 1.5&nbsp;kg and a tray of 30 extra-large eggs weighs 1.75&nbsp;kg, which is about 17% more egg for the same count."],
+    ["Are these prices the same in every store?", "Not always. They are the prices each shop shows on its website when we check. A store near you can charge a little more or less, and specials come and go."],
+    ["How often are the prices checked?", "Every 6 hours. Each table shows the time of the last check. If a shop cannot be read for a day, its prices come off the page until it can."],
+    ["Why are Woolworths and Costco not listed?", "Their websites do not let us read prices automatically, so we leave them out instead of showing a number that could be old."],
+    ["Does YOLKO deliver?", `Yes. Saturday morning, 6am to 12pm, to nearly 700 Sydney suburbs. Delivery is $${PRICE.delivery} an order. Order by Thursday night.`],
+  ];
+  const graph = [webPage(path, "Egg prices in Sydney", description), breadcrumbs(path, trail), faqPage(path, faqs), BUSINESS_REF];
+  // Until the Worker fills them: YOLKO's own tray and a line saying the shops are being checked.
+  const blank = pricesBlocks({ latest: null, prices: PRICE, delivery: PRICE.delivery });
+  const sizes = [
+    ["Medium", "500&nbsp;g", "1.25&nbsp;kg", "42&nbsp;g"],
+    ["Large", "600&nbsp;g", "1.5&nbsp;kg", "50&nbsp;g"],
+    ["Extra-large", "700&nbsp;g", "1.75&nbsp;kg", "58&nbsp;g"],
+    ["Jumbo", "800&nbsp;g", "2&nbsp;kg", "67&nbsp;g"],
+  ];
+  const body = `  <main>
+${heroSection({
+    trail,
+    h1: "Egg prices in Sydney",
+    sub: `What a tray or a dozen costs at Coles, Aldi and IGA right now, next to YOLKO's tray of 30 for <strong>$${PRICE.tray1}</strong>. Checked every 6 hours.`,
+    secondary: ["See the prices", "#trays-title"],
+  })}
+
+    <section class="band" aria-labelledby="trays-title">
+      <div class="wrap">
+${sectionHead("A tray of 30 eggs", "Sorted by price per egg. Each pack links to the shop's own page.", "trays-title")}
+          ${slot("prices-trays", blank["prices-trays"])}
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="packs-title">
+      <div class="wrap">
+${sectionHead("Dozens and 18 packs", "The lowest-priced pack of each size and kind at Coles and Aldi.", "packs-title")}
+          ${slot("prices-packs", blank["prices-packs"])}
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="compare-title">
+      <div class="wrap">
+${sectionHead("How to compare egg prices", "Two numbers tell you what a pack really costs.", "compare-title")}
+      </div>
+      <div class="wrap local-row">
+        <div class="panel">
+          <h2>Price per egg</h2>
+          <p>Divide the price by the number of eggs. It is the quickest way to set a dozen against a tray of 30, and the bigger pack usually wins.</p>
+        </div>
+        <div class="panel">
+          <h2>Price per kilo</h2>
+          <p>Eggs are sold by size, so two packs of 30 can hold different amounts of egg. Price per kilo shows what you really pay.</p>
+        </div>
+      </div>
+      <div class="wrap">
+        <table class="price-table all-cols">
+          <caption class="sr-only">Egg sizes in Australia by pack weight</caption>
+          <thead><tr><th scope="col">Size</th><th scope="col">A dozen</th><th scope="col">Tray of 30</th><th scope="col">Each egg</th></tr></thead>
+          <tbody>
+${sizes.map(([name, dozen, tray, each]) => `            <tr><th scope="row">${name}</th><td>${dozen}</td><td>${tray}</td><td>${each}</td></tr>`).join("\n")}
+          </tbody>
+        </table>
+        <p class="cmp-note">Each egg is the average for its size. YOLKO's tray is extra-large: 1.75&nbsp;kg, about 17% more egg than a 1.5&nbsp;kg tray of large eggs.</p>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="sources-title">
+      <div class="wrap">
+        <div class="panel">
+          <h2 id="sources-title">Where these prices come from</h2>
+          <p>We read each shop's own website every 6 hours. From Coles and Aldi we list the lowest-priced pack of each size and kind. From IGA and Umall we check one tray of 30.</p>
+          <p>These are the prices each shop shows on its website. A store near you can charge a little more or less, and a price can change between checks. If a shop cannot be read for a day, its prices come off this page until it can.</p>
+          <p>Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a> and we will fix it.</p>
+          ${slot("prices-sources", blank["prices-sources"])}
+        </div>
+      </div>
+    </section>
+
+${priceCards("YOLKO prices", `Pace Farm extra-large eggs, delivered on Saturday morning. Delivery is $${PRICE.delivery} flat.`)}
+
+${faqSection("Egg price questions", faqs)}
+
+${ctaBand("Eggs to your door this Saturday", `A tray of 30 is $${PRICE.tray1}. Order by Thursday night.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
+  </main>`;
+  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
+}
+
 function areasPage(existingHtml) {
   const path = "/egg-delivery-areas";
   const title = "Egg Delivery Areas Sydney | Nearly 700 Suburbs We Cover | YOLKO";
@@ -1128,7 +1228,7 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES, ["Bulk eggs", "/
 const HOME_FAQ = [
   ["When do you deliver?", `Saturday, between 6am and 12pm. Order by Thursday night. Delivery is $${PRICE.delivery} flat.`],
   ["Which suburbs do you cover?", `Nearly 700 suburbs across Sydney, from Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
-  ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a tray of 30 (about ${perEgg(PRICE.tray1, 30)}¢ an egg), <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is $${PRICE.delivery} flat.`],
+  ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a tray of 30 (about ${perEgg(PRICE.tray1, 30)}¢ an egg), <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is $${PRICE.delivery} flat. See how that sits next to the supermarkets on <a href="${PRICES_PATH}">egg prices in Sydney</a>.`],
   ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],
   ["Can delivery be free?", "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
@@ -1200,13 +1300,16 @@ function sitemap() {
     ["/egg-delivery-sydney", "0.9"],
     ["/bulk-eggs-sydney", "0.9"],
     ["/egg-delivery-areas", "0.8"],
+    // Its prices are re-read every 6 hours: the Worker swaps this date for the time of the
+    // last price check whenever it serves the sitemap.
+    [PRICES_PATH, "0.8", "daily"],
     ...SUBURB_PAGES.map((s) => [suburbPath(s), "0.7"]),
   ];
   const lastmod = lastmods();
-  const urls = entries.map(([p, priority]) => `  <url>
+  const urls = entries.map(([p, priority, freq = "weekly"]) => `  <url>
     <loc>${pageUrl(p)}</loc>
-    <lastmod>${lastmod(p)}</lastmod>
-    <changefreq>weekly</changefreq>
+    <lastmod>${p === PRICES_PATH ? TODAY : lastmod(p)}</lastmod>
+    <changefreq>${freq}</changefreq>
     <priority>${priority}</priority>
     <image:image>
       <image:loc>${HERO_IMG.replace(/&/g, "&amp;")}</image:loc>
@@ -1224,6 +1327,7 @@ ${urls.join("\n")}
 for (const s of SUBURB_PAGES) writeFileSync(join(ROOT, `egg-delivery-${s.slug}.html`), suburbPage(s));
 writeFileSync(join(ROOT, "egg-delivery-sydney.html"), sydneyPage());
 writeFileSync(join(ROOT, "bulk-eggs-sydney.html"), bulkPage());
+writeFileSync(join(ROOT, `${PRICES_PATH.slice(1)}.html`), pricesPage());
 const areasFile = join(ROOT, "egg-delivery-areas.html");
 writeFileSync(areasFile, areasPage(readFileSync(areasFile, "utf8")));
 writeFileSync(join(ROOT, "404.html"), notFoundPage());

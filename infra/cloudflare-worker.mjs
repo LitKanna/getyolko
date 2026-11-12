@@ -1,5 +1,6 @@
 import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
-import { priceWatchView, runPoll, runScheduledPoll, saveTyped } from "./price-watch.mjs";
+import { priceWatchView, runPoll, runScheduledPoll, saveTyped, getLatest as latestShopPrices, lastPriceChange } from "./price-watch.mjs";
+import { fillPricesPage, sitemapWithPriceChange, PRICES_PATH } from "./prices-page.mjs";
 import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
 import { growersView, runGrowersCheck, runScheduledGrowers } from "./growers.mjs";
 import {
@@ -2854,6 +2855,28 @@ async function myPrices(env) {
   return { tray1: prices.tray1, tray2: prices.tray2, box: prices.box, prices, stock };
 }
 
+/**
+ * /egg-prices-sydney for the public: the built page with its tables filled from the same price
+ * check Admin > Competitors shows, next to the shop's own live tray prices. If anything fails the
+ * page goes out as built (YOLKO's prices and "checking the shops again"), never an error.
+ */
+async function pricesPageHtml(html, env) {
+  try {
+    const [latest, settings] = await Promise.all([latestShopPrices(env), getSettings(env)]);
+    return fillPricesPage(html, {
+      latest,
+      prices: settings.prices,
+      trayWeight: settings.trayWeight,
+      soldOut: Number(settings.traysAvailable) === 0,
+      delivery: SITE_DELIVERY_FEE,
+      now: Date.now(),
+    }).html;
+  } catch (err) {
+    console.log("prices page fill failed", String(err?.message || err));
+    return html;
+  }
+}
+
 function cleanCosts(map, keys) {
   const out = {};
   for (const k of keys) {
@@ -4912,6 +4935,17 @@ export default {
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
     };
+    // The supermarket price page is built with empty tables; fill them from the latest check.
+    if (path === `${PRICES_PATH}.html`) {
+      const html = await pricesPageHtml(await upstreamResp.text(), env);
+      return new Response(request.method === "HEAD" ? null : html, { status: 200, headers });
+    }
+    // In the sitemap that page's date is when one of its prices last changed.
+    if (path === "/sitemap.xml") {
+      const xml = await upstreamResp.text();
+      const changed = await lastPriceChange(env).catch(() => null);
+      return new Response(request.method === "HEAD" ? null : sitemapWithPriceChange(xml, changed), { status: 200, headers });
+    }
     // The order email loads the site font from here, and mail apps fetch it cross-origin.
     if (url.pathname.startsWith("/assets/fonts/")) headers["Access-Control-Allow-Origin"] = "*";
     // Let browsers revalidate expired files with a cheap 304 instead of a full download.
