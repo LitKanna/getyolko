@@ -57,7 +57,12 @@ motion, and the whole logo is in the HTML, so it shows without script. Icons: `f
 `assets/yolko-app-icon-1024.png` (the JSON-LD logo). The brush stroke (`.brush`, white on the
 yellow closing panel) goes under one word a page. Customer emails (`emailFrame` in the Worker)
 use PNGs in `assets/brand/email/` because mail apps do not draw SVG; a changed picture needs a
-new file name. The admin shows the logo in one colour (it stays black, white and greys); its
+new file name. Gmail never loads a web font (it shows the phone's own font), so each email's
+heading is a picture too: `infra/email-titles.mjs` lists the three headings and
+`node infra/build-email-titles.mjs` draws them in Plus Jakarta Sans ExtraBold on a white plate
+(`npm run test:email-titles`). A heading that is not in that list goes out as text. New words
+need a new entry, a new file name and a merge before the Worker names the file, because the site
+serves files from the pinned commit. The admin shows the logo in one colour (it stays black, white and greys); its
 printed box cards follow the brand guide's delivery card, with the egg logo in the QR code. Rules: ink logo with a yellow yolk on white or cream, white with the same yolk
 on black, all black on yellow; never stretch, tilt or recolour it; never under 24px tall. The
 site photos stay exactly as they are.
@@ -181,7 +186,13 @@ Thursday reorder reminders: the order form's "Email me a reminder each Thursday"
 `remind: true`; the order carries `remindOptIn`, and `markOrderPaid` signs the Stripe email up
 (`remind:sub:<sha256(email) prefix>`, list in `remind:index`, link token in `remind:tok:<token>`).
 The cron sends on Thursday (the last day to order) from 10am to 8pm Sydney time, 4 per tick, and the
-email says orders close tonight. It goes through the Zoho Mail
+email says orders close tonight. Its look (Kanna, 12 Nov 2026, who called the old one-sentence
+opening ugly and picked this from three drawn options): a short hello, then one quiet list
+with a row each for Delivery, Order by, Your order and Total, and a full-width Order again
+button. The hello says "want the same again?" only when the list shows their last order, not
+the one tray offered when that is sold out. Under every customer email: YOLKO and the brand
+line, the site and the shop's address as links, and on the reminder one line on why they got it
+with "Stop reminders". Show Kanna a picture before changing how an email looks. It goes through the Zoho Mail
 mailbox (never the CPaaS order sender, which forbids marketing). It skips sold-out weeks, people
 who already ordered for that Saturday, and everything while `remind:off` is set (admin Pause).
 "Order again" links to `/#reorder=<token>`: `index.html` lifts the token out of the URL before the
