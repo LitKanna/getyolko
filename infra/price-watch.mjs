@@ -516,6 +516,18 @@ async function getLatest(env) {
   return (await env.DATA.get(LATEST_KEY, "json")) || null;
 }
 
+/**
+ * When a price or stock on the public page /egg-prices-sydney last changed, in ms (null if never).
+ * Typed-in prices (Costco, Woolworths) are not shown there, so they don't count.
+ */
+async function lastPriceChange(env) {
+  const times = (await getEvents(env))
+    .filter((e) => !String(e?.id || "").startsWith("typed:"))
+    .map((e) => Date.parse(e?.at))
+    .filter(Number.isFinite);
+  return times.length ? Math.max(...times) : null;
+}
+
 /** Which size and kind a history line is about ("cf1500"), worked out from its product name. */
 function eventGroup(e) {
   if (e.variety !== undefined) return e;
@@ -597,6 +609,9 @@ export {
   runPoll,
   runScheduledPoll,
   saveTyped,
+  // for the public price page
+  getLatest,
+  lastPriceChange,
   // for tests
   checkAll,
   diffOffers,

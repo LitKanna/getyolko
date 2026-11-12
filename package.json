@@ -9,6 +9,7 @@
                     "test:delivery":  "node infra/delivery-zones-test.mjs",
                     "test:news":  "node infra/news-feed-test.mjs",
                     "test:growers":  "node infra/growers-test.mjs",
+                    "test:prices":  "node infra/prices-page-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {
