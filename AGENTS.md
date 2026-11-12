@@ -137,7 +137,10 @@ answers 502 so Stripe redelivers. For `WEBHOOK_GRACE_SEC` after a dashboard full
 `/api/refund` and `/api/order-status` leave the order to the webhook, so a stale KV copy never
 returns stock twice. The confirmation and refund emails share `emailFrame()`.
 The admin Emails page uses `GET /api/admin/emails`, `GET /api/admin/email-preview?id=` and
-`POST /api/admin/test-email {to, kind?}` (`kind: "refund"` sends the refund sample). All shop email is orders@getyolko.com on Zoho (order emails
+`POST /api/admin/test-email {to, kind?}` (`kind: "refund"` sends the refund sample). A sample's
+subject carries the Sydney send time (`[Test 9:31pm] ...`, `testSubject`), so each one opens as its
+own conversation: with a bare `[Test]`, Gmail put a second sample under the first and folded its
+body away as a repeat. All shop email is orders@getyolko.com on Zoho (order emails
 reply to it too); getyolkonow@gmail.com is only for Google sign-ins, never for mail.
 
 An order row is written when the customer opens Stripe Checkout, so a row with status `new`, a
