@@ -37,10 +37,31 @@ Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus 
 big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
 stop. Colours are tokens in `:root` of `styles-modern.css`: cream page `#faf7f0`, white cards,
 ink `#14120e`, muted `#6b675e`, yolk `#ffd32a`, green `#1f7a4d` only for the stock dot. Yolk
-yellow is for the logo dot, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
+yellow is for the logo's yolk, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
 dots and the closing band; no orange. Rounded cards and pill buttons, a black announcement bar
 with the next Saturday date, and a black footer. Plain, short copy with no jargon. Never change,
 swap or re-crop the site images (the chalk-tray hero and order photos stay exactly as they are).
+
+### Brand and logo (12 Nov 2026)
+The logo is the Brush egg: one brush stroke that draws an egg, a yellow yolk inside, and YOLKO in
+Plus Jakarta Sans ExtraBold. Kanna picked it on 11 Nov 2026 and asked for it everywhere on 12 Nov.
+Masters are in `assets/brand/` (`yolko-logo.svg`, `yolko-logo-white.svg`, `yolko-egg.svg`); the
+paths every page uses live in `infra/brand.mjs` (a light copy, about 2 KB a logo). `build-pages.mjs`
+writes the header logo, the footer logo (white, reusing the header's shapes) and the icon links
+into every page, including `index.html` and the three plain pages, between `brand`, `brand-foot`
+and `icons` markers. The header logo draws itself once per visit ("Yolk pen", `LOGO_MOTION`): the
+yolk paints the egg, glides to the centre and the name slides out. It never runs with reduced
+motion, and the whole logo is in the HTML, so it shows without script. Icons: `favicon.ico`,
+`assets/favicon.svg` (white egg on a black tile, stroke thickened for tab size),
+`assets/brand/apple-touch-icon.png`, `icon-192` and `icon-512`, `site.webmanifest`, and
+`assets/yolko-app-icon-1024.png` (the JSON-LD logo). The brush stroke (`.brush`, white on the
+yellow closing panel) goes under one word a page. Customer emails (`emailFrame` in the Worker)
+use PNGs in `assets/brand/email/` because mail apps do not draw SVG; a changed picture needs a
+new file name. The admin shows the logo in one colour (it stays black, white and greys); its
+printed box cards follow the brand guide's delivery card, with the yolk dot in the QR code
+(error level H). Rules: ink logo with a yellow yolk on white or cream, white with the same yolk
+on black, all black on yellow; never stretch, tilt or recolour it; never under 24px tall. The
+site photos stay exactly as they are.
 
 ### Viewport fit (non-obvious)
 `index.html` measures `visualViewport` (Chrome / Safari / iOS browser chrome) into

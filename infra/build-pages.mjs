@@ -8,8 +8,8 @@
  *   egg-prices-sydney.html (tables left empty between markers; the Worker fills them, see prices-page.mjs)
  *   assets/coverage-map.svg (the delivery map, from the same zone data checkout uses)
  *   sitemap.xml
- *   index.html: only the JSON-LD block, the FAQ list, the map and the
- *   next-delivery script (each between markers)
+ *   index.html: only the JSON-LD block, the FAQ list, the map, the
+ *   next-delivery script, the icon links and the header and footer logo (each between markers)
  *
  * Usage: node infra/build-pages.mjs && node infra/build-areas-page.mjs
  * (the areas page keeps its generated suburb list; build-areas-page refills it).
@@ -24,13 +24,14 @@ import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 import { buildCoverageMap } from "./coverage-map.mjs";
 import { pricesBlocks, slot, PRICES_PATH } from "./prices-page.mjs";
+import { logoMaster, logoReuse, logoAlone, LOGO_MOTION, iconLinks } from "./brand.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "156";
+const CSS_V = "157";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -55,6 +56,17 @@ const MAP = buildCoverageMap();
 const HERO_IMG = `${SITE}/assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}`;
 const HERO_ALT = `Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $${PRICE.tray1} a tray`;
 const LOGO = `${SITE}/assets/yolko-app-icon-1024.png`;
+
+// The logo in the header draws itself once per visit (see LOGO_MOTION in brand.mjs); the script
+// sits right after it so the first frame is set before the page paints. The footer reuses the
+// header's shapes in white.
+const BRAND_HEADER = (href) => `      <a class="brand" href="${href}" aria-label="YOLKO home">
+        ${logoMaster()}
+      </a>
+      <script>${LOGO_MOTION}</script>`;
+const BRAND_FOOTER = (href, label) => `          <a class="foot-brand" href="${href}" aria-label="${label}">
+            ${logoReuse()}
+          </a>`;
 
 // Suburb landing pages. `local`, `nearby` and `faq` keep each page specific to its area.
 const SUBURB_PAGES = [
@@ -414,8 +426,7 @@ function head({ path, title, description, graph, index = true, hero = true }) {
   <meta name="twitter:image:alt" content="${esc(HERO_ALT)}">
 ${index ? `\n  <link rel="canonical" href="${url}">` : ""}
   <link rel="sitemap" type="application/xml" href="/sitemap.xml">
-  <link rel="icon" type="image/svg+xml" href="${a("assets/favicon.svg")}">
-  <link rel="apple-touch-icon" href="${a("assets/yolko-app-icon-1024.png")}">
+${iconLinks(a).map((l) => `  ${l}`).join("\n")}
   <link rel="preload" as="font" type="font/woff2" href="${a("assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2")}" crossorigin>${hero ? `
   <link rel="preload" as="image" type="image/webp" imagesrcset="${heroSrcset("webp")}" imagesizes="${HERO_SIZES}" fetchpriority="high">` : ""}
   <link rel="stylesheet" href="${a(`assets/fonts.css?v=${FONTS_V}`)}">
@@ -471,10 +482,7 @@ function header(path) {
 
   <header class="topbar">
     <div class="wrap topbar-inner">
-      <a class="brand" href="/" aria-label="YOLKO home">
-        <span class="brand-dot" aria-hidden="true"></span>
-        <span class="brand-name">YOLKO</span>
-      </a>
+${BRAND_HEADER("/")}
       <nav class="topnav" aria-label="Main navigation">
 ${links}
       </nav>
@@ -643,7 +651,7 @@ function ctaBand(title, text, secondary) {
       <div class="wrap">
         <div class="cta-panel">
           <div>
-            <h2>${title}</h2>
+            <h2>${title.replace("Saturday", '<span class="brush">Saturday</span>')}</h2>
             <p>${text}</p>
           </div>
           <div class="hero-cta">
@@ -677,10 +685,7 @@ function footer(path) {
     <div class="wrap">
       <div class="foot-grid">
         <div class="foot-brand-col">
-          <a class="foot-brand" href="/" aria-label="YOLKO home">
-            <span class="brand-dot" aria-hidden="true"></span>
-            <span>YOLKO</span>
-          </a>
+${BRAND_FOOTER("/", "YOLKO home")}
           <p class="foot-tag">Fresh Pace Farm eggs, delivered across Sydney every Saturday morning.</p>
         </div>
         <nav class="foot-col" aria-label="Shop">
@@ -1237,7 +1242,7 @@ const HOME_FAQ = [
 
 function fillMarker(html, name, content) {
   const re = new RegExp(`(<!-- ${name}:start[^>]*-->)[\\s\\S]*?(\\n[ \\t]*<!-- ${name}:end -->)`);
-  if (!re.test(html)) throw new Error(`${name} markers not found in index.html`);
+  if (!re.test(html)) throw new Error(`${name} markers not found`);
   return html.replace(re, (_, a, b) => `${a}\n${content}${b}`);
 }
 
@@ -1267,7 +1272,23 @@ function updateHome() {
   html = fillMarker(html, "faq", faqHtml);
   html = fillMarker(html, "map", mapFigure());
   html = fillMarker(html, "next-run", NEXT_RUN_SCRIPT);
+  html = fillMarker(html, "icons", iconLinks((p) => p).map((l) => `  ${l}`).join("\n"));
+  html = fillMarker(html, "brand", BRAND_HEADER("#top"));
+  html = fillMarker(html, "brand-foot", BRAND_FOOTER("#top", "Back to top"));
   writeFileSync(file, html);
+}
+
+// The three plain pages (privacy, terms, data deletion) have no shop header: they get the icon
+// links and a logo that leads home, between the same kind of markers.
+function updatePlainPages() {
+  const brand = `  <a href="/" aria-label="YOLKO home" style="display:inline-block;margin-bottom:28px;color:#14120e">${logoAlone("brand-logo", "display:block;height:34px;width:auto;overflow:visible")}</a>`;
+  for (const name of ["privacy.html", "terms.html", "data-deletion.html"]) {
+    const file = join(ROOT, name);
+    let html = readFileSync(file, "utf8");
+    html = fillMarker(html, "icons", iconLinks().map((l) => `  ${l}`).join("\n"));
+    html = fillMarker(html, "brand", brand);
+    writeFileSync(file, html);
+  }
 }
 
 /* ---------- Sitemap ---------- */
@@ -1333,6 +1354,7 @@ writeFileSync(areasFile, areasPage(readFileSync(areasFile, "utf8")));
 writeFileSync(join(ROOT, "404.html"), notFoundPage());
 writeFileSync(join(ROOT, "assets", "coverage-map.svg"), MAP.svg);
 updateHome();
+updatePlainPages();
 // Last, so it can see which pages this run changed.
 writeFileSync(join(ROOT, "sitemap.xml"), sitemap());
 console.log(`Built ${SUBURB_PAGES.length} suburb pages, Sydney, bulk, areas, 404, sitemap, map (${MAP.count} suburbs) and homepage data`);
