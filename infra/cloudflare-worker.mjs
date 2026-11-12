@@ -2930,7 +2930,7 @@ async function syncMetaAdsForStock(env, traysAvailable) {
 }
 
 /** Public Meta Pixel ID (Events Manager → YOLKO). Override with env.META_PIXEL_ID. */
-const DEFAULT_META_PIXEL_ID = "797932266678792";
+const DEFAULT_META_PIXEL_ID = "2008953469766472";
 
 function metaPixelId(env) {
   return String(env.META_PIXEL_ID || DEFAULT_META_PIXEL_ID).trim();
