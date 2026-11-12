@@ -15,7 +15,7 @@ import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "bfa635e6b627b2174cc6ca39213bf26bb1081d91";
+const DEPLOY_SHA = "e136e67cebf2af314a112d2eb7ed9957d6ee642f";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -5143,7 +5143,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "239",
+      "X-Yolko-Build": "240",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
