@@ -11,6 +11,7 @@
                     "test:growers":  "node infra/growers-test.mjs",
                     "test:prices":  "node infra/prices-page-test.mjs",
                     "test:stripe-look":  "node infra/stripe-look-test.mjs",
+                    "test:brand-qr":  "node infra/brand-qr-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {

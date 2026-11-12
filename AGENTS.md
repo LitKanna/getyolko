@@ -58,10 +58,19 @@ motion, and the whole logo is in the HTML, so it shows without script. Icons: `f
 yellow closing panel) goes under one word a page. Customer emails (`emailFrame` in the Worker)
 use PNGs in `assets/brand/email/` because mail apps do not draw SVG; a changed picture needs a
 new file name. The admin shows the logo in one colour (it stays black, white and greys); its
-printed box cards follow the brand guide's delivery card, with the yolk dot in the QR code
-(error level H). Rules: ink logo with a yellow yolk on white or cream, white with the same yolk
+printed box cards follow the brand guide's delivery card, with the egg logo in the QR code. Rules: ink logo with a yellow yolk on white or cream, white with the same yolk
 on black, all black on yellow; never stretch, tilt or recolour it; never under 24px tall. The
 site photos stay exactly as they are.
+
+QR codes (`infra/brand-qr.mjs`, used for the box cards): soft squares, rounded corner eyes and
+the egg logo in the middle, at error level H. Scanning comes first. The egg is 25% of the code's
+width and hides about 6.5% of it; whole squares make way for it. That size was picked by reading
+rendered codes back with a scanner library at 600 to 100 pixels, blurred, turned, tilted, in low
+contrast and with extra dirt: it reads wherever the old yolk-dot code read. `npm run
+test:brand-qr` fails if the egg hides more than 8%. Do not colour the eyes or the squares yellow
+(scanners need the contrast), and keep the 4-module white edge. `brand.mjs` and `brand-qr.mjs`
+are not in the deploy workflow's path list: bump `X-Yolko-Build` in the Worker when you change
+them so the change deploys.
 
 Stripe's pay page is branded per checkout (`STRIPE_LOOK` in the Worker, sent as
 `branding_settings`): cream background, yolk button, rounded corners, the logo from
