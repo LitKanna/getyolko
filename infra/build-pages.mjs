@@ -17,6 +17,7 @@
  * YOLKO is a home-based service-area business; only "Sydney NSW" is public.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
@@ -908,13 +909,16 @@ ${ctaBand("Fresh eggs this Saturday", `Order by Thursday night. Delivery is $${P
 
 function bulkPage() {
   const path = "/bulk-eggs-sydney";
-  const title = `Bulk Eggs Sydney | 180-Egg Box $${PRICE.box}, Saturday Delivery | YOLKO`;
-  const description = `Buy eggs in bulk in Sydney. A full box of 180 Pace Farm XL cage eggs is $${PRICE.box} (40¢ an egg), up to 10 boxes per order. Saturday delivery for cafés, bakers and big families.`;
+  // "Wholesale" is what cafés and restaurants type; a box is the trade's 15 dozen carton.
+  const title = `Bulk and Wholesale Eggs Sydney | 180-Egg Box $${PRICE.box} | YOLKO`;
+  const description = `Bulk eggs in Sydney with no trade account. A box of 180 Pace Farm XL cage eggs is $${PRICE.box} (${perEgg(PRICE.box, 180)}¢ an egg), up to 10 boxes. Saturday delivery for cafés and bakers.`;
   const trail = [["Home", "/"], ["Bulk eggs Sydney", path]];
   const faqs = [
     ["How much is a bulk box of eggs?", `A full box is 180 Pace Farm extra-large eggs (six trays of 30) for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivery is <strong>$${PRICE.delivery}</strong> flat.`],
+    ["Do you sell eggs wholesale?", `We sell by the box at one price for everyone. A box is the standard 15 dozen carton, 180 eggs, for <strong>$${PRICE.box}</strong>. You do not need an ABN or a trade account.`],
+    ["How many eggs are in a box?", "180. That is six trays of 30, or 15 dozen, and about 10.5&nbsp;kg of eggs."],
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>.`],
-    ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers order full boxes for Saturday delivery, and many set up a weekly standing order."],
+    ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers can order full boxes for Saturday delivery, and can set up a weekly standing order."],
     ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
     ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."],
     ["How should I store 180 eggs?", "In the fridge, in their trays, stacked flat. Use them by the best-before date on the pack."],
@@ -949,11 +953,14 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
       </div>
     </section>
 
-    <section class="band">
+    <section class="band" aria-labelledby="wholesale-title">
+      <div class="wrap">
+${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 dozen box at one price for everyone. No trade account and no contract.", "wholesale-title")}
+      </div>
       <div class="wrap local-row">
         <div class="panel">
           <h2>Weekly standing orders</h2>
-          <p>For cafés, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
+          <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
           <div class="hero-cta">
             <a class="btn btn-ink" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
           </div>
@@ -1125,7 +1132,7 @@ const HOME_FAQ = [
   ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],
   ["Can delivery be free?", "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
-  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés can <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us</a> for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk eggs</a>.`],
+  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés and restaurants can <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us</a> for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
 ];
 
 function fillMarker(html, name, content) {
@@ -1165,6 +1172,28 @@ function updateHome() {
 
 /* ---------- Sitemap ---------- */
 
+/**
+ * When each page last changed. A page keeps the date from the committed sitemap unless its file
+ * differs from the last commit, so search engines are only told about pages that really changed
+ * (Google ignores lastmod on sites where every date moves on every deploy). Without git, or for
+ * a new page, the date is today.
+ */
+function lastmods() {
+  const dates = new Map();
+  const dirty = new Set();
+  try {
+    const git = (...args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    for (const m of git("show", "HEAD:sitemap.xml").matchAll(/<loc>([^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/g)) dates.set(m[1], m[2]);
+    for (const line of git("status", "--porcelain", "--", "*.html").split("\n")) if (line.trim()) dirty.add(line.slice(3).trim());
+  } catch {
+    return () => TODAY;
+  }
+  return (p) => {
+    const file = p === "/" ? "index.html" : `${p.slice(1)}.html`;
+    return dirty.has(file) ? TODAY : dates.get(pageUrl(p)) || TODAY;
+  };
+}
+
 function sitemap() {
   const entries = [
     ["/", "1.0"],
@@ -1173,9 +1202,10 @@ function sitemap() {
     ["/egg-delivery-areas", "0.8"],
     ...SUBURB_PAGES.map((s) => [suburbPath(s), "0.7"]),
   ];
+  const lastmod = lastmods();
   const urls = entries.map(([p, priority]) => `  <url>
     <loc>${pageUrl(p)}</loc>
-    <lastmod>${TODAY}</lastmod>
+    <lastmod>${lastmod(p)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>${priority}</priority>
     <image:image>
@@ -1198,6 +1228,7 @@ const areasFile = join(ROOT, "egg-delivery-areas.html");
 writeFileSync(areasFile, areasPage(readFileSync(areasFile, "utf8")));
 writeFileSync(join(ROOT, "404.html"), notFoundPage());
 writeFileSync(join(ROOT, "assets", "coverage-map.svg"), MAP.svg);
-writeFileSync(join(ROOT, "sitemap.xml"), sitemap());
 updateHome();
+// Last, so it can see which pages this run changed.
+writeFileSync(join(ROOT, "sitemap.xml"), sitemap());
 console.log(`Built ${SUBURB_PAGES.length} suburb pages, Sydney, bulk, areas, 404, sitemap, map (${MAP.count} suburbs) and homepage data`);
