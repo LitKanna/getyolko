@@ -36,7 +36,7 @@ export const MAX_DELIVERY_KM = 45;
 export const SITE_DELIVERY_FEE = 5;
 
 export const UNKNOWN_SUBURB_ERROR =
-  "We could not match that suburb or postcode. Email orders@getyolko.com and we will check if we can deliver.";
+  "We could not match that suburb or postcode. WhatsApp us or email orders@getyolko.com and we will check if we can deliver.";
 
 export function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;

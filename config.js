@@ -8,9 +8,9 @@ const SITE_CONFIG = {
   assetVersion: "82",
 
   // The shop's WhatsApp number in international format, digits only. Only ever YOLKO's own
-  // line ("61480093935"), never a personal mobile. Empty until WhatsApp Business is live on
-  // the line: the shop then shows no WhatsApp links and asks for an email.
-  whatsappNumber: "",
+  // line ("61480093935", WhatsApp Business since 13 Nov 2026), never a personal mobile.
+  // Leave it empty and the shop shows no WhatsApp links and asks for an email.
+  whatsappNumber: "61480093935",
 
   // Deprecated: fixed Stripe Payment Links. Left empty on purpose.
   // Buy now / Pay online always call /api/checkout with live tray/box prices
