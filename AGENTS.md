@@ -236,7 +236,11 @@ with a row each for Delivery, Order by, Your order and Total, and a full-width O
 button. The hello says "want the same again?" only when the list shows their last order, not
 the one tray offered when that is sold out. Under every customer email: the site and the shop's
 address as links, nothing else (Kanna did not like a "Saturday morning eggs" line there), and on
-the reminder one line on why they got it with "Stop reminders". The order and refund emails use the same list (`emailList` in the
+the reminder one line on why they got it with "Stop reminders". The order and refund emails are the
+customer's receipt, so under those two links they also carry one quiet line,
+"YOLKO · ABN 62 944 969 621" (`receipt: true` in `emailFrame`, `SHOP_ABN` in the Worker): YOLKO has been a registered
+business name on that ABN since 14 Nov 2026, and Kanna picked this placement from two drawn
+options. The reminder does not carry it. The order and refund emails use the same list (`emailList` in the
 Worker): one short line, then Delivery, Address, Your order and Total paid with a full-width
 View receipt button, or Your order, Refunded to and Refund with the bank timing as a quiet line
 under it. Keep list names short (the name column never wraps, so a long name squeezes the

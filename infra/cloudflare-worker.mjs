@@ -437,6 +437,9 @@ function stripeDetailsFromSession(session) {
 const STRIPE_BRAND = "YOLKO";
 // Every email customers see or reply to is the Zoho mailbox. The old Gmail is only for Google.
 const SHOP_EMAIL = "orders@getyolko.com";
+// YOLKO is a registered business name (ASIC, 14 Nov 2026) on this ABN. Order and refund emails
+// are the customer's receipt, so they carry it as one quiet line under the sign-off.
+const SHOP_ABN = "62 944 969 621";
 const STRIPE_SUPPORT_EMAIL = SHOP_EMAIL;
 // The shop's own line (phone-line.mjs), never a personal mobile (Kanna, 13 Nov 2026).
 const STRIPE_SUPPORT_PHONE = LINE_NUMBER;
@@ -928,10 +931,12 @@ function emailTitle(title, mark) {
  * A whole customer email: the logo and a small `label` on top, the heading (a picture in the
  * brand font when infra/email-titles.mjs has one, text otherwise), `rows` (table rows inside the
  * white card; the first one needs no space above it), the black band with the help line, then
- * the sign-off: the site and the shop's address, as links. `why` (HTML) goes under it on emails
- * that are not about an order: why this person got it and how to stop it.
+ * the sign-off: the site and the shop's address, as links. `receipt` adds the business name and
+ * ABN as one quiet line under them (order and refund emails only; Kanna picked this look on
+ * 14 Nov 2026). `why` (HTML) goes under it on emails that are not about an order: why this
+ * person got it and how to stop it.
  */
-function emailFrame({ subject, preheader, label = "", title, mark = "", rows, help, why = "" }) {
+function emailFrame({ subject, preheader, label = "", title, mark = "", rows, help, why = "", receipt = false }) {
   const C = EMAIL_C;
   const FONT = EMAIL_FONT;
   const side = `background:${C.paper};border-left:1px solid ${C.line};border-right:1px solid ${C.line}`;
@@ -965,6 +970,7 @@ ${rows}
 </tr></table>
 </td></tr>
 <tr><td align="center" style="padding:20px 12px 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><a href="https://getyolko.com" style="color:${C.muted};text-decoration:underline">getyolko.com</a> &nbsp;·&nbsp; <a href="mailto:${SHOP_EMAIL}" style="color:${C.muted};text-decoration:underline">${SHOP_EMAIL}</a></td></tr>
+${receipt ? `<tr><td align="center" style="padding:6px 12px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted}">YOLKO &nbsp;·&nbsp; ABN ${SHOP_ABN}</td></tr>` : ""}
 ${why ? `<tr><td align="center" style="padding:16px 12px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${C.muted}">${why}</td></tr>` : ""}
 </table>
 </td></tr></table></body></html>`;
@@ -990,6 +996,7 @@ function buildOrderEmail(order) {
     title: "Your eggs are booked for Saturday",
     mark: "Saturday",
     help: "Need to change something?",
+    receipt: true,
     rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Thanks, ${htmlEscape(first)}. We have your payment.</td></tr>
 ${emailList([
   ["Delivery", `${htmlEscape(when)}${emailUnder(DELIVERY_HOURS)}`],
@@ -1014,7 +1021,7 @@ ${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View r
     receipt ? `\nReceipt: ${receipt}` : null,
     "",
     EMAIL_HELP_TEXT,
-    "YOLKO · getyolko.com",
+    `YOLKO · ABN ${SHOP_ABN} · getyolko.com`,
   ].filter((l) => l !== null).join("\n");
 
   return { subject, html, text };
@@ -1050,6 +1057,7 @@ function buildRefundEmail(order, refund) {
     title: "Your refund is on its way",
     mark: "refund",
     help: "Questions about your refund?",
+    receipt: true,
     rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}, ${rest ? "the rest of your order is refunded" : partial ? "part of your order is refunded" : "your order is refunded in full"}.</td></tr>
 ${emailList([
   ["Your order", htmlEscape(emailItem(qty, item))],
@@ -1073,7 +1081,7 @@ ${emailList([
     `Amount refunded: ${amount} ${currency}`,
     "",
     EMAIL_HELP_TEXT,
-    "YOLKO · getyolko.com",
+    `YOLKO · ABN ${SHOP_ABN} · getyolko.com`,
   ].filter((l) => l !== null).join("\n");
 
   return { subject, html, text };
@@ -5250,7 +5258,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "249",
+      "X-Yolko-Build": "250",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
