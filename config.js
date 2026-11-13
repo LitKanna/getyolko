@@ -7,9 +7,10 @@ const SITE_CONFIG = {
   // Bump when site assets change, to force browsers to fetch fresh files.
   assetVersion: "82",
 
-  // Your WhatsApp number in international format, digits only.
-  // Example for an Australian mobile 0412 345 678: "61412345678"
-  whatsappNumber: "61433975055",
+  // The shop's WhatsApp number in international format, digits only. Only ever YOLKO's own
+  // line ("61480093935"), never a personal mobile. Empty until WhatsApp Business is live on
+  // the line: the shop then shows no WhatsApp links and asks for an email.
+  whatsappNumber: "",
 
   // Deprecated: fixed Stripe Payment Links. Left empty on purpose.
   // Buy now / Pay online always call /api/checkout with live tray/box prices
