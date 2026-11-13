@@ -627,34 +627,33 @@ section {
   font-weight: 700;
 }
 
-/* ---------- Order ---------- */
+/* ---------- Order ----------
+   "Big yolk" (Kanna, 13 Nov 2026). A yolk poster holds the photo, one switch and one
+   giant price; the address and the Buy button sit on the cream page under it.
+   Sizes inside the poster follow its own width (cqw), so the words never grow taller
+   than the square photo beside them. */
 .order {
   padding: clamp(32px, 4vw, 56px) 0 var(--section);
 }
 
-.shop-card {
+.order-form {
   display: grid;
-  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
-  gap: clamp(32px, 4vw, 56px);
-  align-items: start;
-  padding: clamp(18px, 2.8vw, 40px) clamp(18px, 3.3vw, 48px) clamp(24px, 3vw, 44px) clamp(18px, 2.8vw, 40px);
-  border-radius: var(--r-lg);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  gap: 36px;
+  min-width: 0;
 }
 
-.shop-product {
-  display: grid;
-  gap: 22px;
-  position: sticky;
-  top: calc(var(--topbar-h) + 24px);
+.order-stage {
+  --stage-r: 32px;
+  --photo-pad: 0px;
+  --photo-r: 0px;
+  overflow: hidden;
+  border-radius: var(--stage-r);
+  background: var(--yolk);
+  container-type: inline-size;
 }
 
-.shop-product h3 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+.order-photo {
+  min-width: 0;
 }
 
 .order-tray-rotator {
@@ -662,7 +661,7 @@ section {
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: var(--photo-r);
   background: var(--sand);
 }
 
@@ -691,123 +690,128 @@ section {
   object-fit: cover;
 }
 
-.tick-list {
+.order-pick {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  padding: 26px 20px 20px;
+  padding: 26px clamp(20px, 5.7cqw, 36px) 20px;
+}
+
+.order-head {
+  display: grid;
+  gap: 8px;
+}
+
+.order-head h2 {
+  margin: 0;
+  font-size: 36px;
+  font-size: clamp(30px, 10.8cqw, 44px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.order-head p {
+  margin: 0;
+  color: rgba(20, 18, 14, 0.78);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* A line break may only fall between the two sentences. */
+.order-head p span {
+  display: inline-block;
+}
+
+.order-choose {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
-.tick-list li {
+/* The switch: a white track, and one ink pill on the chosen option. */
+.picker {
   position: relative;
-  padding-left: 36px;
-  font-size: 15px;
-  line-height: 1.5;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper);
 }
 
-.tick-list li::before {
+.bundle-opt {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.bundle-opt input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bundle-opt.is-picked {
+  color: var(--white);
+}
+
+.bundle-opt:has(input:checked) {
+  color: var(--white);
+}
+
+/* Until the script places the sliding pill, the chosen option paints itself. */
+.picker:not(.has-thumb) .bundle-opt:has(input:checked) {
+  background: var(--ink);
+}
+
+.picker.has-thumb::before {
   content: "";
   position: absolute;
+  top: 5px;
+  bottom: 5px;
   left: 0;
-  top: -1px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--yolk) center / 14px 14px no-repeat
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5' stroke='%2314120e' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-}
-
-.order-form {
-  display: grid;
-  gap: 28px;
-  min-width: 0;
-}
-
-.form-group {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-}
-
-.form-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.form-head h3 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.stock-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 6px 12px;
+  width: var(--thumb-w, 0);
   border-radius: 999px;
-  background: var(--sand);
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--ink);
+  transform: translateX(var(--thumb-x, 0));
+  transition: transform 280ms var(--ease), width 280ms var(--ease), opacity 160ms ease;
 }
 
-.stock-note::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--green);
+.picker.has-thumb.no-pick::before {
+  opacity: 0;
 }
 
-.picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.picker legend {
-  float: left;
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.picker legend.sr-only {
-  float: none;
-  width: 1px;
-}
-
-.picker-dozen {
-  min-width: 0;
-  margin: 8px 0 0;
-  padding: 0;
-  border: 0;
-}
-
-.picker-dozen legend {
-  margin-bottom: 10px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
+.bundle-opt:has(input:focus-visible) {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* Kind of tray, shown only when more than one tray is on sale this week */
 .kind-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 12px;
+  gap: 6px;
 }
 
 .kind-chip {
@@ -816,17 +820,12 @@ section {
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
-  border: 1.5px solid var(--line);
   border-radius: 999px;
-  background: var(--paper);
+  background: rgba(255, 255, 255, 0.55);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
-}
-
-.kind-chip:hover {
-  border-color: var(--line-strong);
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .kind-chip input {
@@ -840,164 +839,241 @@ section {
 }
 
 .kind-chip:has(input:checked) {
-  border-color: var(--ink);
+  color: var(--white);
   background: var(--ink);
-  color: var(--paper);
 }
 
 .kind-chip:has(input:focus-visible) {
   outline: 2.5px solid var(--ink);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
-.bundle-opt {
-  position: relative;
+/* Dozens, when any are on sale: one more switch for each kind */
+#dozen-pickers {
   display: grid;
-  align-content: start;
-  gap: 2px;
+  gap: 12px;
+}
+
+#dozen-pickers:empty {
+  display: none;
+}
+
+.picker-dozen {
   min-width: 0;
-  padding: 18px 18px 16px 20px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--paper);
-  cursor: pointer;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
-}
-
-.bundle-opt:hover {
-  border-color: var(--line-strong);
-}
-
-.bundle-opt input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
   margin: 0;
-  opacity: 0;
-  cursor: pointer;
+  padding: 0;
+  border: 0;
 }
 
-/* Custom radio, top right */
-.bundle-opt::after {
-  content: "";
-  position: absolute;
-  top: 18px;
-  right: 16px;
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: 50%;
-  background: var(--paper);
-  transition: border 160ms ease, background 160ms ease;
-}
-
-.bundle-opt:has(input:checked) {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 0.5px var(--ink);
-}
-
-.bundle-opt:has(input:checked)::after {
-  border: 6px solid var(--ink);
-  background: var(--yolk);
-}
-
-.bundle-opt:has(input:focus-visible) {
-  outline: 2.5px solid var(--ink);
-  outline-offset: 3px;
-}
-
-.bo-name {
-  padding-right: 28px;
-  font-size: 17px;
+.picker-dozen legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: rgba(20, 18, 14, 0.78);
+  font-size: 14px;
   font-weight: 700;
 }
 
-.bo-eggs {
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.bo-price-row {
+/* The price of what is picked */
+.pick-price {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  margin-top: 10px;
-}
-
-.bo-price {
-  font-size: 30px;
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-}
-
-.bo-each {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 12px 16px;
-  min-width: 0;
-}
-
-.qty-row {
-  grid-template-columns: 184px minmax(0, 1fr);
-}
-
-.delivery-loc-row {
-  grid-template-columns: 1.3fr 1fr 0.8fr;
+  align-items: flex-end;
+  gap: 8px 16px;
   margin-top: 4px;
 }
 
-.details-row {
-  grid-template-columns: 1fr 1fr;
+.pick-num {
+  display: flex;
+  align-items: flex-start;
+  font-size: 112px;
+  font-size: clamp(88px, 34cqw, 136px);
+  font-weight: 800;
+  line-height: 0.78;
+  letter-spacing: -0.065em;
 }
 
-.field {
+.pick-num.is-long {
+  font-size: 84px;
+  font-size: clamp(64px, 25cqw, 100px);
+}
+
+.pick-num.swap {
+  animation: price-swap 260ms var(--ease);
+}
+
+.pick-cur {
+  margin: 0.02em 0.06em 0 0;
+  font-size: 0.44em;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.pick-what {
   display: grid;
+  padding-bottom: 1px;
+}
+
+.pick-what b {
+  font-size: 24px;
+  font-size: clamp(20px, 7.4cqw, 28px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.pick-what span {
+  color: rgba(20, 18, 14, 0.74);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.order-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-top: 16px;
+  border-top: 1.5px solid rgba(20, 18, 14, 0.14);
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.order-foot p {
+  margin: 0;
+}
+
+.stock-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.stock-note::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+
+.stock-note.is-out::before {
+  background: var(--ink);
+}
+
+/* Under the poster: where to, who for, pay */
+.order-details {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.form-group {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 16px;
+}
+
+.form-head h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.order-when {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.order-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
 }
 
-.field label,
-.field-label {
-  font-size: 14px;
-  font-weight: 600;
+.order-fields > .field,
+.order-fields > .field-hint {
+  grid-column: 1 / -1;
 }
 
-.field input:not([type="radio"]):not([type="checkbox"]) {
+.order-fields > .field-city,
+.order-fields > .field-postcode {
+  grid-column: auto;
+}
+
+.order-you {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* A field carries its name inside the box, above what is typed. */
+.field {
+  position: relative;
+  min-width: 0;
+}
+
+.field label {
+  position: absolute;
+  top: 10px;
+  left: 19.5px;
+  z-index: 1;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.field input {
   width: 100%;
-  min-height: 56px;
-  padding: 14px 18px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--r-sm);
+  height: 62px;
+  padding: 27px 18px 9px;
+  border: 1.5px solid transparent;
+  border-radius: 16px;
   color: var(--ink);
-  background: var(--cream);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
   /* 16px minimum: iOS Safari zooms into smaller inputs */
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .field input::placeholder {
   color: #8f8a7f;
-}
-
-.field input:hover {
-  border-color: var(--line-strong);
+  font-weight: 500;
+  opacity: 1;
 }
 
 .field input:focus {
   outline: none;
   border-color: var(--ink);
-  background: var(--paper);
   box-shadow: 0 0 0 4px rgba(20, 18, 14, 0.08);
+}
+
+.field input:-webkit-autofill {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  box-shadow: inset 0 0 0 100px var(--paper), var(--shadow-card);
+}
+
+.field input:-webkit-autofill:focus {
+  box-shadow: inset 0 0 0 100px var(--paper), 0 0 0 4px rgba(20, 18, 14, 0.08);
 }
 
 .field.error input {
@@ -1006,14 +1082,14 @@ section {
 }
 
 .field-error {
-  margin: 0;
+  margin: 6px 2px 0 19.5px;
   color: var(--red);
   font-size: 13px;
   font-weight: 600;
 }
 
 .field-hint {
-  margin: 4px 0 0;
+  margin: 2px 2px 0 19.5px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 600;
@@ -1049,101 +1125,10 @@ section {
   animation: shake 350ms ease;
 }
 
-.stepper {
-  min-height: 56px;
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
-  align-items: center;
-  gap: 4px;
-  padding: 5px;
-  border: 1.5px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--cream);
-}
-
-.step-btn {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 10px;
-  color: var(--ink);
-  background: var(--paper);
-  box-shadow: 0 1px 2px rgba(20, 18, 14, 0.08);
-  font-size: 20px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.step-btn:hover {
-  background: var(--sand);
-}
-
-.step-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.step-value {
-  text-align: center;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.step-value.bump {
-  animation: value-pop 260ms var(--ease);
-}
-
-.seg {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-}
-
-.seg-opt {
-  position: relative;
-  min-height: 56px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 10px;
-  padding: 8px 18px;
-  border: 1.5px solid transparent;
-  border-radius: var(--r-sm);
-  background: var(--sand);
-  cursor: default;
-}
-
-.seg-opt input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.seg-opt:has(input:not(:disabled)) {
-  cursor: pointer;
-  background: var(--paper);
-  border-color: var(--line);
-}
-
-.seg-opt:has(input:not(:disabled):checked) {
-  border-color: var(--ink);
-}
-
-.seg-day {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.seg-hours {
-  color: var(--muted);
-  font-size: 15px;
-}
-
 .ref-note {
   margin: 0;
-  padding: 14px 16px;
-  border-radius: var(--r-sm);
+  padding: 14px 18px;
+  border-radius: 16px;
   background: #fff6cc;
   font-size: 15px;
   font-weight: 600;
@@ -1151,8 +1136,8 @@ section {
 
 .form-msg {
   margin: 0;
-  padding: 14px 16px;
-  border-radius: var(--r-sm);
+  padding: 14px 18px;
+  border-radius: 16px;
   color: var(--red);
   background: #fff1ef;
   font-size: 15px;
@@ -1164,34 +1149,154 @@ section {
   background: var(--sand);
 }
 
+/* The Thursday reminder: a row like the fields above, with a switch at its end. */
 .remind-opt {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: fit-content;
-  min-height: 44px;
-  margin: -6px 0;
-  font-size: 15px;
-  font-weight: 500;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  min-height: 62px;
+  margin: -14px 0 0;
+  padding: 9px 14px 9px 19.5px;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
 }
 
-.remind-opt input {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  margin: 0;
-  accent-color: var(--ink);
-}
-
-.cta-row {
+.remind-text {
   display: grid;
-  gap: 10px;
+  gap: 1px;
+  min-width: 0;
 }
 
-#buynow-btn {
-  min-height: 62px;
+.remind-label {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.remind-what {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* The checkbox draws itself as a switch: a yolk slides across an ink track when it is on. */
+.remind-opt input {
+  position: relative;
+  flex: none;
+  width: 54px;
+  height: 32px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+
+.remind-opt input::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.22);
+  transition: transform 220ms var(--ease), background 200ms ease;
+}
+
+.remind-opt input:checked {
+  background: var(--ink);
+}
+
+.remind-opt input:checked::before {
+  background: var(--yolk);
+  box-shadow: none;
+  transform: translateX(22px);
+}
+
+/* How many, and one button that carries the total */
+.pay-bar {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  height: 64px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
+.step-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: transparent;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.step-btn:hover {
+  background: var(--sand);
+}
+
+.step-btn:disabled {
+  opacity: 0.3;
+  background: transparent;
+  cursor: default;
+}
+
+.step-value {
+  text-align: center;
   font-size: 18px;
+  font-weight: 800;
+}
+
+.step-value.bump {
+  animation: value-pop 260ms var(--ease);
+}
+
+.buy-btn {
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 0 24px 0 26px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.buy-total {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.buy-btn[aria-busy="true"] {
+  justify-content: center;
+}
+
+.buy-btn[aria-busy="true"] .buy-total {
+  display: none;
 }
 
 .form-note {
@@ -1202,7 +1307,6 @@ section {
   margin: -12px 0 0;
   color: var(--muted);
   font-size: 14px;
-  text-align: center;
 }
 
 .form-note::before {
@@ -1212,6 +1316,201 @@ section {
   flex: none;
   background: center / 16px 16px no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b675e' stroke-width='2'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5'/%3E%3Cpath d='M8 10.5V8a4 4 0 0 1 8 0v2.5'/%3E%3C/svg%3E");
+}
+
+/* Narrowest phones: the stepper and the button still share one row. */
+@media (max-width: 350px) {
+  .pay-bar {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .stepper {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    padding: 0 4px;
+  }
+
+  .step-btn {
+    width: 40px;
+  }
+
+  .buy-btn {
+    padding: 0 16px 0 18px;
+    font-size: 16px;
+  }
+
+  .buy-total {
+    font-size: 19px;
+  }
+}
+
+/* Tablets and up: the photo sits beside the words, and the form goes two across.
+   Here the photo is framed in yolk, so the two sides never have to be the same height. */
+@media (min-width: 700px) {
+  .order-form {
+    gap: clamp(40px, 4.4vw, 52px);
+  }
+
+  .order-stage {
+    --stage-r: clamp(32px, 3.7vw, 44px);
+    --photo-pad: 14px;
+    --photo-r: calc(var(--stage-r) - var(--photo-pad));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .order-photo {
+    padding: var(--photo-pad) 0 var(--photo-pad) var(--photo-pad);
+  }
+
+  .order-pick {
+    gap: 22px;
+    gap: clamp(16px, 2.17cqw, 26px);
+    padding: 28px 40px;
+    padding: clamp(20px, 3cqw, 36px) clamp(24px, 5.33cqw, 64px);
+  }
+
+  .order-head {
+    gap: clamp(8px, 1.17cqw, 14px);
+  }
+
+  .order-head h2 {
+    font-size: 44px;
+    font-size: clamp(32px, 4.67cqw, 56px);
+  }
+
+  .order-head p {
+    font-size: 16px;
+    font-size: clamp(15px, 1.5cqw, 18px);
+  }
+
+  .bundle-opt {
+    min-height: 50px;
+    min-height: clamp(46px, 4.67cqw, 56px);
+    font-size: clamp(15px, 1.42cqw, 17px);
+  }
+
+  .pick-price {
+    gap: 8px clamp(14px, 1.83cqw, 22px);
+    margin-top: 6px;
+  }
+
+  .pick-num {
+    font-size: 136px;
+    font-size: clamp(96px, 14.67cqw, 176px);
+  }
+
+  .pick-num.is-long {
+    font-size: 100px;
+    font-size: clamp(72px, 10.6cqw, 128px);
+  }
+
+  .pick-what b {
+    font-size: 28px;
+    font-size: clamp(22px, 3cqw, 36px);
+  }
+
+  .pick-what span {
+    font-size: clamp(15px, 1.58cqw, 19px);
+  }
+
+  .order-foot {
+    padding-top: clamp(14px, 1.67cqw, 20px);
+    font-size: clamp(14.5px, 1.33cqw, 16px);
+  }
+
+  .order-details {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(24px, 4vw, 56px);
+    row-gap: 26px;
+    align-items: start;
+  }
+
+  /* The address is three boxes tall here, so the reminder goes under the two
+     details boxes to match it, and the pay bar runs the full width below. */
+  .order-addr {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .order-you {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .order-you .order-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .remind-opt {
+    grid-column: 2;
+    grid-row: 2;
+    margin: -18px 0 0;
+  }
+
+  .pay-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .form-note {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    margin-top: -10px;
+  }
+}
+
+/* Wide screens: the photo runs to the poster's edge. With more to choose from
+   (other trays or dozens) the words can grow taller than the photo, so it stays framed. */
+@media (min-width: 1000px) {
+  .order-stage:not(:has(.kind-chips:not([hidden]), #dozen-pickers:not(:empty))) {
+    --photo-pad: 0px;
+    --photo-r: 0px;
+  }
+
+  .order-stage:not(:has(.kind-chips:not([hidden]), #dozen-pickers:not(:empty))) .order-photo {
+    align-self: start;
+  }
+}
+
+/* Wide screens: suburb, city and postcode share a row, so both sides are two boxes
+   tall; the reminder sits on the left beside the pay bar. */
+@media (min-width: 1100px) {
+  .order-addr .order-fields {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  }
+
+  .order-addr .order-fields > .field-suburb {
+    grid-column: auto;
+  }
+
+  .order-addr {
+    grid-row: 1;
+  }
+
+  .remind-opt {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 64px;
+    margin: 0;
+  }
+
+  .pay-bar {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .form-note {
+    grid-column: 2;
+    grid-row: 3;
+  }
+}
+
+@media (max-width: 999px) and (min-width: 700px) {
+  .buy-btn {
+    padding: 0 20px 0 22px;
+  }
 }
 
 /* ---------- Confirmation (reserve flow) ---------- */
@@ -2500,6 +2799,10 @@ section {
   80% { transform: translateX(-2px); }
 }
 
+@keyframes price-swap {
+  from { opacity: 0.35; transform: translateY(0.05em); }
+}
+
 @keyframes button-spin {
   to { transform: rotate(360deg); }
 }
@@ -2521,6 +2824,11 @@ section {
   .order-tray-photo,
   .showcase-photo > img.chalk-hold,
   .order-tray-photo > img.chalk-hold,
+  .picker.has-thumb::before,
+  .remind-opt input,
+  .remind-opt input::before,
+  .pick-num,
+  .step-value,
   .mobile-cta,
   .share-sheet,
   .share-card {
@@ -2533,30 +2841,6 @@ section {
 @media (min-width: 640px) {
   .share-sheet {
     place-items: center;
-  }
-}
-
-@media (max-width: 1100px) {
-  .shop-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .shop-product {
-    position: static;
-    grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
-    align-items: center;
-  }
-
-  .shop-product .order-tray-rotator {
-    grid-row: span 2;
-  }
-
-  .shop-product h3 {
-    align-self: end;
-  }
-
-  .shop-product .tick-list {
-    align-self: start;
   }
 }
 
@@ -2698,70 +2982,6 @@ section {
 @media (max-width: 640px) {
   .announce-more {
     display: none;
-  }
-
-  .shop-card {
-    padding: 14px 14px 22px;
-    border-radius: 24px;
-  }
-
-  .shop-product {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
-  }
-
-  .shop-product .order-tray-rotator {
-    grid-row: auto;
-    border-radius: 16px;
-  }
-
-  .picker {
-    gap: 8px;
-  }
-
-  .bundle-opt {
-    padding: 14px 10px 12px 12px;
-    border-radius: 14px;
-  }
-
-  /* Three cards side by side leave no room for a radio dot: the chosen card turns yolk instead. */
-  .bundle-opt::after {
-    display: none;
-  }
-
-  .bundle-opt:has(input:checked) {
-    background: #fff6cc;
-  }
-
-  .bo-name {
-    padding-right: 0;
-    font-size: 15px;
-  }
-
-  .bo-eggs {
-    font-size: 13px;
-  }
-
-  .bo-price {
-    font-size: 22px;
-  }
-
-  .bo-each {
-    display: none;
-  }
-
-  .qty-row,
-  .delivery-loc-row,
-  .details-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .delivery-loc-row {
-    grid-template-columns: minmax(0, 1fr) 110px;
-  }
-
-  .delivery-loc-row .field:first-child {
-    grid-column: 1 / -1;
   }
 
   .areas-panel {
@@ -2918,14 +3138,6 @@ section {
 @media (max-width: 380px) {
   .hero-cta .btn {
     width: 100%;
-  }
-
-  .bo-name {
-    font-size: 14px;
-  }
-
-  .bo-price {
-    font-size: 20px;
   }
 
   /* The egg sizes table on the narrowest phones. */
