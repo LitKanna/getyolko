@@ -49,6 +49,34 @@ YOLKO's own eggs, so never caption it as one, and never swap in a drawn or compu
 has no price in it, so it does not swap with the tray price the way the hero does
 (`orderBrandPicture` in `app.js`).
 
+### Order section: "Big yolk" (13 Nov 2026)
+Kanna called the old order card "old style and cluttered", picked this from three drawn
+directions and then trimmed it by hand, so keep it this spare. A yolk poster (`.order-stage`)
+holds the photo, the heading, one short line, one switch (`.picker`: 1 tray, 2 trays, Full box),
+the price of what is picked in giant type (`#pick-price`, with `#pick-eggs` and `#pick-each`
+beside it) and a foot row with the stock note and "$5 delivery". Under it, on the cream page:
+Deliver to (the Saturday's date sits beside the heading), Your details, the Thursday reminder,
+then the stepper beside a Buy now button that carries the total, and one line, "Secure payment
+by Stripe". Kanna's notes, all 13 Nov:
+- One short line under the heading, never a paragraph.
+- Nothing under Buy now but the Stripe line: no price breakdown, no friend's link line, no
+  receipt line. Messages still go in `#form-msg` and `#ref-note`, above the pay bar. No toasts.
+- Example text in a box must not put an x next to digits ("04xx"): the font turns it into a
+  small times sign. Use a real-looking example ("0412 345 678").
+- The reminder is a white row with a switch (the checkbox draws itself as one), not a bare tick box.
+- No tick list, no "Delivery day" box, no "Quantity" label, and no card inside a card.
+
+How it holds together: names sit inside the boxes (`.field label` is placed over its input),
+so `flagInvalid` still finds `.field`. Sizes inside the poster follow its own width (`cqw`), so
+the words never grow taller than the square photo, which is never cropped. Under 700px the
+photo sits on top; from 700px it sits beside the words in a yolk frame; from 1000px it runs to
+the poster's edge, but only while the three tray sizes are the whole choice. When other trays or
+dozens are on sale (`#tray-kinds`, `#dozen-pickers`) the words get taller, so the photo keeps its
+frame. `refreshSubmitPrice()` in `app.js` sets the big price and the button's total, and
+`placeThumbs()` slides the switch's ink pill; with no script the chosen option paints itself.
+Each option keeps its eggs and price in hidden text (`.bo-eggs`, `.bo-price`) for screen readers
+and for `setTrayVariety`.
+
 ### Brand and logo (12 Nov 2026)
 The logo is the Brush egg: one brush stroke that draws an egg, a yellow yolk inside, and YOLKO in
 Plus Jakarta Sans ExtraBold. Kanna picked it on 11 Nov 2026 and asked for it everywhere on 12 Nov.

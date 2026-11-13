@@ -207,12 +207,14 @@ function chalkHeroUrls(p) {
    the tray price the way the hero does. */
 const ORDER_PICTURE_VER = "1";
 const ORDER_PICTURE_ALT = "A fried egg on a slice of toast, seen from above among rows of golden toast";
+// Full width in the poster on phones, half of it beside the words from tablets up.
+const ORDER_PICTURE_SIZES = "(max-width: 699px) calc(100vw - 40px), 560px";
 
 function orderBrandPicture(active, idAttr) {
   const v = ORDER_PICTURE_VER;
   return `<picture class="order-tray-photo${active}">
-      <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=${v} 1x, assets/brand/order-picture-1120.webp?v=${v} 2x">
-      <img${idAttr} src="assets/brand/order-picture-560.jpg?v=${v}" srcset="assets/brand/order-picture-560.jpg?v=${v} 1x, assets/brand/order-picture-1120.jpg?v=${v} 2x" alt="${ORDER_PICTURE_ALT}" width="560" height="560" loading="lazy" decoding="async">
+      <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=${v} 560w, assets/brand/order-picture-1120.webp?v=${v} 1120w" sizes="${ORDER_PICTURE_SIZES}">
+      <img${idAttr} src="assets/brand/order-picture-560.jpg?v=${v}" srcset="assets/brand/order-picture-560.jpg?v=${v} 560w, assets/brand/order-picture-1120.jpg?v=${v} 1120w" sizes="${ORDER_PICTURE_SIZES}" alt="${ORDER_PICTURE_ALT}" width="560" height="560" loading="lazy" decoding="async">
     </picture>`;
 }
 
@@ -427,10 +429,15 @@ function currentQuantity() {
   return Math.max(1, parseInt(quantityInput.value, 10) || 1);
 }
 
+const qtyMinus = document.getElementById("qty-minus");
+const qtyPlus = document.getElementById("qty-plus");
+
 function setQuantity(qty) {
   const next = Math.min(10, Math.max(1, qty));
   quantityInput.value = String(next);
   qtyValue.textContent = String(next);
+  qtyMinus.disabled = next <= 1;
+  qtyPlus.disabled = next >= 10;
   // Brief pop so the quantity change registers visually.
   qtyValue.classList.remove("bump");
   void qtyValue.offsetWidth;
@@ -438,8 +445,8 @@ function setQuantity(qty) {
   refreshSubmitPrice();
 }
 
-document.getElementById("qty-minus").addEventListener("click", () => setQuantity(currentQuantity() - 1));
-document.getElementById("qty-plus").addEventListener("click", () => setQuantity(currentQuantity() + 1));
+qtyMinus.addEventListener("click", () => setQuantity(currentQuantity() - 1));
+qtyPlus.addEventListener("click", () => setQuantity(currentQuantity() + 1));
 
 function eggCount(bundleKey) {
   const b = BUNDLES[bundleKey];
@@ -471,43 +478,82 @@ function describeOrder(bundleKey, qty) {
   return trays === 1 ? `1 tray (30 eggs)` : `${trays} trays (${eggs} eggs)`;
 }
 
+/* ---------- The poster: one switch, one big price ---------- */
+const pickNum = document.getElementById("pick-num");
+const pickPrice = document.getElementById("pick-price");
+const pickEggs = document.getElementById("pick-eggs");
+const pickEach = document.getElementById("pick-each");
+const buyTotal = document.getElementById("buy-total");
+
+function money(n) {
+  return "$" + (Number.isInteger(n) ? n : n.toFixed(2));
+}
+
+// The switch's ink pill slides to the chosen option. Until this runs (or with no
+// script at all) the chosen option paints itself, so the form never looks unpicked.
+function placeThumbs() {
+  if (!form) return;
+  form.querySelectorAll(".picker").forEach((track) => {
+    const input = track.querySelector('input[name="bundle"]:checked');
+    const label = input ? input.closest(".bundle-opt") : null;
+    track.classList.add("has-thumb");
+    track.classList.toggle("no-pick", !label);
+    // A class as well as :has(), so the chosen words turn white in browsers without :has().
+    track.querySelectorAll(".bundle-opt").forEach((opt) => opt.classList.toggle("is-picked", opt === label));
+    if (label && label.offsetWidth) {
+      track.style.setProperty("--thumb-x", `${label.offsetLeft}px`);
+      track.style.setProperty("--thumb-w", `${label.offsetWidth}px`);
+    }
+  });
+}
+
+// The big price shows what is picked; the Buy button shows the whole order with delivery.
 function refreshSubmitPrice() {
-  // Order summary strip removed. Buy now is the only CTA.
+  const key = currentBundle();
+  const b = BUNDLES[key] || BUNDLES.tray2;
+  if (pickPrice && pickNum) {
+    const text = money(b.price).slice(1);
+    if (pickPrice.textContent !== text) {
+      pickPrice.textContent = text;
+      pickNum.classList.toggle("is-long", text.length > 2);
+      // Brief settle so the new price registers.
+      pickNum.classList.remove("swap");
+      void pickNum.offsetWidth;
+      pickNum.classList.add("swap");
+    }
+    const eggs = eggCount(key);
+    if (pickEggs) pickEggs.textContent = `${eggs} eggs`;
+    if (pickEach) pickEach.textContent = `${perEggText(b.price, eggs)} an egg`;
+  }
+  if (buyTotal) buyTotal.textContent = money(b.price * currentQuantity() + DELIVERY_FEE);
+  placeThumbs();
+}
+
+if (form) {
+  if ("ResizeObserver" in window) new ResizeObserver(placeThumbs).observe(form);
+  else window.addEventListener("resize", placeThumbs);
 }
 
 function syncFulfillmentUI() {
-  const whenLabel = document.getElementById("when-label");
-  const daySeg = document.getElementById("day-seg");
+  const when = document.getElementById("order-when");
   const addrField = document.getElementById("delivery-address-field");
   const streetInput = document.getElementById("delivery-street");
   const suburbInput = document.getElementById("delivery-suburb");
   const postcodeInput = document.getElementById("delivery-postcode");
-  const formNote = document.querySelector(".form-note");
 
-  if (whenLabel) whenLabel.textContent = "Delivery day";
   if (addrField) addrField.hidden = false;
   if (streetInput) streetInput.required = true;
   if (suburbInput) suburbInput.required = true;
   if (postcodeInput) postcodeInput.required = true;
 
-  if (daySeg) {
-    const satDate = nextPickupDate("Saturday");
-    // Display-only; hidden input name="pickupDay" stays the form value.
-    daySeg.innerHTML = `<label class="seg-opt">
-      <input type="radio" name="pickupDayDisplay" value="Saturday" checked disabled>
-      <span class="seg-day">Saturday ${satDate}</span>
-      <span class="seg-hours">6am to 12pm</span>
-    </label>`;
-  }
-
-  if (formNote) {
-    formNote.textContent = "Secure card payment by Stripe.";
-  }
+  // The Saturday this order is for, beside "Deliver to" (the Worker sets the same date).
+  if (when) when.textContent = `Saturday ${nextPickupDate("Saturday")}, 6am to 12pm`;
   refreshSubmitPrice();
 }
 
-document.querySelectorAll('input[name="bundle"]').forEach((radio) => {
-  radio.addEventListener("change", refreshSubmitPrice);
+// One listener on the form, because the dozens and other trays are drawn in later.
+form?.addEventListener("change", (e) => {
+  if (e.target && e.target.name === "bundle") refreshSubmitPrice();
 });
 
 // Price cards on the suburb and bulk pages link to /?b=<pack>#order to pick that pack.
@@ -520,9 +566,6 @@ document.querySelectorAll('input[name="bundle"]').forEach((radio) => {
   radio.dispatchEvent(new Event("change", { bubbles: true }));
 })();
 
-// Day radios are re-rendered from settings, so listen on the container
-const daySegEl = document.getElementById("day-seg");
-if (daySegEl) daySegEl.addEventListener("change", refreshSubmitPrice);
 const fulfillmentSeg = document.getElementById("fulfillment-seg");
 if (fulfillmentSeg) fulfillmentSeg.addEventListener("change", syncFulfillmentUI);
 
@@ -816,6 +859,7 @@ function setTrayVariety(id) {
     r.checked = r.value === trayVariety;
   });
   refreshStockNote();
+  refreshSubmitPrice();
 }
 
 /** Kind-of-tray chips, only when more than one tray is on sale. */
@@ -855,11 +899,11 @@ function renderDozens() {
       <div class="picker">${list.map(({ v, o }) => `<label class="bundle-opt">
         <input type="radio" name="bundle" value="${escHtml(o.key)}"${o.key === keep ? " checked" : ""}>
         <span class="bo-name">${escHtml(v.weight)}</span>
-        <span class="bo-eggs">12 ${KIND_WORD[kind]} eggs</span>
-        <span class="bo-price-row"><span class="bo-price" id="bp-${escHtml(o.key)}">$${o.price}</span></span>
+        <span class="sr-only"><span class="bo-eggs">12 ${KIND_WORD[kind]} eggs</span>, <span class="bo-price" id="bp-${escHtml(o.key)}">$${o.price}</span></span>
       </label>`).join("")}</div>
     </fieldset>`;
   }).join("");
+  placeThumbs();
   // A dozen that sold out since the page loaded: go back to the trays.
   if (keep && !form.querySelector('input[name="bundle"]:checked')) {
     const tray = form.querySelector('#tray-picker [data-opt="two"]:not([hidden]) input') || form.querySelector('#tray-picker input:not(:disabled)');
@@ -877,13 +921,16 @@ function refreshStockNote() {
   if (!v || v.main) {
     if (!Number.isFinite(mainTraysLeft)) return;
     stockNote.textContent = mainTraysLeft > 0
-      ? `${mainTraysLeft} ${mainTraysLeft === 1 ? "tray" : "trays"} left this week.`
+      ? `${mainTraysLeft} ${mainTraysLeft === 1 ? "tray" : "trays"} left this week`
       : "Sold out this week. Check back Wednesday.";
+    // The dot is green only while there is something to buy.
+    stockNote.classList.toggle("is-out", mainTraysLeft <= 0);
     stockNote.hidden = false;
     return;
   }
   const unit = v.format === "dozen" ? ["dozen", "dozens"] : v.eggs === 30 ? ["tray", "trays"] : ["pack", "packs"];
-  stockNote.textContent = `${v.left} ${v.left === 1 ? unit[0] : unit[1]} left this week.`;
+  stockNote.textContent = `${v.left} ${v.left === 1 ? unit[0] : unit[1]} left this week`;
+  stockNote.classList.remove("is-out");
   stockNote.hidden = false;
 }
 
@@ -941,6 +988,7 @@ function applySettings(settings) {
   renderTrayKinds();
   renderDozens();
   refreshStockNote();
+  refreshSubmitPrice();
 
   // Product type from admin (cage trays or free-range packs)
   applyProductType(settings.trayWeight);
@@ -1594,10 +1642,10 @@ copyButton.addEventListener("click", async () => {
 
 againButton.addEventListener("click", () => {
   form.reset();
-  syncFulfillmentUI();
-  refreshSubmitPrice();
   doneSection.hidden = true;
   orderSection.hidden = false;
+  setQuantity(1);
+  syncFulfillmentUI();
   orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
 });
 

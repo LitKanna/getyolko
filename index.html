@@ -93,7 +93,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=157">
+  <link rel="stylesheet" href="styles-modern.css?v=158">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -686,149 +686,142 @@
 
     <section id="order" class="order">
       <div class="wrap">
-        <header class="section-head split">
-          <h2>Order your eggs</h2>
-          <p>Order by Thursday night for Saturday delivery.</p>
-        </header>
-
-        <div class="shop-card">
-          <div class="shop-product">
-            <div class="order-tray-rotator" data-rotator="order" aria-hidden="true">
-              <picture class="order-tray-photo is-active">
-                <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=1 1x, assets/brand/order-picture-1120.webp?v=1 2x">
-                <img id="order-tray-img" src="assets/brand/order-picture-560.jpg?v=1" srcset="assets/brand/order-picture-560.jpg?v=1 1x, assets/brand/order-picture-1120.jpg?v=1 2x" width="560" height="560" loading="lazy" decoding="async" alt="A fried egg on a slice of toast, seen from above among rows of golden toast">
-              </picture>
-            </div>
-            <h3>Pace Farm eggs, 30 to a tray</h3>
-            <ul class="tick-list">
-              <li>Extra-large eggs, the same brand as the supermarket</li>
-              <li>Delivered Saturday, 6am to 12pm</li>
-              <li>$5 flat delivery, or free with a friend's link</li>
-              <li>Email receipt as soon as you pay</li>
-            </ul>
-          </div>
-
-          <form id="order-form" class="order-form">
-            <div class="form-group">
-              <div class="form-head">
-                <h3>Your eggs</h3>
-                <p class="stock-note" id="stock-note" hidden></p>
+        <form id="order-form" class="order-form">
+          <div class="order-stage">
+            <div class="order-photo">
+              <div class="order-tray-rotator" data-rotator="order" aria-hidden="true">
+                <picture class="order-tray-photo is-active">
+                  <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=1 560w, assets/brand/order-picture-1120.webp?v=1 1120w" sizes="(max-width: 699px) calc(100vw - 40px), 560px">
+                  <img id="order-tray-img" src="assets/brand/order-picture-560.jpg?v=1" srcset="assets/brand/order-picture-560.jpg?v=1 560w, assets/brand/order-picture-1120.jpg?v=1 1120w" sizes="(max-width: 699px) calc(100vw - 40px), 560px" width="560" height="560" loading="lazy" decoding="async" alt="A fried egg on a slice of toast, seen from above among rows of golden toast">
+                </picture>
               </div>
-              <div class="kind-chips" id="tray-kinds" role="radiogroup" aria-label="Kind of tray" hidden></div>
-              <fieldset class="picker" id="tray-picker">
-                <legend class="sr-only">Trays (30 eggs)</legend>
-                <label class="bundle-opt" data-opt="one">
-                  <input type="radio" name="bundle" value="tray1">
-                  <span class="bo-name">1 tray</span>
-                  <span class="bo-eggs">30 eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-tray1">$13</span><span class="bo-each"><span data-per-egg="tray1">43¢</span> an egg</span></span>
-                </label>
-                <label class="bundle-opt" data-opt="two">
-                  <input type="radio" name="bundle" value="tray2" checked>
-                  <span class="bo-name">2 trays</span>
-                  <span class="bo-eggs">60 eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-tray2">$25</span><span class="bo-each"><span data-per-egg="tray2">42¢</span> an egg</span></span>
-                </label>
-                <label class="bundle-opt" data-opt="box">
-                  <input type="radio" name="bundle" value="box">
-                  <span class="bo-name">Full box</span>
-                  <span class="bo-eggs">180 eggs</span>
-                  <span class="bo-price-row"><span class="bo-price" id="bp-box">$72</span><span class="bo-each"><span data-per-egg="box">40¢</span> an egg</span></span>
-                </label>
-              </fieldset>
+            </div>
 
-              <div id="dozen-pickers"></div>
+            <div class="order-pick">
+              <header class="order-head">
+                <h2>Order your eggs</h2>
+                <p><span>Extra-large eggs.</span> <span>Order by Thursday night.</span></p>
+              </header>
+
+              <div class="order-choose">
+                <div class="kind-chips" id="tray-kinds" role="radiogroup" aria-label="Kind of tray" hidden></div>
+                <fieldset class="picker" id="tray-picker">
+                  <legend class="sr-only">Trays (30 eggs)</legend>
+                  <label class="bundle-opt" data-opt="one">
+                    <input type="radio" name="bundle" value="tray1">
+                    <span class="bo-name">1 tray</span>
+                    <span class="sr-only"><span class="bo-eggs">30 eggs</span>, <span class="bo-price" id="bp-tray1">$13</span></span>
+                  </label>
+                  <label class="bundle-opt" data-opt="two">
+                    <input type="radio" name="bundle" value="tray2" checked>
+                    <span class="bo-name">2 trays</span>
+                    <span class="sr-only"><span class="bo-eggs">60 eggs</span>, <span class="bo-price" id="bp-tray2">$25</span></span>
+                  </label>
+                  <label class="bundle-opt" data-opt="box">
+                    <input type="radio" name="bundle" value="box">
+                    <span class="bo-name">Full box</span>
+                    <span class="sr-only"><span class="bo-eggs">180 eggs</span>, <span class="bo-price" id="bp-box">$72</span></span>
+                  </label>
+                </fieldset>
+
+                <div id="dozen-pickers"></div>
+              </div>
 
               <input type="hidden" name="fulfillment" value="delivery">
               <input type="hidden" name="pickupDay" value="Saturday">
 
-              <div class="field-row qty-row">
-                <div class="field field-qty">
-                  <span class="field-label">Quantity</span>
-                  <div class="stepper">
-                    <button type="button" class="step-btn" id="qty-minus" aria-label="Decrease quantity">−</button>
-                    <output class="step-value" id="qty-value">1</output>
-                    <button type="button" class="step-btn" id="qty-plus" aria-label="Increase quantity">+</button>
-                  </div>
-                  <input type="hidden" id="quantity" name="quantity" value="1">
-                </div>
+              <div class="pick-price">
+                <span class="pick-num" id="pick-num"><span class="pick-cur">$</span><span id="pick-price">25</span></span>
+                <span class="pick-what"><b id="pick-eggs">60 eggs</b><span id="pick-each">42¢ an egg</span></span>
+              </div>
 
-                <div class="field" id="when-field">
-                  <span class="field-label" id="when-label">Delivery day</span>
-                  <div class="seg" id="day-seg">
-                    <label class="seg-opt">
-                      <input type="radio" name="pickupDayDisplay" value="Saturday" checked disabled>
-                      <span class="seg-day">Saturday</span>
-                      <span class="seg-hours">6am to 12pm</span>
-                    </label>
-                  </div>
-                </div>
+              <div class="order-foot">
+                <p class="stock-note" id="stock-note" hidden></p>
+                <p class="order-fee">$5 delivery</p>
               </div>
             </div>
+          </div>
 
-            <div class="form-group">
-              <div class="form-head"><h3>Where should we deliver?</h3></div>
-              <div class="field" id="delivery-address-field">
-                <label for="delivery-street">Street address</label>
-                <input id="delivery-street" name="deliveryStreet" type="text" placeholder="e.g. Unit 4, 12 Smith Street" autocomplete="address-line1" required>
-                <div class="field-row delivery-loc-row">
-                  <div class="field">
-                    <label for="delivery-suburb">Suburb</label>
-                    <input id="delivery-suburb" name="deliverySuburb" type="text" placeholder="e.g. Strathfield" autocomplete="address-level2" required>
-                  </div>
-                  <div class="field">
-                    <label for="delivery-city">City</label>
-                    <input id="delivery-city" name="deliveryCity" type="text" placeholder="Sydney" autocomplete="address-level1" value="Sydney">
-                  </div>
-                  <div class="field">
-                    <label for="delivery-postcode">Postcode</label>
-                    <input id="delivery-postcode" name="deliveryPostcode" type="text" inputmode="numeric" maxlength="4" placeholder="2135" autocomplete="postal-code" required>
-                  </div>
+          <div class="order-details">
+            <div class="form-group order-addr">
+              <div class="form-head">
+                <h3>Deliver to</h3>
+                <p class="order-when" id="order-when">Saturday, 6am to 12pm</p>
+              </div>
+              <div class="order-fields" id="delivery-address-field">
+                <div class="field field-street">
+                  <label for="delivery-street">Street address</label>
+                  <input id="delivery-street" name="deliveryStreet" type="text" placeholder="Unit 4, 12 Smith Street" autocomplete="address-line1" required>
+                </div>
+                <div class="field field-suburb">
+                  <label for="delivery-suburb">Suburb</label>
+                  <input id="delivery-suburb" name="deliverySuburb" type="text" placeholder="Strathfield" autocomplete="address-level2" required>
+                </div>
+                <div class="field field-city">
+                  <label for="delivery-city">City</label>
+                  <input id="delivery-city" name="deliveryCity" type="text" placeholder="Sydney" autocomplete="address-level1" value="Sydney">
+                </div>
+                <div class="field field-postcode">
+                  <label for="delivery-postcode">Postcode</label>
+                  <input id="delivery-postcode" name="deliveryPostcode" type="text" inputmode="numeric" maxlength="4" placeholder="2135" autocomplete="postal-code" required>
                 </div>
                 <p class="field-hint" id="delivery-zone-hint" hidden></p>
               </div>
             </div>
 
-            <div class="form-group">
-              <div class="form-head"><h3>Your details</h3></div>
-              <div class="field-row details-row">
-                <div class="field">
-                  <label for="name">Name</label>
-                  <input id="name" name="name" type="text" placeholder="Full name" autocomplete="name" required>
-                </div>
+            <div class="order-you">
+              <div class="form-group">
+                <div class="form-head"><h3>Your details</h3></div>
+                <div class="order-fields">
+                  <div class="field">
+                    <label for="name">Name</label>
+                    <input id="name" name="name" type="text" placeholder="Full name" autocomplete="name" required>
+                  </div>
 
-                <!-- Honeypot: leave empty. Bots that fill it are dropped server-side.
-                     Do NOT name this "company"/"name"/"email"; iOS autofill fills those. -->
-                <div class="hp-field" aria-hidden="true">
-                  <label for="yolko_hp">Leave blank</label>
-                  <input id="yolko_hp" name="yolko_hp" type="text" tabindex="-1" autocomplete="off" inputmode="none">
-                </div>
+                  <!-- Honeypot: leave empty. Bots that fill it are dropped server-side.
+                       Do NOT name this "company"/"name"/"email"; iOS autofill fills those. -->
+                  <div class="hp-field" aria-hidden="true">
+                    <label for="yolko_hp">Leave blank</label>
+                    <input id="yolko_hp" name="yolko_hp" type="text" tabindex="-1" autocomplete="off" inputmode="none">
+                  </div>
 
-                <div class="field">
-                  <label for="phone">Mobile number</label>
-                  <input id="phone" name="phone" type="tel" inputmode="numeric" placeholder="04xx xxx xxx" autocomplete="tel" aria-describedby="phone-error" required>
-                  <p class="field-error" id="phone-error" hidden>Enter a valid Australian mobile, e.g. 0412 345 678</p>
+                  <div class="field">
+                    <label for="phone">Mobile number</label>
+                    <input id="phone" name="phone" type="tel" inputmode="numeric" placeholder="0412 345 678" autocomplete="tel" aria-describedby="phone-error" required>
+                    <p class="field-error" id="phone-error" hidden>Enter a valid Australian mobile, e.g. 0412 345 678</p>
+                  </div>
                 </div>
               </div>
+
+              <p class="ref-note" id="ref-note" role="status" hidden></p>
+
+              <p class="form-msg" id="form-msg" role="alert" hidden></p>
             </div>
-
-            <p class="ref-note" id="ref-note" role="status" hidden></p>
-
-            <p class="form-msg" id="form-msg" role="alert" hidden></p>
 
             <label class="remind-opt">
-              <input type="checkbox" id="remind" name="remind" value="1">
-              <span>Email me a reminder each Thursday</span>
+              <span class="remind-text">
+                <span class="remind-label">Reminder</span>
+                <span class="remind-what">Email me each Thursday</span>
+              </span>
+              <input type="checkbox" id="remind" name="remind" value="1" role="switch">
             </label>
 
-            <div class="cta-row">
-              <button type="submit" class="btn btn-solid btn-lg btn-block" id="buynow-btn">
+            <div class="pay-bar">
+              <div class="stepper" role="group" aria-label="How many">
+                <button type="button" class="step-btn" id="qty-minus" aria-label="Decrease quantity" disabled>−</button>
+                <output class="step-value" id="qty-value">1</output>
+                <button type="button" class="step-btn" id="qty-plus" aria-label="Increase quantity">+</button>
+              </div>
+              <input type="hidden" id="quantity" name="quantity" value="1">
+              <button type="submit" class="btn btn-solid btn-lg buy-btn" id="buynow-btn">
                 <span id="buynow-label">Buy now</span>
+                <span class="buy-total" id="buy-total">$30</span>
               </button>
             </div>
-            <p class="form-note">Secure card payment by Stripe.</p>
-          </form>
-        </div>
+
+            <p class="form-note">Secure payment by Stripe</p>
+          </div>
+        </form>
       </div>
     </section>
 
@@ -1078,6 +1071,6 @@
   </footer>
 
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=156"></script>
+  <script src="app.js?v=157"></script>
 </body>
 </html>
