@@ -48,7 +48,8 @@ assert(unknown.code === "unknown_suburb", `unknown code should be unknown_suburb
 assert(unknown.code !== "out_of_range", "unknown must not be reported as out of range");
 assert(unknown.error === UNKNOWN_SUBURB_ERROR, "unknown should use the contact-us message");
 assert(/orders@getyolko\.com/i.test(unknown.error), "unknown message should include orders@getyolko.com");
-assert(/whatsapp/i.test(unknown.error), "unknown message should mention WhatsApp");
+// No WhatsApp here until WhatsApp Business is live on the shop's own line (13 Nov 2026).
+assert(!/whatsapp/i.test(unknown.error), "unknown message should not send people to WhatsApp yet");
 
 const padstowPcOnly = checkDeliveryAddress({ street: "1 Padstow Pde", suburb: "", city: "Sydney", postcode: "2211" });
 assert(padstowPcOnly.deliver === true, "postcode 2211 alone should deliver");

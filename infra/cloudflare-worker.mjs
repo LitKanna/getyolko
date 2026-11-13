@@ -14,6 +14,9 @@ import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
 import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
+import {
+  LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
+} from "./phone-line.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
 const DEPLOY_SHA = "0c0258ca20df51ddbd9ffb3e849e70ca081af141";
@@ -435,9 +438,10 @@ const STRIPE_BRAND = "YOLKO";
 // Every email customers see or reply to is the Zoho mailbox. The old Gmail is only for Google.
 const SHOP_EMAIL = "orders@getyolko.com";
 const STRIPE_SUPPORT_EMAIL = SHOP_EMAIL;
-const STRIPE_SUPPORT_PHONE = "+61433975055";
+// The shop's own line (phone-line.mjs), never a personal mobile (Kanna, 13 Nov 2026).
+const STRIPE_SUPPORT_PHONE = LINE_NUMBER;
 // Bump the version when the business profile above changes, so Stripe gets it again.
-const STRIPE_BRAND_FLAG = "stripe:branded:yolko:3";
+const STRIPE_BRAND_FLAG = "stripe:branded:yolko:4";
 
 // Stripe's pay page in the shop's own look: cream page, yolk button, the logo. Stripe reads the
 // pictures by their public address, so they must be live before they are named here, and a
@@ -849,7 +853,10 @@ const EMAIL_C = { canvas: "#faf7f0", paper: "#ffffff", ink: "#14120e", ink2: "#3
 // iPad and Mac), which Kanna picked on 12 Nov 2026 from four drawn options. Other devices fall
 // through to their own font, as before.
 const EMAIL_FONT = `'Plus Jakarta Sans',ui-rounded,'SF Pro Rounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
-const EMAIL_WA = `https://wa.me/${STRIPE_SUPPORT_PHONE.replace(/\D/g, "")}`;
+// WhatsApp Business is not live on the shop's line yet, so the emails ask for a reply only.
+// Once it is live, set this to `https://wa.me/${LINE_NUMBER.replace(/\D/g, "")}`.
+const EMAIL_WA = "";
+const EMAIL_HELP_TEXT = EMAIL_WA ? `Questions? Reply to this email or WhatsApp us: ${EMAIL_WA}` : "Questions? Reply to this email.";
 const EMAIL_IMG = "https://getyolko.com/assets/brand/email";
 
 /**
@@ -954,7 +961,7 @@ ${rows}
 <tr><td style="background:${C.ink};border-radius:0 0 16px 16px;padding:14px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td width="43" valign="middle"><img src="${EMAIL_IMG}/egg-1.png" width="43" height="48" alt="" style="display:block;border:0;outline:none"></td>
-<td valign="middle" style="padding-left:12px;font-family:${FONT};font-size:14px;line-height:20px;color:#ffffff">${htmlEscape(help)} Reply to this email or message us on <a href="${EMAIL_WA}" style="color:#ffffff;text-decoration:underline">WhatsApp</a>.</td>
+<td valign="middle" style="padding-left:12px;font-family:${FONT};font-size:14px;line-height:20px;color:#ffffff">${htmlEscape(help)} Reply to this email${EMAIL_WA ? ` or message us on <a href="${EMAIL_WA}" style="color:#ffffff;text-decoration:underline">WhatsApp</a>` : ""}.</td>
 </tr></table>
 </td></tr>
 <tr><td align="center" style="padding:20px 12px 0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.muted}"><a href="https://getyolko.com" style="color:${C.muted};text-decoration:underline">getyolko.com</a> &nbsp;·&nbsp; <a href="mailto:${SHOP_EMAIL}" style="color:${C.muted};text-decoration:underline">${SHOP_EMAIL}</a></td></tr>
@@ -972,7 +979,6 @@ function buildOrderEmail(order) {
   const where = order.deliveryAddress || "Your delivery address";
   const ref = orderRef(order);
   const receipt = order.stripe?.receiptUrl || "";
-  const wa = EMAIL_WA;
   const subject = `Your YOLKO order is confirmed (#${ref})`;
   const C = EMAIL_C;
   const preheader = `Order #${ref} is confirmed. Delivery on ${when}, ${DELIVERY_HOURS}.`;
@@ -1007,7 +1013,7 @@ ${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View r
     where,
     receipt ? `\nReceipt: ${receipt}` : null,
     "",
-    `Questions? Reply to this email or WhatsApp us: ${wa}`,
+    EMAIL_HELP_TEXT,
     "YOLKO · getyolko.com",
   ].filter((l) => l !== null).join("\n");
 
@@ -1066,7 +1072,7 @@ ${emailList([
     `Refunded to: ${card}`,
     `Amount refunded: ${amount} ${currency}`,
     "",
-    `Questions? Reply to this email or WhatsApp us: ${EMAIL_WA}`,
+    EMAIL_HELP_TEXT,
     "YOLKO · getyolko.com",
   ].filter((l) => l !== null).join("\n");
 
@@ -2120,6 +2126,30 @@ function mailHtml(text, quote) {
     ? `<br><div style="color:#6d6b64">${htmlEscape(quote.header || "")}</div><blockquote style="margin:6px 0 0;padding:0 0 0 12px;border-left:3px solid #e5e0d5;color:#3d3b36">${htmlEscape(String(quote.text).slice(0, 20000)).replace(/\r?\n/g, "<br>")}</blockquote>`
     : "";
   return `<div style="font-family:'Plus Jakarta Sans',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#171714">${body}<br><br><span style="color:#6d6b64">YOLKO · getyolko.com</span>${q}</div>`;
+}
+
+/* ---------- The shop's phone line (phone-line.mjs) ---------- */
+
+/** Keep the last 100 calls and texts to the line, newest first, for looking back. */
+async function lineLog(env, entry) {
+  const list = (await env.DATA.get(LINE_LOG_KEY, "json").catch(() => null)) || [];
+  list.unshift({ ...entry, at: new Date().toISOString() });
+  await env.DATA.put(LINE_LOG_KEY, JSON.stringify(list.slice(0, 100)));
+}
+
+/** A text to the line goes to the shop mailbox, so it shows in Admin > Emails with the rest. */
+async function emailLineText(env, msg) {
+  const auth = await zohoAuth(env);
+  if (!auth) return;
+  const acct = await zohoMailAccount(env, auth);
+  const mail = textEmail(msg);
+  await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+    fromAddress: acct.address || SHOP_EMAIL,
+    toAddress: SHOP_EMAIL,
+    subject: mail.subject,
+    content: mailHtml(mail.text),
+    mailFormat: "html",
+  });
 }
 
 /* ---------- Thursday reorder reminders ----------
@@ -4347,6 +4377,35 @@ async function handleApi(request, env, url, ctx) {
     } catch (err) {
       return json({ ok: false, reconnect: Boolean(err?.reconnect), error: String(err?.message || err).slice(0, 300) }, 502);
     }
+  }
+
+  // The shop's phone line. Telnyx asks what to do with a call and hands over each text. The
+  // address carries a key kept in KV, because the answer names the phone that calls ring on.
+  if (url.pathname.startsWith("/api/line/")) {
+    const [kind, key] = url.pathname.slice("/api/line/".length).split("/");
+    const config = await env.DATA.get(LINE_CONFIG_KEY, "json").catch(() => null);
+    if (!config?.key || !key || !sameText(key, config.key)) return json({ error: "not found" }, 404);
+    if (kind === "voice" && (request.method === "POST" || request.method === "GET")) {
+      const form = request.method === "POST" ? new URLSearchParams(await request.text().catch(() => "")) : url.searchParams;
+      const after = url.searchParams.get("after") === "1";
+      const from = String(form.get("From") || "").replace(/[^\d+]/g, "").slice(0, 20);
+      const status = String(form.get("DialCallStatus") || "").slice(0, 20);
+      ctx.waitUntil(lineLog(env, after ? { kind: "call-end", from, status } : { kind: "call", from }).catch(() => null));
+      const answer = after ? voiceAfter(status) : voiceAnswer(config, `https://getyolko.com/api/line/voice/${encodeURIComponent(key)}?after=1`);
+      return new Response(answer, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
+    }
+    if (kind === "sms" && request.method === "POST") {
+      const msg = textFromWebhook(await request.json().catch(() => null));
+      if (!msg) return json({ ok: true, ignored: true });
+      // Telnyx sends a text again if it gets no answer in time: each one is emailed once.
+      const seen = `line:sms:${msg.id}`;
+      if (await env.DATA.get(seen).catch(() => null)) return json({ ok: true, repeat: true });
+      await env.DATA.put(seen, "1", { expirationTtl: 7 * 24 * 3600 }).catch(() => null);
+      ctx.waitUntil(lineLog(env, { kind: "text", from: msg.from, text: msg.text.slice(0, 300), pictures: msg.pictures }).catch(() => null));
+      ctx.waitUntil(emailLineText(env, msg).catch((err) => console.log("line text email failed", String(err?.message || err))));
+      return json({ ok: true });
+    }
+    return json({ error: "not found" }, 404);
   }
 
   // Zoho CPaaS webhooks: delivered, opened, clicked, bounced and spam reports for order emails.

@@ -572,9 +572,12 @@ async function refreshDeliveryZoneHint() {
     } else if (d.code === "unknown_suburb") {
       hint.hidden = false;
       hint.className = "field-hint field-hint-unknown";
-      const wa = String(config.whatsappNumber || "61433975055").replace(/\D/g, "") || "61433975055";
-      hint.innerHTML =
-        `We could not match that suburb or postcode. <a href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> or email <a href="mailto:orders@getyolko.com">orders@getyolko.com</a> and we will check if we can deliver.`;
+      // WhatsApp shows only while config.js names a number (YOLKO's own line, once WhatsApp is live on it).
+      const wa = String(config.whatsappNumber || "").replace(/\D/g, "");
+      const mail = '<a href="mailto:orders@getyolko.com">orders@getyolko.com</a>';
+      hint.innerHTML = wa
+        ? `We could not match that suburb or postcode. <a href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> or email ${mail} and we will check if we can deliver.`
+        : `We could not match that suburb or postcode. Email ${mail} and we will check if we can deliver.`;
       hint.style.color = "";
     } else {
       hint.hidden = false;

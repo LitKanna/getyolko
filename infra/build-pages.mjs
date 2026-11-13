@@ -37,9 +37,20 @@ const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
 
-const PHONE = "+61433975055";
-const WHATSAPP = "https://wa.me/61433975055";
+// YOLKO's own line, 0480 093 935 (a Telnyx number, see phone-line.mjs). Kanna's own mobile
+// must never show on a page (Kanna, 13 Nov 2026).
+const PHONE = "+61480093935";
+// WhatsApp Business is not live on the line yet, so the pages ask for an email. Once it is
+// live, set this to "https://wa.me/61480093935" and rebuild: the WhatsApp links come back.
+const WHATSAPP = "";
 const EMAIL = "orders@getyolko.com";
+/** A link that asks people to get in touch: WhatsApp when it is live, email until then. */
+const contactLink = (onWhatsApp, byEmail) => (WHATSAPP
+  ? `<a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">${onWhatsApp}</a>`
+  : `<a href="mailto:${EMAIL}">${byEmail}</a>`);
+const CONTACT_WORDS = WHATSAPP ? "message us on WhatsApp" : "email us";
+/** The same ask as a second button: [label, link]. */
+const CONTACT_BUTTON = WHATSAPP ? ["WhatsApp us", WHATSAPP] : ["Email us", `mailto:${EMAIL}`];
 // Public directory listings of this same business, for JSON-LD sameAs. Add a
 // listing only once it shows publicly, and never one that shows a street address.
 const SAME_AS = [
@@ -101,8 +112,8 @@ const SUBURB_PAGES = [
   {
     slug: "concord", name: "Concord", postcode: "2137", region: "Canada Bay",
     nearby: ["Mortlake", "Breakfast Point", "Cabarita", "Concord West", "North Strathfield"],
-    faq: ["Can a café on Majors Bay Road get a weekly box?", `Yes. Order the $${PRICE.box} box (180 eggs) online, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a> to set up a weekly standing order.`],
-    local: `Concord is mostly houses, with a strip of cafés along Majors Bay Road. A café can order a 180-egg box online each week, or message us on WhatsApp to set up a standing order. Homes in Breakfast Point and Cabarita get the same Saturday delivery and the same $${PRICE.delivery} fee.`,
+    faq: ["Can a café on Majors Bay Road get a weekly box?", `Yes. Order the $${PRICE.box} box (180 eggs) online, or ${contactLink("message us on WhatsApp", "email us")} to set up a weekly standing order.`],
+    local: `Concord is mostly houses, with a strip of cafés along Majors Bay Road. A café can order a 180-egg box online each week, or ${CONTACT_WORDS} to set up a standing order. Homes in Breakfast Point and Cabarita get the same Saturday delivery and the same $${PRICE.delivery} fee.`,
   },
   {
     slug: "auburn", name: "Auburn", postcode: "2144", region: "Cumberland",
@@ -113,14 +124,14 @@ const SUBURB_PAGES = [
   {
     slug: "rhodes", name: "Rhodes", postcode: "2138", region: "Canada Bay",
     nearby: ["Liberty Grove", "Concord West", "Wentworth Point", "Meadowbank", "Putney"],
-    faq: ["Can you deliver to my apartment building?", "Yes. Put your unit number in the street address. If we need access on the day, we message you on WhatsApp."],
-    local: `Rhodes is almost all apartment towers, and so is Wentworth Point across the Bennelong Bridge. Put your unit number in the street address, and we message you on WhatsApp if we need access on the day. When neighbours in the same building order for the same Saturday, every order after the first ships free.`,
+    faq: ["Can you deliver to my apartment building?", "Yes. Put your unit number in the street address. If we need access on the day, we message you."],
+    local: `Rhodes is almost all apartment towers, and so is Wentworth Point across the Bennelong Bridge. Put your unit number in the street address, and we message you if we need access on the day. When neighbours in the same building order for the same Saturday, every order after the first ships free.`,
   },
   {
     slug: "ashfield", name: "Ashfield", postcode: "2131", region: "Inner west",
     nearby: ["Summer Hill", "Croydon", "Haberfield", "Ashbury", "Dulwich Hill"],
-    faq: ["Do restaurants in Ashfield order boxes?", `Yes. A box is 180 eggs for $${PRICE.box}, up to 10 boxes an order. <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a> for a weekly standing order.`],
-    local: `Ashfield mixes apartment blocks near the station with older houses on the side streets. The Shanghainese and other Chinese restaurants along Liverpool Road can order 180-egg boxes, up to 10 at a time, or message us on WhatsApp for a weekly standing order.`,
+    faq: ["Do restaurants in Ashfield order boxes?", `Yes. A box is 180 eggs for $${PRICE.box}, up to 10 boxes an order. ${contactLink("Message us on WhatsApp", "Email us")} for a weekly standing order.`],
+    local: `Ashfield mixes apartment blocks near the station with older houses on the side streets. The Shanghainese and other Chinese restaurants along Liverpool Road can order 180-egg boxes, up to 10 at a time, or ${CONTACT_WORDS} for a weekly standing order.`,
   },
   {
     slug: "ryde", name: "Ryde", postcode: "2112", region: "Northern Sydney",
@@ -131,14 +142,14 @@ const SUBURB_PAGES = [
   {
     slug: "bankstown", name: "Bankstown", postcode: "2200", region: "South-west",
     nearby: ["Yagoona", "Punchbowl", "Condell Park", "Bass Hill", "Greenacre"],
-    faq: ["Can bakeries and sweet shops order in bulk?", `Yes. Order up to 10 boxes of 180 eggs ($${PRICE.box} each), or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a> for a weekly standing order.`],
+    faq: ["Can bakeries and sweet shops order in bulk?", `Yes. Order up to 10 boxes of 180 eggs ($${PRICE.box} each), or ${contactLink("message us on WhatsApp", "email us")} for a weekly standing order.`],
     local: `Bankstown has apartments around the station and plenty of family homes in Yagoona, Condell Park and Greenacre. The Vietnamese bakeries and Lebanese sweet shops in Bankstown can order 180-egg boxes for $${PRICE.box} each, up to 10 at a time.`,
   },
   {
     slug: "parramatta", name: "Parramatta", postcode: "2150", region: "Western Sydney",
     nearby: ["Harris Park", "Westmead", "North Parramatta", "Rosehill", "Granville"],
     faq: ["Is Harris Park or Westmead covered?", "Yes. Both are inside the Saturday delivery area, and there is no extra charge for Parramatta."],
-    local: `Central Parramatta is mostly apartment towers, and North Parramatta and Rosehill have more houses. In a tower, add your unit number, and we message you on WhatsApp if the building needs letting in. Harris Park, Sydney's Little India, is next door, and its sweet shops and restaurants can order 180-egg boxes.`,
+    local: `Central Parramatta is mostly apartment towers, and North Parramatta and Rosehill have more houses. In a tower, add your unit number, and we message you if the building needs letting in. Harris Park, Sydney's Little India, is next door, and its sweet shops and restaurants can order 180-egg boxes.`,
   },
 ];
 
@@ -626,9 +637,10 @@ ${mapFigure()}
     </section>`;
 }
 
-const CONTACT_ROW = `          <div class="contact-row">
+const CONTACT_ROW = `          <div class="contact-row">${WHATSAPP ? `
             <a class="btn btn-ink btn-small" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
-            <a class="btn btn-ghost btn-small" href="mailto:${EMAIL}">Email</a>
+            <a class="btn btn-ghost btn-small" href="mailto:${EMAIL}">Email</a>` : `
+            <a class="btn btn-ink btn-small" href="mailto:${EMAIL}">Email us</a>`}
           </div>`;
 
 function faqSection(title, faqs) {
@@ -706,8 +718,8 @@ ${BRAND_FOOTER("/", "YOLKO home")}
         <nav class="foot-col" aria-label="Help">
           <p class="foot-h">Help</p>
           <a href="/#faq">Questions</a>
-          <a href="mailto:${EMAIL}">${EMAIL}</a>
-          <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a href="mailto:${EMAIL}">${EMAIL}</a>${WHATSAPP ? `
+          <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ""}
         </nav>
       </div>
       <div class="foot-bottom">
@@ -929,7 +941,7 @@ function bulkPage() {
     ["How much is a bulk box of eggs?", `A full box is 180 Pace Farm extra-large eggs (six trays of 30) for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivery is <strong>$${PRICE.delivery}</strong> flat.`],
     ["Do you sell eggs wholesale?", `We sell by the box at one price for everyone. A box is the standard 15 dozen carton, 180 eggs, for <strong>$${PRICE.box}</strong>. You do not need an ABN or a trade account.`],
     ["How many eggs are in a box?", "180. That is six trays of 30, or 15 dozen, and about 10.5&nbsp;kg of eggs."],
-    ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>.`],
+    ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, ${contactLink("message us on WhatsApp", "email us")}.`],
     ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers can order full boxes for Saturday delivery, and can set up a weekly standing order."],
     ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
     ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."],
@@ -949,7 +961,7 @@ ${heroSection({
     sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivered on Saturday morning, $${PRICE.delivery} flat.`,
     cta: "Order a box",
     ctaHref: "/?b=box#order",
-    secondary: ["WhatsApp us", WHATSAPP],
+    secondary: CONTACT_BUTTON,
     alt: `${HERO_ALT}. Six trays make a 180-egg box`,
   })}
 
@@ -974,7 +986,7 @@ ${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 doze
           <h2>Weekly standing orders</h2>
           <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
           <div class="hero-cta">
-            <a class="btn btn-ink" href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+            <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
           </div>
         </div>
         <div class="panel">
@@ -989,7 +1001,7 @@ ${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 doze
 
 ${faqSection("Bulk order questions", faqs)}
 
-${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, ["WhatsApp us", WHATSAPP])}
+${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, CONTACT_BUTTON)}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
@@ -1098,7 +1110,7 @@ function areasPage(existingHtml) {
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], ["Delivery areas", path]];
   const faqs = [
     ["Is my suburb covered?", "If the search on this page finds it, yes. We check your exact street and postcode before you pay."],
-    ["My suburb doesn't come up. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us on WhatsApp</a>. Some places have unusual names in the postcode data.`],
+    ["My suburb doesn't come up. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or ${contactLink("message us on WhatsApp", "email us")}. Some places have unusual names in the postcode data.`],
     ["Does delivery cost more further out?", `No. It is <strong>$${PRICE.delivery}</strong> flat anywhere in the delivery area.`],
     ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Thursday night."],
   ];
@@ -1181,7 +1193,7 @@ ${list}
       hits.slice(0, MAX).forEach(function (it) { results.appendChild(it.li.cloneNode(true)); });
       results.hidden = !hits.length;
       if (!hits.length) {
-        status.innerHTML = 'No match. <a href="/#order">Try the order form</a> or <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> to check.';
+        status.innerHTML = 'No match. <a href="/#order">Try the order form</a> or ${contactLink("WhatsApp us", "email us")} to check.';
       } else if (hits.length === 1) {
         status.textContent = "Yes, we deliver there.";
       } else {
@@ -1241,7 +1253,7 @@ const HOME_FAQ = [
   ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],
   ["Can delivery be free?", "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
-  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés and restaurants can <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">message us</a> for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
+  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés and restaurants can ${contactLink("message us", "email us")} for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
 ];
 
 function fillMarker(html, name, content) {
