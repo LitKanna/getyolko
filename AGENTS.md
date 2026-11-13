@@ -40,7 +40,14 @@ ink `#14120e`, muted `#6b675e`, yolk `#ffd32a`, green `#1f7a4d` only for the sto
 yellow is for the logo's yolk, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
 dots and the closing band; no orange. Rounded cards and pill buttons, a black announcement bar
 with the next Saturday date, and a black footer. Plain, short copy with no jargon. Never change,
-swap or re-crop the site images (the chalk-tray hero and order photos stay exactly as they are).
+swap or re-crop the site images unless Kanna asks for that picture by name. The hero is the
+chalk-tray photo and stays exactly as it is. The order section shows `assets/brand/order-picture-*`
+(Kanna asked for a new picture there on 13 Nov 2026 and turned down 3D drawings, photo edits,
+made-up photos, logo artwork and illustrations): a real public-domain (CC0) photograph of a fried
+egg on toast, with the YOLKO logo only as a small cream tag in the corner. It is not a photo of
+YOLKO's own eggs, so never caption it as one, and never swap in a drawn or computer-made picture. It
+has no price in it, so it does not swap with the tray price the way the hero does
+(`orderBrandPicture` in `app.js`).
 
 ### Brand and logo (12 Nov 2026)
 The logo is the Brush egg: one brush stroke that draws an egg, a yellow yolk inside, and YOLKO in
@@ -69,7 +76,7 @@ need a new entry, a new file name and a merge before the Worker names the file, 
 serves files from the pinned commit. The admin shows the logo in one colour (it stays black, white and greys); its
 printed box cards follow the brand guide's delivery card, with the egg logo in the QR code. Rules: ink logo with a yellow yolk on white or cream, white with the same yolk
 on black, all black on yellow; never stretch, tilt or recolour it; never under 24px tall. The
-site photos stay exactly as they are.
+site photos stay as they are (see Look above for the one order-section picture Kanna changed).
 
 QR codes (`infra/brand-qr.mjs`, used for the box cards): soft squares, rounded corner eyes and
 the egg logo in the middle, at error level H. Scanning comes first. The egg is 25% of the code's
