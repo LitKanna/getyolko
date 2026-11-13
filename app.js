@@ -202,12 +202,18 @@ function chalkHeroUrls(p) {
   };
 }
 
-function chalkOrderUrls(p) {
-  return {
-    primary: `assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}`,
-    webpSrcset: `assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}`,
-    alt: chalkAlt(p),
-  };
+/* The order section shows a real photograph of an egg on toast with a small
+   YOLKO tag (Kanna, 13 Nov 2026). It has no price in it, so it never swaps with
+   the tray price the way the hero does. */
+const ORDER_PICTURE_VER = "1";
+const ORDER_PICTURE_ALT = "A fried egg on a slice of toast, seen from above among rows of golden toast";
+
+function orderBrandPicture(active, idAttr) {
+  const v = ORDER_PICTURE_VER;
+  return `<picture class="order-tray-photo${active}">
+      <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=${v} 1x, assets/brand/order-picture-1120.webp?v=${v} 2x">
+      <img${idAttr} src="assets/brand/order-picture-560.jpg?v=${v}" srcset="assets/brand/order-picture-560.jpg?v=${v} 1x, assets/brand/order-picture-1120.jpg?v=${v} 2x" alt="${ORDER_PICTURE_ALT}" width="560" height="560" loading="lazy" decoding="async">
+    </picture>`;
 }
 
 function waitMs(ms) {
@@ -217,14 +223,13 @@ function waitMs(ms) {
 let chalkSwapToken = 0;
 
 async function swapChalkPicture(pic, p) {
-  const kind = pic.getAttribute("data-chalk-price");
   const source = pic.querySelector("source:not([data-chalk-hold])");
   const img = pic.querySelector("img:not([data-chalk-hold])");
   if (!img) return;
 
   if (img.dataset.chalkShowing === String(p)) return;
 
-  const urls = kind === "hero" ? chalkHeroUrls(p) : chalkOrderUrls(p);
+  const urls = chalkHeroUrls(p);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // No JPG preload here: the browser picks the WebP size from srcset, and the
@@ -241,21 +246,15 @@ async function swapChalkPicture(pic, p) {
   hold.classList.add("chalk-hold");
   pic.appendChild(hold);
 
-  if (kind === "hero") {
-    if (source) {
-      source.srcset = urls.webpSrcset;
-      source.sizes = HERO_SIZES;
-    }
-    img.src = urls.primary;
-    img.srcset = urls.imgSrcset;
-    img.sizes = HERO_SIZES;
-    img.width = 1536;
-    img.height = 1536;
-  } else {
-    if (source) source.srcset = urls.webpSrcset;
-    img.src = urls.primary;
-    img.removeAttribute("srcset");
+  if (source) {
+    source.srcset = urls.webpSrcset;
+    source.sizes = HERO_SIZES;
   }
+  img.src = urls.primary;
+  img.srcset = urls.imgSrcset;
+  img.sizes = HERO_SIZES;
+  img.width = 1536;
+  img.height = 1536;
   img.alt = urls.alt;
   img.dataset.chalkShowing = String(p);
 
@@ -277,7 +276,7 @@ async function swapChalkPicture(pic, p) {
 function applyChalkPriceImage(trayPrice) {
   const p = chalkPriceKey(trayPrice);
   const token = ++chalkSwapToken;
-  const pics = [...document.querySelectorAll("picture[data-chalk-price]")];
+  const pics = [...document.querySelectorAll('picture[data-chalk-price="hero"]')];
   pics.forEach((pic) => { pic.dataset.chalkSwapPending = String(p); });
 
   // Fire-and-forget async crossfades; never blank the frame while loading.
@@ -330,17 +329,10 @@ function buildHeroPicture(item, index) {
 }
 
 function buildOrderPicture(item, index) {
-  const isChalk = item.kind === "chalk";
   const active = index === 0 ? " is-active" : "";
-  const chalkAttr = isChalk ? ' data-chalk-price="order"' : "";
   const idAttr = index === 0 ? ' id="order-tray-img"' : "";
-  if (isChalk) {
-    const p = chalkPriceKey(item.chalkPrice || BUNDLES.tray1.price);
-    return `<picture class="order-tray-photo${active}"${chalkAttr}>
-      <source type="image/webp" srcset="assets/chalk-tray/${p}-square-560.webp?v=${CHALK_ASSET_VER}">
-      <img${idAttr} src="assets/chalk-tray/${p}-square-560.jpg?v=${CHALK_ASSET_VER}" alt="${chalkAlt(p)}" width="560" height="560" data-chalk-showing="${p}" loading="lazy" decoding="async">
-    </picture>`;
-  }
+  // The chalkboard photo's place in the order section is the egg on toast picture.
+  if (item.kind === "chalk") return orderBrandPicture(active, idAttr);
   const sq = item.square || {};
   const jpg = withVer(sq.jpg || item.preview);
   const webp = sq.webp ? withVer(sq.webp) : "";

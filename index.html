@@ -694,30 +694,10 @@
         <div class="shop-card">
           <div class="shop-product">
             <div class="order-tray-rotator" data-rotator="order" aria-hidden="true">
-              <picture class="order-tray-photo is-active" data-chalk-price="order">
-                <source type="image/webp">
-                <img id="order-tray-img" width="560" height="560" loading="lazy" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray">
+              <picture class="order-tray-photo is-active">
+                <source type="image/webp" srcset="assets/brand/order-picture-560.webp?v=1 1x, assets/brand/order-picture-1120.webp?v=1 2x">
+                <img id="order-tray-img" src="assets/brand/order-picture-560.jpg?v=1" srcset="assets/brand/order-picture-560.jpg?v=1 1x, assets/brand/order-picture-1120.jpg?v=1 2x" width="560" height="560" loading="lazy" decoding="async" alt="A fried egg on a slice of toast, seen from above among rows of golden toast">
               </picture>
-              <script>
-              (function () {
-                var FALLBACK = 13, VER = "112", MIN = 1, MAX = 30;
-                var p = (window.__YOLKO_TRAY1 >= MIN && window.__YOLKO_TRAY1 <= MAX) ? window.__YOLKO_TRAY1 : FALLBACK;
-                try {
-                  var c = Math.round(Number(localStorage.getItem("yolko.tray1Price")));
-                  if (c >= MIN && c <= MAX) p = c;
-                } catch (e) {}
-                window.__YOLKO_TRAY1 = p;
-                var pic = document.currentScript.previousElementSibling;
-                var source = pic && pic.querySelector("source");
-                var img = pic && pic.querySelector("img");
-                if (source) source.srcset = "assets/chalk-tray/" + p + "-square-560.webp?v=" + VER;
-                if (img) {
-                  img.src = "assets/chalk-tray/" + p + "-square-560.jpg?v=" + VER;
-                  img.alt = "Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $" + p + " a tray";
-                  img.dataset.chalkShowing = String(p);
-                }
-              })();
-              </script>
             </div>
             <h3>Pace Farm eggs, 30 to a tray</h3>
             <ul class="tick-list">
@@ -1098,6 +1078,6 @@
   </footer>
 
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=155"></script>
+  <script src="app.js?v=156"></script>
 </body>
 </html>
