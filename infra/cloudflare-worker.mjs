@@ -853,9 +853,9 @@ const EMAIL_C = { canvas: "#faf7f0", paper: "#ffffff", ink: "#14120e", ink2: "#3
 // iPad and Mac), which Kanna picked on 12 Nov 2026 from four drawn options. Other devices fall
 // through to their own font, as before.
 const EMAIL_FONT = `'Plus Jakarta Sans',ui-rounded,'SF Pro Rounded',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
-// WhatsApp Business is not live on the shop's line yet, so the emails ask for a reply only.
-// Once it is live, set this to `https://wa.me/${LINE_NUMBER.replace(/\D/g, "")}`.
-const EMAIL_WA = "";
+// WhatsApp Business is live on the shop's own line (13 Nov 2026), so the emails offer it beside
+// a reply. Set this to "" and they ask for a reply only.
+const EMAIL_WA = `https://wa.me/${LINE_NUMBER.replace(/\D/g, "")}`;
 const EMAIL_HELP_TEXT = EMAIL_WA ? `Questions? Reply to this email or WhatsApp us: ${EMAIL_WA}` : "Questions? Reply to this email.";
 const EMAIL_IMG = "https://getyolko.com/assets/brand/email";
 

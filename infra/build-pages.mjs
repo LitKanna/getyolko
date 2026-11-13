@@ -40,9 +40,9 @@ const MAP_V = "1";
 // YOLKO's own line, 0480 093 935 (a Telnyx number, see phone-line.mjs). Kanna's own mobile
 // must never show on a page (Kanna, 13 Nov 2026).
 const PHONE = "+61480093935";
-// WhatsApp Business is not live on the line yet, so the pages ask for an email. Once it is
-// live, set this to "https://wa.me/61480093935" and rebuild: the WhatsApp links come back.
-const WHATSAPP = "";
+// WhatsApp Business is live on the line (13 Nov 2026), so the pages offer WhatsApp beside the
+// email. Only ever the shop's own line here. Set this to "" and rebuild to take the links off.
+const WHATSAPP = "https://wa.me/61480093935";
 const EMAIL = "orders@getyolko.com";
 /** A link that asks people to get in touch: WhatsApp when it is live, email until then. */
 const contactLink = (onWhatsApp, byEmail) => (WHATSAPP
