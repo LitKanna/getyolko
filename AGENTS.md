@@ -32,9 +32,23 @@ same zone data checkout uses) or `infra/build-areas-page.mjs` (the A to Z suburb
 `node infra/build-pages.mjs && node infra/build-areas-page.mjs`. Never put the Sydney Markets
 address or its 2129 postcode on any page: YOLKO is a home-based, service-area business.
 
+The three plain pages (`privacy.html`, `terms.html`, `data-deletion.html`) keep their words by
+hand, but the build writes their icon links, stylesheet links, header and footer (markers
+`icons`, `styles`, `header`, `footer`), so they always match the shop. Their body is
+`<article class="legal">` with a `.legal-head` (title, date) and a `.legal-body`.
+
+### Polish, not a new look (14 Nov 2026)
+Kanna turned down 21 proposed new looks and chose "Polish the site I have now": no new look, go
+page by page fixing spacing, sizes and anything untidy, and show each fix as a before and after
+picture. Round 1 (build 251): the plain pages got the shop header and footer; on
+`/egg-delivery-areas` the A to Z fold (`.az-all`) sits under the map and the search card is one
+row; on phones the hero facts stack and suburb chips inside a card become a two-column grid;
+paired cards with a button (`.panel:has(> .hero-cta)`) line their buttons up; short pages
+(`.legal`, `.notfound`) push the footer to the bottom of the screen.
+
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
-big ExtraBold headings (hero up to 92px, tight letter spacing), sentence case, no trailing full
+big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
 stop. Colours are tokens in `:root` of `styles-modern.css`: cream page `#faf7f0`, white cards,
 ink `#14120e`, muted `#6b675e`, yolk `#ffd32a`, green `#1f7a4d` only for the stock dot. Yolk
 yellow is for the logo's yolk, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
@@ -48,32 +62,6 @@ egg on toast, with the YOLKO logo only as a small cream tag in the corner. It is
 YOLKO's own eggs, so never caption it as one, and never swap in a drawn or computer-made picture. It
 has no price in it, so it does not swap with the tray price the way the hero does
 (`orderBrandPicture` in `app.js`).
-
-### "Posters" look (14 Nov 2026)
-Kanna asked for every page to look better on computers and phones. The idea carries the Big yolk
-order poster to the whole site: each section is one big rounded block of ink, yolk or white on
-the cream page (`--r-poster`), with large type and little else. Colours on an ink block are the
-`--on-ink*` tokens, soft text on yolk is `--on-yolk-soft`; yellow is never used for words on a
-light ground. No gradients, grain, hover lifts or scroll fade-ins.
-- Hero (`.hero-grid`): an ink poster with the words on the left and the chalk-tray photo on the
-  right. The photo is always square and never cropped. From 1200px it runs to the poster's edge
-  and sets the poster's height (`--hero-photo`); from 901 to 1199px it sits in a 20px frame; at
-  900px and under the poster stacks (words, buttons, framed photo, the three facts). The h1 is
-  sized from its own column (`cqw`) and the screen height (`--vvh`), so it never wraps to a fourth
-  line or pushes the next section into view. From 1700px the page is 1440px wide.
-- How it works (`.how > .wrap`) and any `.ink-poster`: ink blocks. `.duo` is two columns inside
-  one (the bulk page), split by a hairline when stacked on a phone.
-- Prices (`.price-cards`): one yolk board, three columns split by hairlines, giant prices with a
-  small dollar sign (`.pc-cur`) and ink Order buttons. On the Sydney page it sits between the two
-  ink posters so they never touch.
-- Suburbs page: the finder is a yolk poster; the A to Z list is a closed fold right under the
-  map, so the yellow closing band is always the last thing before the footer.
-- 404 and the legal pages: an ink poster for the title. `privacy.html`, `terms.html` and
-  `data-deletion.html` are written by hand, but the build fills their `icons`, `styles`, `header`
-  and `footer` markers, so they carry the same header and footer as every other page.
-- The phone order bar has a faint cream ring so it stays readable over an ink poster.
-Before calling a change live, look at each page at 1920x1080, 1440x900, 1366x768, 1536x734,
-390x844, 375x667 and 412x915.
 
 ### Order section: "Big yolk" (13 Nov 2026)
 Kanna called the old order card "old style and cluttered", picked this from three drawn
@@ -109,8 +97,8 @@ Plus Jakarta Sans ExtraBold. Kanna picked it on 11 Nov 2026 and asked for it eve
 Masters are in `assets/brand/` (`yolko-logo.svg`, `yolko-logo-white.svg`, `yolko-egg.svg`); the
 paths every page uses live in `infra/brand.mjs` (a light copy, about 2 KB a logo). `build-pages.mjs`
 writes the header logo, the footer logo (white, reusing the header's shapes) and the icon links
-into every page, including `index.html` and the three plain pages, between `brand`, `brand-foot`
-and `icons` markers. The header logo draws itself once per visit ("Yolk pen", `LOGO_MOTION`): the
+into every page, including `index.html`, between `brand`, `brand-foot` and `icons` markers (the
+three plain pages get the whole header and footer from the build instead). The header logo draws itself once per visit ("Yolk pen", `LOGO_MOTION`): the
 yolk paints the egg, glides to the centre and the name slides out. It never runs with reduced
 motion, and the whole logo is in the HTML, so it shows without script. Icons: `favicon.ico`,
 `assets/favicon.svg` (white egg on a black tile, stroke thickened for tab size),

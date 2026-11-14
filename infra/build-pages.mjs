@@ -588,7 +588,7 @@ function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.
             <h3>${p.name}</h3>
             <p class="pc-meta">${p.eggs} eggs · ${perEgg(p.price, p.eggs)}¢ an egg</p>
             <div class="pc-row">
-              <span class="pc-price"><span class="pc-cur">$</span>${p.price}</span>
+              <span class="pc-price">$${p.price}</span>
               <a class="btn btn-solid btn-small" href="/?b=${k}#order" aria-label="Order ${p.name.toLowerCase()}">Order</a>
             </div>
           </li>`;
@@ -912,8 +912,6 @@ ${heroSection({
     secondary: ["Check your suburb", "#map-title"],
   })}
 
-${priceCards("Prices")}
-
 ${timeline("How Saturday delivery works", STEPS(`To your door, $${PRICE.delivery} flat, anywhere in the delivery area.`))}
 
 ${mapPanel("We deliver to nearly 700 Sydney suburbs", `From Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. Same Saturday run, same $${PRICE.delivery} delivery.`, suburbCheck("map-q"))}
@@ -926,6 +924,8 @@ ${cards}
         </ul>
       </div>
     </section>
+
+${priceCards("Prices")}
 
 ${faqSection("Sydney delivery questions", faqs)}
 
@@ -981,18 +981,22 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
     </section>
 
     <section class="band" aria-labelledby="wholesale-title">
-      <div class="wrap ink-poster">
+      <div class="wrap">
 ${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 dozen box at one price for everyone. No trade account and no contract.", "wholesale-title")}
-        <div class="duo">
-          <div>
-            <h3>Order online</h3>
-            <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
-            <a class="btn btn-solid" href="/?b=box#order">Order a box</a>
+      </div>
+      <div class="wrap local-row">
+        <div class="panel">
+          <h2>Weekly standing orders</h2>
+          <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
+          <div class="hero-cta">
+            <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
           </div>
-          <div>
-            <h3>Weekly standing orders</h3>
-            <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
-            <a class="btn btn-ghost" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
+        </div>
+        <div class="panel">
+          <h2>Order online</h2>
+          <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
+          <div class="hero-cta">
+            <a class="btn btn-solid" href="/?b=box#order">Order a box</a>
           </div>
         </div>
       </div>
@@ -1213,13 +1217,11 @@ function notFoundPage() {
   const body = `  <main>
     <section class="notfound">
       <div class="wrap">
-        <div class="notfound-poster">
-          <h1>Page not found</h1>
-          <p>The link may be old or mistyped. Here are some good places to start.</p>
-          <div class="hero-cta">
-            <a class="btn btn-solid btn-lg" href="/#order">Order eggs</a>
-            <a class="btn btn-ghost btn-lg" href="/">Home</a>
-          </div>
+        <h1>Page not found</h1>
+        <p>The link may be old or mistyped. Here are some good places to start.</p>
+        <div class="hero-cta">
+          <a class="btn btn-solid btn-lg" href="/#order">Order eggs</a>
+          <a class="btn btn-ghost btn-lg" href="/">Home</a>
         </div>
         <p class="local-nearby-label">Delivery pages</p>
         <ul class="local-siblings">
