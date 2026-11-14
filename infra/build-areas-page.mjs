@@ -35,7 +35,7 @@ const rows = SUBURBS
   .map((s) => ({ ...s, q: quoteDelivery({ lat: s.lat, lng: s.lng, name: s.name, crossing: s.crossing }) }))
   .filter((s) => s.q.deliver);
 
-// A to Z in one compact block at the bottom of the page. People use the search box
+// A to Z in one compact block, in a closed fold under the map. People use the search box
 // at the top; the list is there so every suburb name and postcode is on the page.
 const letters = [...new Set(rows.map((s) => s.name[0].toUpperCase()))].sort();
 const blocks = letters.map((letter) => {

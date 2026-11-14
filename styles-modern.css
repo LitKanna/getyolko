@@ -1,5 +1,6 @@
-/* YOLKO storefront, 2026 redesign (Figma: "YOLKO Website 2026").
+/* YOLKO storefront, 2026 redesign (Figma: "YOLKO Website 2026"), "Posters" look (Nov 2026).
    One font (Plus Jakarta Sans), cream page, ink text, yolk yellow for the main actions.
+   Each section is one big rounded block of ink, yolk or white, like the Big yolk order poster.
    Shared by index.html and every page infra/build-pages.mjs writes. */
 
 :root {
@@ -20,7 +21,7 @@
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
   --gutter: clamp(20px, 4vw, 48px);
-  --max: 1200px;
+  --max: 1320px;
   /* --vvh / --app-height come from the visualViewport script in the page head */
   --vvh: 1svh;
   --vvw: 1vw;
@@ -30,12 +31,19 @@
   --announce-h: 40px;
   --topbar-h: 76px;
   --section: clamp(72px, 8.5vw, 120px);
+  /* A poster: the hero, the order stage, How it works, the price board, the map, the closing band. */
+  --r-poster: clamp(28px, 3.7vw, 44px);
   --r-xl: clamp(26px, 2.8vw, 40px);
   --r-lg: clamp(22px, 2.2vw, 32px);
   --r-md: 18px;
   --r-sm: 14px;
   --shadow-card: 0 1px 2px rgba(20, 18, 14, 0.04), 0 4px 14px rgba(20, 18, 14, 0.04);
   --shadow-float: 0 22px 48px -12px rgba(20, 18, 14, 0.24);
+  /* Words and hairlines on an ink poster. */
+  --on-ink: #faf7f0;
+  --on-ink-soft: rgba(250, 247, 240, 0.72);
+  --on-ink-line: rgba(250, 247, 240, 0.18);
+  --on-yolk-soft: rgba(20, 18, 14, 0.76);
 }
 
 * {
@@ -375,20 +383,29 @@ section {
   content: " →";
 }
 
-/* ---------- Hero ---------- */
+/* ---------- Hero ----------
+   An ink poster that fills the first screen. The words sit on the ink and the chalk-tray
+   photo, always square, runs to the poster's edge on wide screens. On narrower ones it
+   sits inside the poster in a frame, like the photo in the order poster. */
 .hero {
-  --hero-photo: min(560px, 44vw, calc(var(--frame-h) - var(--topbar-h) - var(--announce-h) - 96px));
+  --poster-cap: 720px;
+  --poster-h: clamp(440px, calc(var(--frame-h) - var(--topbar-h) - var(--announce-h) - 40px), var(--poster-cap));
+  --poster-pad: clamp(24px, min(4.2vw, 6 * var(--vvh)), 64px);
+  --hero-photo: min(var(--poster-h), 50vw);
   display: flex;
   align-items: center;
   min-height: calc(var(--frame-h) - var(--topbar-h) - var(--announce-h));
-  padding: clamp(24px, 4 * var(--vvh), 48px) 0 clamp(40px, 6 * var(--vvh), 72px);
+  padding: 8px 0 32px;
 }
 
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: clamp(40px, 5vw, 72px);
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: var(--r-poster);
+  color: var(--on-ink);
+  background: var(--ink);
 }
 
 /* Hero spacing steps up with the hierarchy: heading and line sit close (24),
@@ -398,7 +415,11 @@ section {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   min-width: 0;
+  padding: var(--poster-pad);
+  /* The heading is sized from this column's width, so it never outgrows the photo beside it. */
+  container-type: inline-size;
 }
 
 .hero .crumbs {
@@ -414,24 +435,23 @@ section {
 }
 
 .hero h1 {
-  max-width: 11.5ch;
   margin: 0;
-  font-size: clamp(42px, min(5.6vw, 10.4 * var(--vvh)), 80px);
-  line-height: 0.98;
+  font-size: clamp(40px, min(14.4cqw, 10.4 * var(--vvh)), 92px);
+  line-height: 0.96;
   letter-spacing: -0.045em;
 }
 
 .hero-sub {
-  max-width: 34ch;
+  max-width: 30ch;
   margin: 0;
-  color: var(--muted);
+  color: var(--on-ink-soft);
   font-size: clamp(17px, 0.5vw + 14px, 21px);
   line-height: 1.5;
 }
 
 .hero-sub b,
 .hero-sub strong {
-  color: var(--ink);
+  color: var(--white);
 }
 
 .hero-sub strong {
@@ -448,21 +468,38 @@ section {
   gap: 12px;
 }
 
+/* On the ink poster the second button is a cream outline. */
+.hero .btn-ghost {
+  color: var(--on-ink);
+  border-color: rgba(250, 247, 240, 0.55);
+}
+
+.hero .btn-ghost:hover {
+  color: var(--ink);
+  background: var(--on-ink);
+  border-color: var(--on-ink);
+}
+
+.hero :focus-visible {
+  outline-color: var(--yolk);
+}
+
 .hero-facts {
   display: flex;
   flex-wrap: wrap;
   align-self: stretch;
-  gap: 10px 28px;
+  justify-content: space-between;
+  gap: 10px 14px;
   margin-top: clamp(28px, 4.4 * var(--vvh), 40px);
   padding-top: clamp(20px, 2.8 * var(--vvh), 24px);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--on-ink-line);
 }
 
 .hero-facts li {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
@@ -478,17 +515,49 @@ section {
 
 .hero-showcase {
   position: relative;
+  align-self: center;
   width: var(--hero-photo);
 }
 
-/* Chalk-tray heroes are square. Keep 1 / 1 (AGENTS.md). */
+/* Chalk-tray heroes are square. Keep 1 / 1 (AGENTS.md). The poster clips the outer corners. */
 .showcase-card {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border-radius: var(--r-lg);
   background: #2a2620;
+}
+
+/* Between the phone layout and wide screens the words need more of the width, so the
+   photo is smaller and sits in a frame inside the poster. */
+@media (min-width: 901px) and (max-width: 1199px) {
+  .hero {
+    /* As big as the first screen allows, while the words keep about 470px. */
+    --hero-photo: min(calc(var(--poster-h) - 40px), max(40vw, calc(100vw - 2 * var(--gutter) - 490px)));
+  }
+
+  .hero-grid {
+    padding: 20px 20px 20px 0;
+  }
+
+  .hero-copy {
+    padding: calc(var(--poster-pad) - 20px) clamp(20px, 3vw, 36px) calc(var(--poster-pad) - 20px) var(--poster-pad);
+  }
+
+  .showcase-card {
+    border-radius: calc(var(--r-poster) - 12px);
+  }
+}
+
+/* Big monitors: everything gets a little more room, and the hero poster a little more height. */
+@media (min-width: 1700px) {
+  :root {
+    --max: 1440px;
+  }
+
+  .hero {
+    --poster-cap: 800px;
+  }
 }
 
 .showcase-rotator {
@@ -589,6 +658,19 @@ section {
   color: var(--line-strong);
 }
 
+.hero .crumbs {
+  color: rgba(250, 247, 240, 0.6);
+}
+
+.hero .crumbs a:hover,
+.hero .crumbs [aria-current="page"] {
+  color: var(--on-ink);
+}
+
+.hero .crumbs-sep {
+  color: rgba(250, 247, 240, 0.3);
+}
+
 /* ---------- Section heads ---------- */
 .section-head {
   display: grid;
@@ -633,7 +715,7 @@ section {
    Sizes inside the poster follow its own width (cqw), so the words never grow taller
    than the square photo beside them. */
 .order {
-  padding: clamp(32px, 4vw, 56px) 0 var(--section);
+  padding: 0 0 var(--section);
 }
 
 .order-form {
@@ -643,7 +725,7 @@ section {
 }
 
 .order-stage {
-  --stage-r: 32px;
+  --stage-r: var(--r-poster);
   --photo-pad: 0px;
   --photo-r: 0px;
   overflow: hidden;
@@ -1352,7 +1434,6 @@ section {
   }
 
   .order-stage {
-    --stage-r: clamp(32px, 3.7vw, 44px);
     --photo-pad: 14px;
     --photo-r: calc(var(--stage-r) - var(--photo-pad));
     display: grid;
@@ -1606,9 +1687,78 @@ section {
   gap: 10px;
 }
 
-/* ---------- How it works: timeline ---------- */
+/* ---------- How it works: timeline, on an ink poster ---------- */
 .how {
   padding: 0 0 var(--section);
+}
+
+.how > .wrap,
+.ink-poster {
+  padding: clamp(32px, 5vw, 72px);
+  border-radius: var(--r-poster);
+  color: var(--on-ink);
+  background: var(--ink);
+}
+
+.how .section-head,
+.ink-poster .section-head {
+  margin-bottom: clamp(36px, 4.4vw, 60px);
+}
+
+.how .section-head h2,
+.ink-poster .section-head h2 {
+  max-width: none;
+}
+
+.how .section-head p,
+.ink-poster .section-head p {
+  color: var(--on-ink-soft);
+}
+
+.ink-poster :focus-visible {
+  outline-color: var(--yolk);
+}
+
+/* Two ways to do one thing, side by side on an ink poster (bulk page). */
+.duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(28px, 4vw, 64px);
+  padding-top: clamp(28px, 3.4vw, 48px);
+  border-top: 1px solid var(--on-ink-line);
+}
+
+.duo > div {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 12px;
+}
+
+.duo h3 {
+  margin: 0;
+  font-size: clamp(28px, 1.9vw + 14px, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.duo p {
+  max-width: 44ch;
+  margin: 0 0 12px;
+  color: var(--on-ink-soft);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.ink-poster .btn-ghost {
+  color: var(--on-ink);
+  border-color: rgba(250, 247, 240, 0.55);
+}
+
+.ink-poster .btn-ghost:hover {
+  color: var(--ink);
+  background: var(--on-ink);
+  border-color: var(--on-ink);
 }
 
 .timeline {
@@ -1634,7 +1784,7 @@ section {
   z-index: 1;
   width: 22px;
   height: 22px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--yolk);
   border-radius: 50%;
   background: var(--yolk);
 }
@@ -1646,26 +1796,27 @@ section {
   right: 0;
   top: 10px;
   height: 2px;
-  background: rgba(20, 18, 14, 0.18);
+  background: rgba(250, 247, 240, 0.24);
 }
 
 .tl-when {
-  color: var(--muted);
-  font-size: 15px;
+  color: var(--yolk);
+  font-size: 16px;
   font-weight: 700;
 }
 
 .timeline h3 {
   margin: 0;
-  font-size: clamp(22px, 1vw + 14px, 28px);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-size: clamp(28px, 1.9vw + 14px, 44px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
 }
 
 .timeline p {
   max-width: 36ch;
   margin: 0;
-  color: var(--muted);
+  color: var(--on-ink-soft);
+  font-size: 17px;
   line-height: 1.6;
 }
 
@@ -1683,27 +1834,29 @@ section {
 .save-card {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding: clamp(24px, 2.4vw, 34px);
+  gap: 10px;
+  padding: clamp(26px, 2.8vw, 44px);
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
 }
 
+/* The saving itself, in poster type. */
 .save-big {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
-  margin: 0 0 10px;
-  font-size: clamp(44px, 3vw + 16px, 56px);
+  gap: 0 12px;
+  margin: 0 0 clamp(20px, 3vw, 44px);
+  font-size: clamp(64px, 5.4vw + 12px, 104px);
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.045em;
+  line-height: 0.86;
+  letter-spacing: -0.06em;
 }
 
 .save-big > span:last-child {
   color: var(--muted);
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -1716,8 +1869,8 @@ section {
 
 .save-card h3 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: -0.015em;
+  font-size: clamp(22px, 0.6vw + 18px, 28px);
+  letter-spacing: -0.025em;
 }
 
 .save-card p {
@@ -1734,6 +1887,21 @@ section {
   margin-top: 6px;
 }
 
+/* The box is the yolk tile. */
+.save-card:nth-child(3) {
+  background: var(--yolk);
+  box-shadow: none;
+}
+
+.save-card:nth-child(3) p,
+.save-card:nth-child(3) .save-big > span:last-child {
+  color: var(--on-yolk-soft);
+}
+
+.save-card:nth-child(3) .save-big {
+  color: var(--ink);
+}
+
 /* ---------- Delivery areas ---------- */
 .areas {
   padding: 0 0 var(--section);
@@ -1745,7 +1913,7 @@ section {
   align-items: center;
   gap: clamp(32px, 4vw, 64px);
   padding: clamp(28px, 4.4vw, 64px);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-poster);
   background: var(--paper);
   box-shadow: var(--shadow-card);
 }
@@ -2055,7 +2223,7 @@ section {
   flex-wrap: wrap;
   gap: 28px 40px;
   padding: clamp(32px, 5vw, 72px);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-poster);
   background: var(--yolk);
 }
 
@@ -2201,7 +2369,8 @@ section {
   border-radius: 999px;
   color: var(--white);
   background: var(--ink);
-  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.28);
+  /* The hairline keeps the bar's edge when it passes over an ink poster. */
+  box-shadow: 0 0 0 1px rgba(250, 247, 240, 0.18), 0 14px 34px rgba(20, 18, 14, 0.28);
   transform: translateY(160%);
   transition: transform 320ms var(--ease);
 }
@@ -2235,8 +2404,15 @@ section {
   padding: 0 0 var(--section);
 }
 
-.band-first {
-  padding-top: clamp(16px, 2vw, 32px);
+/* Under the hero poster: a section that opens with its heading on the cream page gets air,
+   and one that opens with a block sits close to it, the way the order poster does. */
+.hero + .band {
+  padding-top: clamp(28px, 4vw, 56px);
+}
+
+.hero + .band-first,
+.hero + .areas-finder {
+  padding-top: 0;
 }
 
 .local-row {
@@ -2281,46 +2457,69 @@ section {
   font-weight: 700;
 }
 
+/* The three packs: one yolk board, the price in the same giant type as the order poster. */
 .price-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  overflow: hidden;
+  border-radius: var(--r-poster);
+  background: var(--yolk);
 }
 
 .price-cards li {
   display: grid;
-  gap: 4px;
-  padding: clamp(24px, 2.4vw, 32px);
-  border-radius: var(--r-lg);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
+  gap: 2px;
+  padding: clamp(26px, 3.2vw, 48px);
+}
+
+.price-cards li + li {
+  border-left: 1.5px solid rgba(20, 18, 14, 0.14);
 }
 
 .price-cards h3 {
   margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.015em;
+  font-size: clamp(22px, 0.6vw + 18px, 28px);
+  letter-spacing: -0.025em;
 }
 
 .price-cards .pc-meta {
   margin: 0;
-  color: var(--muted);
+  color: var(--on-yolk-soft);
   font-size: 15px;
+  font-weight: 600;
 }
 
 .price-cards .pc-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 18px;
+  margin-top: clamp(28px, 4vw, 56px);
 }
 
 .price-cards .pc-price {
-  font-size: clamp(40px, 2vw + 20px, 48px);
+  display: flex;
+  align-items: flex-start;
+  font-size: clamp(76px, 7.4vw, 124px);
   font-weight: 800;
+  line-height: 0.78;
+  letter-spacing: -0.065em;
+}
+
+.price-cards .pc-cur {
+  margin: 0.02em 0.06em 0 0;
+  font-size: 0.44em;
   line-height: 1;
-  letter-spacing: -0.045em;
+  letter-spacing: 0;
+}
+
+.price-cards .btn-solid {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.price-cards .btn-solid:hover {
+  background: #000;
 }
 
 .price-table {
@@ -2539,6 +2738,11 @@ section {
   gap: 12px;
 }
 
+/* Tiles in a row share one height, however their second line wraps. */
+.local-suburbs li {
+  display: grid;
+}
+
 .local-suburbs .all a {
   color: var(--white);
   background: var(--ink);
@@ -2554,6 +2758,7 @@ section {
 
 .local-suburbs a {
   display: grid;
+  align-content: start;
   gap: 2px;
   padding: 20px 22px;
   border: 1.5px solid transparent;
@@ -2586,13 +2791,54 @@ section {
 }
 
 /* Delivery areas finder (/egg-delivery-areas) */
+/* The search is what this page is for, so it gets the yolk poster. The map sits close under it. */
+.areas-finder {
+  padding-bottom: clamp(20px, 2.4vw, 32px);
+}
+
 .areas-finder .panel {
   gap: 20px;
+  padding: clamp(28px, 4.4vw, 64px);
+  border-radius: var(--r-poster);
+  background: var(--yolk);
+  box-shadow: none;
+}
+
+.areas-finder .panel h2 {
+  font-size: clamp(34px, 3.2vw + 8px, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.areas-finder .panel > p {
+  color: var(--on-yolk-soft);
+  font-weight: 600;
 }
 
 .areas-finder .suburb-check {
-  max-width: 560px;
+  max-width: 640px;
+  min-height: 72px;
   padding-right: 22px;
+  border-color: transparent;
+  background: var(--paper);
+}
+
+.areas-finder .suburb-check input {
+  font-size: 18px;
+}
+
+.areas-finder .suburb-check:focus-within {
+  border-color: var(--ink);
+}
+
+.areas-finder .area-status {
+  color: var(--ink);
+}
+
+/* Nothing typed yet: the empty line takes no room, so the poster ends under the box. */
+.areas-finder .area-status:empty {
+  min-height: 0;
+  margin-top: -20px;
 }
 
 .area-status {
@@ -2611,14 +2857,22 @@ section {
   margin-top: -4px;
 }
 
-/* All suburbs, A to Z: one quiet fold at the bottom of /egg-delivery-areas */
+/* All suburbs, A to Z: one closed fold on /egg-delivery-areas, a white panel close under the map */
+.az-all {
+  margin-top: clamp(12px, 1.6vw, 20px);
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
 .az-all summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 600;
+  position: relative;
+  display: block;
+  padding: clamp(22px, 2.4vw, 32px) clamp(72px, 7vw, 96px) clamp(22px, 2.4vw, 32px) clamp(24px, 3vw, 40px);
+  font-size: clamp(20px, 0.8vw + 16px, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
   list-style: none;
   cursor: pointer;
 }
@@ -2627,22 +2881,33 @@ section {
   display: none;
 }
 
+/* The same round plus as the questions. */
 .az-all summary::after {
-  content: "+";
-  font-size: 18px;
-  font-weight: 500;
+  content: "";
+  position: absolute;
+  right: clamp(22px, 2.6vw, 36px);
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--sand) center / 14px 14px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%2314120e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  transition: transform 220ms var(--ease), background-color 180ms ease;
+}
+
+.az-all summary:hover::after {
+  background-color: var(--line);
 }
 
 .az-all[open] summary::after {
-  content: "−";
-}
-
-.az-all summary:hover {
-  color: var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 .az-list {
-  margin-top: 20px;
+  padding: 0 clamp(24px, 3vw, 40px) clamp(24px, 3vw, 40px);
   columns: 4 200px;
   column-gap: 32px;
   color: var(--muted);
@@ -2678,24 +2943,113 @@ section {
   font-weight: 600;
 }
 
+/* Page not found: the message on an ink poster, the delivery pages under it */
 .notfound {
-  padding: clamp(48px, 8vw, 120px) 0 var(--section);
+  padding: 8px 0 var(--section);
+}
+
+.notfound-poster {
+  margin-bottom: clamp(28px, 3vw, 40px);
+  padding: clamp(32px, 6vw, 88px) clamp(24px, 5vw, 72px);
+  border-radius: var(--r-poster);
+  color: var(--on-ink);
+  background: var(--ink);
 }
 
 .notfound h1 {
-  margin: 0 0 12px;
-  font-size: clamp(44px, 5vw, 72px);
-  line-height: 1;
+  margin: 0 0 16px;
+  font-size: clamp(44px, 6.4vw, 92px);
+  line-height: 0.96;
   letter-spacing: -0.045em;
 }
 
-.notfound p {
-  color: var(--muted);
-  font-size: 18px;
+.notfound-poster p {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--on-ink-soft);
+  font-size: clamp(17px, 0.5vw + 14px, 21px);
 }
 
 .notfound .hero-cta {
-  margin: 28px 0 48px;
+  margin-top: clamp(28px, 3vw, 40px);
+}
+
+.notfound-poster .btn-ghost {
+  color: var(--on-ink);
+  border-color: rgba(250, 247, 240, 0.55);
+}
+
+.notfound-poster .btn-ghost:hover {
+  color: var(--ink);
+  background: var(--on-ink);
+  border-color: var(--on-ink);
+}
+
+.notfound-poster :focus-visible {
+  outline-color: var(--yolk);
+}
+
+/* ---------- Privacy, terms, data deletion ----------
+   The page's name on an ink poster, then plain text at a width that reads easily. */
+.legal {
+  padding: 8px 0 var(--section);
+}
+
+.legal-head {
+  padding: clamp(32px, 5vw, 72px);
+  border-radius: var(--r-poster);
+  color: var(--on-ink);
+  background: var(--ink);
+}
+
+.legal-head h1 {
+  margin: 0;
+  font-size: clamp(40px, 5.6vw, 84px);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.legal-head p {
+  margin: 16px 0 0;
+  color: var(--on-ink-soft);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.legal-body {
+  max-width: calc(68ch + 2 * clamp(32px, 5vw, 72px));
+  padding: clamp(32px, 4vw, 56px) clamp(32px, 5vw, 72px) 0;
+  color: var(--ink-soft);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.legal-body h2 {
+  margin: 40px 0 12px;
+  color: var(--ink);
+  font-size: clamp(22px, 0.6vw + 18px, 28px);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.legal-body p,
+.legal-body li {
+  margin: 0 0 12px;
+}
+
+.legal-body ul {
+  padding-left: 22px;
+  list-style: disc;
+}
+
+.legal-body strong {
+  color: var(--ink);
+}
+
+.legal-body a {
+  color: var(--ink);
+  font-weight: 600;
+  text-underline-offset: 3px;
 }
 
 /* ---------- After paying: share link sheet ---------- */
@@ -2863,12 +3217,14 @@ section {
 
   .hero {
     min-height: 0;
-    padding: 20px 0 56px;
+    padding: 8px 0 20px;
   }
 
+  /* The poster holds the words, then the photo in a frame, then the facts. */
   .hero-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    padding: 28px 20px 22px;
+    border-radius: 28px;
   }
 
   /* On phones the photo sits between the button and the facts */
@@ -2881,7 +3237,7 @@ section {
   }
 
   .crumbs { order: 0; }
-  .hero h1 { order: 2; max-width: 12ch; }
+  .hero h1 { order: 2; font-size: clamp(38px, 11.4vw, 72px); }
   .hero-sub { order: 3; }
   .hero-cta { order: 4; }
   .hero-showcase { order: 5; }
@@ -2892,12 +3248,63 @@ section {
     margin-top: 32px;
   }
 
+  .showcase-card {
+    border-radius: 18px;
+  }
+
   .hero .hero-cta {
     margin-top: 32px;
   }
 
   .hero-facts {
-    margin-top: 32px;
+    justify-content: flex-start;
+    gap: 10px 24px;
+    margin-top: 22px;
+    padding-top: 18px;
+  }
+
+  .how > .wrap,
+  .ink-poster,
+  .legal-head {
+    padding: 32px 22px 34px;
+    border-radius: 28px;
+  }
+
+  .duo {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  /* Stacked, the second block gets the same hairline the first one sits under. */
+  .duo > div + div {
+    padding-top: 28px;
+    border-top: 1px solid var(--on-ink-line);
+  }
+
+  .duo .btn {
+    width: 100%;
+  }
+
+  .hero + .band {
+    padding-top: 28px;
+  }
+
+  .hero + .band-first,
+  .hero + .areas-finder {
+    padding-top: 0;
+  }
+
+  .crumbs {
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .legal-body {
+    padding: 28px 2px 0;
+  }
+
+  .notfound-poster {
+    border-radius: 28px;
   }
 
   .hero-cta .btn {
@@ -2927,10 +3334,22 @@ section {
   }
 
   .save-grid,
-  .price-cards,
   .local-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
+  }
+
+  .price-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .price-cards li + li {
+    border-top: 1.5px solid rgba(20, 18, 14, 0.14);
+    border-left: 0;
+  }
+
+  .price-cards .pc-row {
+    margin-top: 22px;
   }
 
   .local-suburbs {
@@ -2982,6 +3401,15 @@ section {
 @media (max-width: 640px) {
   .announce-more {
     display: none;
+  }
+
+  /* Two tiles across on a phone: tighter, so "2144 · Cumberland" stays on one line. */
+  .local-suburbs a {
+    padding: 16px;
+  }
+
+  .local-suburbs span {
+    font-size: 13px;
   }
 
   .areas-panel {

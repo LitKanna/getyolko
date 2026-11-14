@@ -24,7 +24,7 @@ import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 import { buildCoverageMap } from "./coverage-map.mjs";
 import { pricesBlocks, slot, PRICES_PATH } from "./prices-page.mjs";
-import { logoMaster, logoReuse, logoAlone, LOGO_MOTION, iconLinks } from "./brand.mjs";
+import { logoMaster, logoReuse, LOGO_MOTION, iconLinks } from "./brand.mjs";
 import { shareImage, SHARE_IMG_PX } from "./share-preview.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "158";
+const CSS_V = "159";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -486,10 +486,12 @@ const NAV = [
   ["Questions", "#faq"],
 ];
 
+const NO_FAQ = new Set(["/404", "/privacy", "/terms", "/data-deletion"]);
+
 function header(path) {
   const links = NAV.map(([label, href]) => {
-    // The 404 page has no FAQ of its own.
-    if (href === "#faq" && path === "/404") href = "/#faq";
+    // The 404 page and the three plain pages have no FAQ of their own.
+    if (href === "#faq" && NO_FAQ.has(path)) href = "/#faq";
     const current = href === path ? ' aria-current="page"' : "";
     return `        <a href="${href}"${current}>${label}</a>`;
   }).join("\n");
@@ -586,7 +588,7 @@ function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.
             <h3>${p.name}</h3>
             <p class="pc-meta">${p.eggs} eggs · ${perEgg(p.price, p.eggs)}¢ an egg</p>
             <div class="pc-row">
-              <span class="pc-price">$${p.price}</span>
+              <span class="pc-price"><span class="pc-cur">$</span>${p.price}</span>
               <a class="btn btn-solid btn-small" href="/?b=${k}#order" aria-label="Order ${p.name.toLowerCase()}">Order</a>
             </div>
           </li>`;
@@ -622,7 +624,8 @@ function suburbCheck(id) {
             </form>`;
 }
 
-function mapPanel(title, text, extra = "") {
+// `after` sits under the panel, close to it (the A to Z fold on the suburbs page).
+function mapPanel(title, text, extra = "", after = "") {
   return `    <section class="areas" aria-labelledby="map-title">
       <div class="wrap">
         <div class="areas-panel">
@@ -632,7 +635,7 @@ function mapPanel(title, text, extra = "") {
 ${extra}
           </div>
 ${mapFigure()}
-        </div>
+        </div>${after ? `\n${after}` : ""}
       </div>
     </section>`;
 }
@@ -909,6 +912,8 @@ ${heroSection({
     secondary: ["Check your suburb", "#map-title"],
   })}
 
+${priceCards("Prices")}
+
 ${timeline("How Saturday delivery works", STEPS(`To your door, $${PRICE.delivery} flat, anywhere in the delivery area.`))}
 
 ${mapPanel("We deliver to nearly 700 Sydney suburbs", `From Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. Same Saturday run, same $${PRICE.delivery} delivery.`, suburbCheck("map-q"))}
@@ -921,8 +926,6 @@ ${cards}
         </ul>
       </div>
     </section>
-
-${priceCards("Prices")}
 
 ${faqSection("Sydney delivery questions", faqs)}
 
@@ -978,22 +981,18 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
     </section>
 
     <section class="band" aria-labelledby="wholesale-title">
-      <div class="wrap">
+      <div class="wrap ink-poster">
 ${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 dozen box at one price for everyone. No trade account and no contract.", "wholesale-title")}
-      </div>
-      <div class="wrap local-row">
-        <div class="panel">
-          <h2>Weekly standing orders</h2>
-          <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
-          <div class="hero-cta">
-            <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
-          </div>
-        </div>
-        <div class="panel">
-          <h2>Order online</h2>
-          <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
-          <div class="hero-cta">
+        <div class="duo">
+          <div>
+            <h3>Order online</h3>
+            <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
             <a class="btn btn-solid" href="/?b=box#order">Order a box</a>
+          </div>
+          <div>
+            <h3>Weekly standing orders</h3>
+            <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
+            <a class="btn btn-ghost" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
           </div>
         </div>
       </div>
@@ -1155,24 +1154,18 @@ ${heroSection({
       </div>
     </section>
 
-${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`)}
+${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`, "", `        <details class="az-all">
+          <summary>All suburbs, A to Z</summary>
+          <div class="az-list">
+${list}
+          </div>
+        </details>`)}
 
 ${faqSection("Delivery area questions", faqs)}
 
 ${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.tray2}, and a box of 180 is $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
-
-    <section class="band az" aria-label="All suburbs we deliver to">
-      <div class="wrap">
-        <details class="az-all">
-          <summary>See all suburbs we deliver to, A to Z</summary>
-          <div class="az-list">
-${list}
-          </div>
-        </details>
-      </div>
-    </section>
   </main>`;
-  // The search reads the A to Z list at the bottom of the page and shows matches under the box.
+  // The search reads the A to Z list further down the page and shows matches under the box.
   const scripts = `  <script>
   (function () {
     var q = document.getElementById("area-q");
@@ -1220,11 +1213,13 @@ function notFoundPage() {
   const body = `  <main>
     <section class="notfound">
       <div class="wrap">
-        <h1>Page not found</h1>
-        <p>The link may be old or mistyped. Here are some good places to start.</p>
-        <div class="hero-cta">
-          <a class="btn btn-solid btn-lg" href="/#order">Order eggs</a>
-          <a class="btn btn-ghost btn-lg" href="/">Home</a>
+        <div class="notfound-poster">
+          <h1>Page not found</h1>
+          <p>The link may be old or mistyped. Here are some good places to start.</p>
+          <div class="hero-cta">
+            <a class="btn btn-solid btn-lg" href="/#order">Order eggs</a>
+            <a class="btn btn-ghost btn-lg" href="/">Home</a>
+          </div>
         </div>
         <p class="local-nearby-label">Delivery pages</p>
         <ul class="local-siblings">
@@ -1294,15 +1289,21 @@ function updateHome() {
   writeFileSync(file, html);
 }
 
-// The three plain pages (privacy, terms, data deletion) have no shop header: they get the icon
-// links and a logo that leads home, between the same kind of markers.
+// The three plain pages (privacy, terms, data deletion) are written by hand. The build gives
+// them the shop's own header, footer, icons and stylesheet, each between markers, so they look
+// like every other page and never fall behind it.
 function updatePlainPages() {
-  const brand = `  <a href="/" aria-label="YOLKO home" style="display:inline-block;margin-bottom:28px;color:#14120e">${logoAlone("brand-logo", "display:block;height:34px;width:auto;overflow:visible")}</a>`;
-  for (const name of ["privacy.html", "terms.html", "data-deletion.html"]) {
-    const file = join(ROOT, name);
+  const styles = `  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/fonts.css?v=${FONTS_V}">
+  <link rel="stylesheet" href="/styles-modern.css?v=${CSS_V}">`;
+  for (const name of ["privacy", "terms", "data-deletion"]) {
+    const file = join(ROOT, `${name}.html`);
+    const path = `/${name}`;
     let html = readFileSync(file, "utf8");
     html = fillMarker(html, "icons", iconLinks().map((l) => `  ${l}`).join("\n"));
-    html = fillMarker(html, "brand", brand);
+    html = fillMarker(html, "styles", styles);
+    html = fillMarker(html, "header", header(path));
+    html = fillMarker(html, "footer", `${footer(path)}\n\n${TOPBAR_SCRIPT}`);
     writeFileSync(file, html);
   }
 }

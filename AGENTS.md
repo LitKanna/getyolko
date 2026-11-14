@@ -34,7 +34,7 @@ address or its 2129 postcode on any page: YOLKO is a home-based, service-area bu
 
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
-big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
+big ExtraBold headings (hero up to 92px, tight letter spacing), sentence case, no trailing full
 stop. Colours are tokens in `:root` of `styles-modern.css`: cream page `#faf7f0`, white cards,
 ink `#14120e`, muted `#6b675e`, yolk `#ffd32a`, green `#1f7a4d` only for the stock dot. Yolk
 yellow is for the logo's yolk, Order / Buy buttons (`.btn-solid`), price highlights, the timeline
@@ -48,6 +48,32 @@ egg on toast, with the YOLKO logo only as a small cream tag in the corner. It is
 YOLKO's own eggs, so never caption it as one, and never swap in a drawn or computer-made picture. It
 has no price in it, so it does not swap with the tray price the way the hero does
 (`orderBrandPicture` in `app.js`).
+
+### "Posters" look (14 Nov 2026)
+Kanna asked for every page to look better on computers and phones. The idea carries the Big yolk
+order poster to the whole site: each section is one big rounded block of ink, yolk or white on
+the cream page (`--r-poster`), with large type and little else. Colours on an ink block are the
+`--on-ink*` tokens, soft text on yolk is `--on-yolk-soft`; yellow is never used for words on a
+light ground. No gradients, grain, hover lifts or scroll fade-ins.
+- Hero (`.hero-grid`): an ink poster with the words on the left and the chalk-tray photo on the
+  right. The photo is always square and never cropped. From 1200px it runs to the poster's edge
+  and sets the poster's height (`--hero-photo`); from 901 to 1199px it sits in a 20px frame; at
+  900px and under the poster stacks (words, buttons, framed photo, the three facts). The h1 is
+  sized from its own column (`cqw`) and the screen height (`--vvh`), so it never wraps to a fourth
+  line or pushes the next section into view. From 1700px the page is 1440px wide.
+- How it works (`.how > .wrap`) and any `.ink-poster`: ink blocks. `.duo` is two columns inside
+  one (the bulk page), split by a hairline when stacked on a phone.
+- Prices (`.price-cards`): one yolk board, three columns split by hairlines, giant prices with a
+  small dollar sign (`.pc-cur`) and ink Order buttons. On the Sydney page it sits between the two
+  ink posters so they never touch.
+- Suburbs page: the finder is a yolk poster; the A to Z list is a closed fold right under the
+  map, so the yellow closing band is always the last thing before the footer.
+- 404 and the legal pages: an ink poster for the title. `privacy.html`, `terms.html` and
+  `data-deletion.html` are written by hand, but the build fills their `icons`, `styles`, `header`
+  and `footer` markers, so they carry the same header and footer as every other page.
+- The phone order bar has a faint cream ring so it stays readable over an ink poster.
+Before calling a change live, look at each page at 1920x1080, 1440x900, 1366x768, 1536x734,
+390x844, 375x667 and 412x915.
 
 ### Order section: "Big yolk" (13 Nov 2026)
 Kanna called the old order card "old style and cluttered", picked this from three drawn
