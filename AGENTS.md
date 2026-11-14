@@ -32,6 +32,20 @@ same zone data checkout uses) or `infra/build-areas-page.mjs` (the A to Z suburb
 `node infra/build-pages.mjs && node infra/build-areas-page.mjs`. Never put the Sydney Markets
 address or its 2129 postcode on any page: YOLKO is a home-based, service-area business.
 
+The three plain pages (`privacy.html`, `terms.html`, `data-deletion.html`) keep their words by
+hand, but the build writes their icon links, stylesheet links, header and footer (markers
+`icons`, `styles`, `header`, `footer`), so they always match the shop. Their body is
+`<article class="legal">` with a `.legal-head` (title, date) and a `.legal-body`.
+
+### Polish, not a new look (14 Nov 2026)
+Kanna turned down 21 proposed new looks and chose "Polish the site I have now": no new look, go
+page by page fixing spacing, sizes and anything untidy, and show each fix as a before and after
+picture. Round 1 (build 251): the plain pages got the shop header and footer; on
+`/egg-delivery-areas` the A to Z fold (`.az-all`) sits under the map and the search card is one
+row; on phones the hero facts stack and suburb chips inside a card become a two-column grid;
+paired cards with a button (`.panel:has(> .hero-cta)`) line their buttons up; short pages
+(`.legal`, `.notfound`) push the footer to the bottom of the screen.
+
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
 big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
@@ -83,8 +97,8 @@ Plus Jakarta Sans ExtraBold. Kanna picked it on 11 Nov 2026 and asked for it eve
 Masters are in `assets/brand/` (`yolko-logo.svg`, `yolko-logo-white.svg`, `yolko-egg.svg`); the
 paths every page uses live in `infra/brand.mjs` (a light copy, about 2 KB a logo). `build-pages.mjs`
 writes the header logo, the footer logo (white, reusing the header's shapes) and the icon links
-into every page, including `index.html` and the three plain pages, between `brand`, `brand-foot`
-and `icons` markers. The header logo draws itself once per visit ("Yolk pen", `LOGO_MOTION`): the
+into every page, including `index.html`, between `brand`, `brand-foot` and `icons` markers (the
+three plain pages get the whole header and footer from the build instead). The header logo draws itself once per visit ("Yolk pen", `LOGO_MOTION`): the
 yolk paints the egg, glides to the centre and the name slides out. It never runs with reduced
 motion, and the whole logo is in the HTML, so it shows without script. Icons: `favicon.ico`,
 `assets/favicon.svg` (white egg on a black tile, stroke thickened for tab size),

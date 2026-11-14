@@ -1806,6 +1806,19 @@ section {
   color: #8f8a7f;
 }
 
+/* The clear button in a search box: a small ink cross, not the browser's blue one. */
+.suburb-check input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin: 0 0 0 8px;
+  border-radius: 50%;
+  background: var(--line) center / 10px 10px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M1.5 1.5l7 7M8.5 1.5l-7 7' stroke='%2314120e' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  cursor: pointer;
+}
+
 .suburb-check .btn {
   min-height: 50px;
 }
@@ -2274,11 +2287,17 @@ section {
   margin-top: 4px;
 }
 
+.panel:has(> .hero-cta) {
+  grid-template-rows: auto 1fr auto;
+  align-content: stretch;
+}
+
 .local-nearby-label {
-  margin: 8px 0 0;
+  margin: 8px 0 12px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.4;
 }
 
 .price-cards {
@@ -2351,6 +2370,15 @@ section {
   background: var(--sand);
   font-size: 14px;
   font-weight: 700;
+}
+
+/* Pack, eggs, price, per egg: the columns share the width instead of bunching on the left. */
+.price-table:not(.all-cols) {
+  table-layout: fixed;
+}
+
+.price-table:not(.all-cols) th:first-child {
+  width: 31%;
 }
 
 .price-table tbody th {
@@ -2549,7 +2577,7 @@ section {
 }
 
 .local-row + .wrap {
-  margin-top: 28px;
+  margin-top: 32px;
 }
 
 .local-suburbs a {
@@ -2587,20 +2615,37 @@ section {
 
 /* Delivery areas finder (/egg-delivery-areas) */
 .areas-finder .panel {
-  gap: 20px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px clamp(32px, 4vw, 64px);
+}
+
+.areas-finder .panel h2,
+.areas-finder .panel > p {
+  grid-column: 1;
 }
 
 .areas-finder .suburb-check {
-  max-width: 560px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  max-width: none;
   padding-right: 22px;
 }
 
+.areas-finder .area-status,
+.areas-finder .area-results {
+  grid-column: 1 / -1;
+}
+
 .area-status {
-  min-height: 1.5em;
-  margin: 0;
+  margin: 12px 0 0;
   color: var(--muted);
   font-size: 15px;
   font-weight: 600;
+}
+
+.area-status:empty {
+  display: none;
 }
 
 .area-status a {
@@ -2608,17 +2653,25 @@ section {
 }
 
 .area-results {
-  margin-top: -4px;
+  margin-top: 8px;
 }
 
-/* All suburbs, A to Z: one quiet fold at the bottom of /egg-delivery-areas */
+/* All suburbs, A to Z: one closed row under the map on /egg-delivery-areas */
+.az-all {
+  margin-top: 20px;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+}
+
 .az-all summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 600;
+  position: relative;
+  display: block;
+  padding: 24px 80px 24px clamp(24px, 3vw, 40px);
+  font-size: clamp(17px, 0.3vw + 15.5px, 19px);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
   list-style: none;
   cursor: pointer;
 }
@@ -2628,21 +2681,31 @@ section {
 }
 
 .az-all summary::after {
-  content: "+";
-  font-size: 18px;
-  font-weight: 500;
+  content: "";
+  position: absolute;
+  right: clamp(24px, 3vw, 40px);
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--sand) center / 14px 14px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%2314120e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  transition: transform 220ms var(--ease), background-color 180ms ease;
+}
+
+.az-all summary:hover::after {
+  background-color: var(--line);
 }
 
 .az-all[open] summary::after {
-  content: "−";
-}
-
-.az-all summary:hover {
-  color: var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 .az-list {
-  margin-top: 20px;
+  padding: 4px clamp(24px, 3vw, 40px) clamp(24px, 3vw, 36px);
   columns: 4 200px;
   column-gap: 32px;
   color: var(--muted);
@@ -2689,13 +2752,120 @@ section {
   letter-spacing: -0.045em;
 }
 
-.notfound p {
+.notfound h1 + p {
+  margin: 0;
   color: var(--muted);
   font-size: 18px;
 }
 
 .notfound .hero-cta {
   margin: 28px 0 48px;
+}
+
+/* A short page (data deletion, page not found) still ends with the footer on the bottom edge
+   of the screen, not with a strip of cream under it. */
+body:has(> main > .legal),
+body:has(> main > .notfound) {
+  display: flex;
+  flex-direction: column;
+}
+
+body:has(> main > .legal) > main,
+body:has(> main > .notfound) > main {
+  flex: 1 0 auto;
+}
+
+/* ---------- Plain pages: privacy, terms, data deletion ----------
+   Same header and footer as the shop. The title sits on the left and the words on the
+   right, the way the Questions section is laid out. */
+.legal {
+  padding: clamp(40px, 6vw, 88px) 0 var(--section);
+}
+
+.legal .wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  gap: clamp(32px, 6vw, 96px);
+  align-items: start;
+}
+
+.legal-head {
+  position: sticky;
+  top: calc(var(--topbar-h) + 24px);
+}
+
+.legal-head h1 {
+  margin: 0;
+  font-size: clamp(40px, 3.2vw + 12px, 64px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.legal-head p {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.legal-body {
+  max-width: 64ch;
+  color: var(--ink-soft);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.legal-body > :first-child {
+  margin-top: 0;
+}
+
+.legal-body h2 {
+  margin: 44px 0 12px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: clamp(20px, 0.4vw + 18px, 24px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.legal-body p {
+  margin: 0 0 16px;
+}
+
+.legal-body ul {
+  margin: 0 0 16px;
+  padding-left: 1.15em;
+  list-style: disc;
+}
+
+.legal-body li {
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.legal-body li::marker {
+  color: var(--line-strong);
+}
+
+.legal-body strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.legal-body a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.legal-body a:hover {
+  text-decoration-color: var(--ink);
 }
 
 /* ---------- After paying: share link sheet ---------- */
@@ -2955,6 +3125,26 @@ section {
     position: static;
   }
 
+  .legal .wrap {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .legal-head {
+    position: static;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .areas-finder .panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .areas-finder .suburb-check {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
   .foot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 32px 24px;
@@ -3004,6 +3194,54 @@ section {
     font-size: 10px;
   }
 
+  .hero-facts {
+    display: grid;
+    gap: 14px;
+  }
+
+  .panel .areas-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel .areas-list li,
+  .panel .areas-list li > a {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    width: 100%;
+    border-radius: var(--r-sm);
+  }
+
+  .panel .areas-list li {
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+  }
+
+  .panel .areas-list li:not(:has(> a)),
+  .panel .areas-list li > a {
+    padding: 11px 12px;
+  }
+
+  .panel .areas-list .chip-strong,
+  .panel .areas-list .chip-strong > a {
+    grid-column: 1 / -1;
+    align-items: center;
+    border-radius: 999px;
+  }
+
+  .az-all summary {
+    padding: 20px 64px 20px 20px;
+  }
+
+  .az-all summary::after {
+    right: 18px;
+  }
+
+  .az-list {
+    padding: 0 20px 22px;
+  }
+
   .cta-panel {
     padding: 36px 24px 28px;
     border-radius: 28px;
@@ -3026,6 +3264,10 @@ section {
   .price-table th:nth-child(2),
   .price-table td:nth-child(2) {
     display: none;
+  }
+
+  .price-table:not(.all-cols) th:first-child {
+    width: 40%;
   }
 
   .price-table tbody tr.best td:last-child::after {
