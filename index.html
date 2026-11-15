@@ -94,7 +94,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=165">
+  <link rel="stylesheet" href="styles-modern.css?v=166">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -660,8 +660,8 @@
 
           <ul class="hero-facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
-            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$5 flat delivery</li>
-            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$5 delivery</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2.5 20.5 6 17 9.5M3.5 11.5V10a4 4 0 0 1 4-4h13M7 21.5 3.5 18 7 14.5M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>Free on weekly orders</li>
           </ul>
         </div>
 
@@ -919,7 +919,7 @@
           <li>
             <span class="tl-when">By Thursday night</span>
             <h3>Order online</h3>
-            <p>Pick one tray, two trays or a 180-egg box, and pay by card. It takes about a minute.</p>
+            <p>Pick one tray, two trays or a 180-egg box, once or every week, and pay by card. It takes about a minute.</p>
           </li>
           <li>
             <span class="tl-when">Straight away</span>
@@ -942,6 +942,14 @@
           <p>Delivery is $5 flat. Here is how to make it free, or pay even less per egg.</p>
         </header>
         <div class="save-grid">
+          <article class="weekly-card">
+            <div class="wk-copy">
+              <h3>Weekly or fortnightly</h3>
+              <p>Same prices. Skip a week or cancel any time.</p>
+            </div>
+            <p class="wk-free">Free <span>delivery</span></p>
+            <a class="btn btn-ink btn-small" href="/?repeat=1#order" data-repeat="1">Order weekly</a>
+          </article>
           <article class="save-card">
             <p class="save-big">Free <span>delivery</span></p>
             <h3>Bring a friend</h3>
@@ -955,7 +963,7 @@
           <article class="save-card">
             <p class="save-big"><span data-per-egg="box">40¢</span> <span>an egg</span></p>
             <h3>Buy by the box</h3>
-            <p>A box of 180 eggs is <span data-price="box">$72</span>. Cafés and big families can set up a weekly order.</p>
+            <p>A box of 180 eggs is <span data-price="box">$72</span>. Order up to 10 at a time.</p>
             <a class="text-link" href="/bulk-eggs-sydney">Bulk eggs</a>
           </article>
         </div>
@@ -1095,6 +1103,7 @@
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
           <a href="#order">Order eggs</a>
+          <a href="/?repeat=1#order" data-repeat="1">Weekly orders</a>
           <a href="/bulk-eggs-sydney">Bulk eggs</a>
           <a href="/egg-prices-sydney">Egg prices</a>
         </nav>
@@ -1124,6 +1133,6 @@
   </footer>
 
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=162"></script>
+  <script src="app.js?v=163"></script>
 </body>
 </html>
