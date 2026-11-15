@@ -423,14 +423,29 @@ can"). The weekly order is said once on each screen it fits, in few words, and n
 - First screen of every page with a photo hero: the third hero fact is "Free on weekly orders"
   (`HERO_FACTS` in `infra/build-pages.mjs`, by hand in `index.html`). It took the place of "Pay
   by card". The middle fact reads "$5 delivery", so the two read as one thought. (The egg prices
-  page has a price board for a first screen and no hero facts; its weekly row says it.)
-- The weekly row (`.weekly-card`, `WEEKLY_CARD` in the generator): one wide card, "Weekly or
-  fortnightly / Same prices. Skip a week or cancel any time. / Free delivery / Order weekly". It
-  sits under the three price cards on the Delivery, suburb and Prices pages, and first in the
-  homepage's "More ways to save". On a phone "delivery" goes under "Free" so the button fits
-  beside it. The Bulk eggs page has its own wholesale card instead (round 5).
+  page has a price board for a first screen and no hero facts; its Prices switch says it.)
+- Homepage, first in "More ways to save": the weekly band (`.weekly-band`, by hand in
+  `index.html`). An ink band with one giant yolk figure, the way the order poster holds its
+  price: "Eggs every Saturday / Same prices. Skip a week or cancel any time." on the left,
+  "$0 delivery, weekly or fortnightly" in the middle, a yolk "Order weekly" button on the right.
+  From 641 to 900px the words take the first row and the figure and button share the second;
+  on a phone the button takes a row of its own.
+- Delivery, suburb and Prices pages: the order form's own switch (Once, Weekly, Fortnightly,
+  each with its delivery cost) sits in the head of the Prices section (`priceCards`,
+  `.price-head`, `.price-often` in the generator). It says what delivery costs, so the line
+  under the heading does not. Picking Weekly or Fortnightly turns each card's "Order" into
+  "Subscribe" and sends it to `/?b=<pack>&repeat=<1|2>#order` (`PRICE_OFTEN_SCRIPT`, an inline
+  script: these pages do not load `app.js`, so the picked option paints itself and there is no
+  sliding pill). The Bulk eggs page has its own wholesale card instead (round 5).
+- Build 259 had one wide white card here and on the homepage ("Weekly or fortnightly ... Free
+  delivery ... Order weekly"). Kanna, 15 Nov 2026: "it is a weak design u created fix that".
+  Build 262 replaced it with the band and the switch. Do not bring back a pale strip with
+  small words: a weekly element is either the real control or a block with one big figure.
 - Every "Order weekly" link is `/?repeat=1#order`. On the homepage the same links carry
   `data-repeat="1"`, and `app.js` picks Weekly and scrolls to the form without a reload.
+  `app.js` declares `DAY_INDEX` and `MONTHS` above `preselectRepeat` on purpose: arriving with
+  `?repeat=` writes the repeat note's date while the file is still loading (builds 258 to 261
+  threw a ReferenceError there; the form still ended up right).
 - Step one of "How Saturday delivery works" says "once or every week"; the footer's Shop list
   has "Weekly orders".
 - Suburb pages never ask anyone to message for a "standing order": they say to pick Weekly.

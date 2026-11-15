@@ -38,7 +38,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=167">
+  <link rel="stylesheet" href="styles-modern.css?v=168">
 
   <script type="application/ld+json">
   {
@@ -330,9 +330,29 @@
 
     <section class="band" aria-labelledby="prices-title">
       <div class="wrap">
-        <header class="section-head">
-          <h2 id="prices-title">Egg prices in Bankstown</h2>
-          <p>Same eggs in every pack. Delivery to Bankstown is $5 flat.</p>
+        <header class="section-head price-head">
+          <div>
+            <h2 id="prices-title">Egg prices in Bankstown</h2>
+            <p>Same eggs in every pack, delivered to Bankstown.</p>
+          </div>
+          <fieldset class="picker price-often" data-price-often>
+            <legend class="sr-only">How often</legend>
+            <label class="bundle-opt">
+              <input type="radio" name="often" value="0" autocomplete="off" checked>
+              <span class="bo-name">Once</span>
+              <span class="bo-sub">$5 delivery</span>
+            </label>
+            <label class="bundle-opt">
+              <input type="radio" name="often" value="1" autocomplete="off">
+              <span class="bo-name">Weekly</span>
+              <span class="bo-sub">Free delivery</span>
+            </label>
+            <label class="bundle-opt">
+              <input type="radio" name="often" value="2" autocomplete="off">
+              <span class="bo-name">Fortnightly</span>
+              <span class="bo-sub">Free delivery</span>
+            </label>
+          </fieldset>
         </header>
         <ul class="price-cards">
           <li>
@@ -340,7 +360,7 @@
             <p class="pc-meta">30 eggs · 43¢ an egg</p>
             <div class="pc-row">
               <span class="pc-price">$13</span>
-              <a class="btn btn-solid btn-small" href="/?b=tray1#order" aria-label="Order 1 tray">Order</a>
+              <a class="btn btn-solid btn-small" href="/?b=tray1#order" data-pack="tray1" data-pack-name="1 tray" aria-label="Order 1 tray">Order</a>
             </div>
           </li>
           <li>
@@ -348,7 +368,7 @@
             <p class="pc-meta">60 eggs · 42¢ an egg</p>
             <div class="pc-row">
               <span class="pc-price">$25</span>
-              <a class="btn btn-solid btn-small" href="/?b=tray2#order" aria-label="Order 2 trays">Order</a>
+              <a class="btn btn-solid btn-small" href="/?b=tray2#order" data-pack="tray2" data-pack-name="2 trays" aria-label="Order 2 trays">Order</a>
             </div>
           </li>
           <li>
@@ -356,16 +376,8 @@
             <p class="pc-meta">180 eggs · 40¢ an egg</p>
             <div class="pc-row">
               <span class="pc-price">$72</span>
-              <a class="btn btn-solid btn-small" href="/?b=box#order" aria-label="Order full box">Order</a>
+              <a class="btn btn-solid btn-small" href="/?b=box#order" data-pack="box" data-pack-name="full box" aria-label="Order full box">Order</a>
             </div>
-          </li>
-          <li class="weekly-card">
-            <div class="wk-copy">
-              <h3>Weekly or fortnightly</h3>
-              <p>Same prices. Skip a week or cancel any time.</p>
-            </div>
-            <p class="wk-free">Free <span>delivery</span></p>
-            <a class="btn btn-ink btn-small" href="/?repeat=1#order">Order weekly</a>
           </li>
         </ul>
       </div>
@@ -467,6 +479,28 @@
     </div>
   </footer>
 
+  <script>
+  (function () {
+    var often = document.querySelector("[data-price-often]");
+    if (!often) return;
+    function sync() {
+      var on = often.querySelector("input:checked");
+      var n = on ? Number(on.value) : 0;
+      often.querySelectorAll(".bundle-opt").forEach(function (o) {
+        o.classList.toggle("is-picked", o.querySelector("input") === on);
+      });
+      document.querySelectorAll(".price-cards [data-pack]").forEach(function (a) {
+        var name = a.getAttribute("data-pack-name");
+        a.href = "/?b=" + a.getAttribute("data-pack") + (n ? "&repeat=" + n : "") + "#order";
+        a.textContent = n ? "Subscribe" : "Order";
+        a.setAttribute("aria-label", n ? "Subscribe to " + name + (n === 1 ? " weekly" : " fortnightly") : "Order " + name);
+      });
+    }
+    often.addEventListener("change", sync);
+    window.addEventListener("pageshow", sync);
+    sync();
+  })();
+  </script>
   <script>
   (function () {
     var bar = document.querySelector(".topbar");
