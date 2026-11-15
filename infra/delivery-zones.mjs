@@ -351,9 +351,11 @@ export function quoteDelivery(input) {
     deliver,
     fee: deliver ? SITE_DELIVERY_FEE : null,
     band: deliver ? `<=${MAX_DELIVERY_KM}km` : `>${MAX_DELIVERY_KM}km`,
+    // Shoppers can see this (it is the error an out-of-area order gets), so it never names
+    // the depot or a distance from it.
     note: deliver
-      ? `Within ${MAX_DELIVERY_KM} km of Sydney Markets: +$${SITE_DELIVERY_FEE} Saturday delivery.`
-      : `Outside ${MAX_DELIVERY_KM} km of Sydney Markets. We only deliver within this area.`,
+      ? `Inside our delivery area: +$${SITE_DELIVERY_FEE} Saturday delivery.`
+      : "Outside our delivery area for now.",
   };
 }
 

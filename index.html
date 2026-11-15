@@ -94,7 +94,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=159">
+  <link rel="stylesheet" href="styles-modern.css?v=160">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -687,7 +687,7 @@
 
     <section id="order" class="order">
       <div class="wrap">
-        <form id="order-form" class="order-form">
+        <form id="order-form" class="order-form" novalidate>
           <div class="order-stage">
             <div class="order-photo">
               <div class="order-tray-rotator" data-rotator="order" aria-hidden="true">
@@ -752,11 +752,12 @@
               <div class="order-fields" id="delivery-address-field">
                 <div class="field field-street">
                   <label for="delivery-street">Street address</label>
-                  <input id="delivery-street" name="deliveryStreet" type="text" placeholder="Unit 4, 12 Smith Street" autocomplete="address-line1" required>
+                  <input id="delivery-street" name="deliveryStreet" type="text" placeholder="Unit 4, 12 Smith Street" autocomplete="address-line1" aria-describedby="street-error" required>
+                  <p class="field-error" id="street-error" hidden></p>
                 </div>
                 <div class="field field-suburb">
                   <label for="delivery-suburb">Suburb</label>
-                  <input id="delivery-suburb" name="deliverySuburb" type="text" placeholder="Strathfield" autocomplete="address-level2" required>
+                  <input id="delivery-suburb" name="deliverySuburb" type="text" placeholder="Strathfield" autocomplete="address-level2" aria-describedby="delivery-zone-hint" required>
                 </div>
                 <div class="field field-city">
                   <label for="delivery-city">City</label>
@@ -764,9 +765,9 @@
                 </div>
                 <div class="field field-postcode">
                   <label for="delivery-postcode">Postcode</label>
-                  <input id="delivery-postcode" name="deliveryPostcode" type="text" inputmode="numeric" maxlength="4" placeholder="2135" autocomplete="postal-code" required>
+                  <input id="delivery-postcode" name="deliveryPostcode" type="text" inputmode="numeric" maxlength="4" placeholder="2135" autocomplete="postal-code" aria-describedby="delivery-zone-hint" required>
                 </div>
-                <p class="field-hint" id="delivery-zone-hint" hidden></p>
+                <p class="field-hint" id="delivery-zone-hint" role="status" hidden></p>
               </div>
             </div>
 
@@ -776,7 +777,8 @@
                 <div class="order-fields">
                   <div class="field">
                     <label for="name">Name</label>
-                    <input id="name" name="name" type="text" placeholder="Full name" autocomplete="name" required>
+                    <input id="name" name="name" type="text" placeholder="Full name" autocomplete="name" aria-describedby="name-error" required>
+                    <p class="field-error" id="name-error" hidden></p>
                   </div>
 
                   <!-- Honeypot: leave empty. Bots that fill it are dropped server-side.
@@ -789,7 +791,7 @@
                   <div class="field">
                     <label for="phone">Mobile number</label>
                     <input id="phone" name="phone" type="tel" inputmode="numeric" placeholder="0412 345 678" autocomplete="tel" aria-describedby="phone-error" required>
-                    <p class="field-error" id="phone-error" hidden>Enter a valid Australian mobile, e.g. 0412 345 678</p>
+                    <p class="field-error" id="phone-error" hidden></p>
                   </div>
                 </div>
               </div>
@@ -1072,6 +1074,6 @@
   </footer>
 
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=157"></script>
+  <script src="app.js?v=158"></script>
 </body>
 </html>
