@@ -605,8 +605,12 @@ function refreshSubmitPrice() {
   if (remindRow) remindRow.hidden = Boolean(repeat);
   if (repeatNote) {
     repeatNote.hidden = !repeat;
+    // What the card is charged from here on, and the first Thursday that happens. Today's
+    // payment is on the button.
     const terms = document.getElementById("repeat-terms");
-    if (terms && repeat) terms.textContent = `${money(total)} today, then every ${repeat === 2 ? "second " : ""}Thursday night`;
+    const from = document.getElementById("repeat-from");
+    if (terms && repeat) terms.textContent = `${money(total)} every ${repeat === 2 ? "second " : ""}Thursday night`;
+    if (from && repeat) from.textContent = `From ${repeatChargeDate(repeat)}. Skip or cancel any time.`;
   }
   placeThumbs();
 }
@@ -1238,7 +1242,8 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 // Booking today for today isn't possible; orders roll to the next market day.
 // Uses the Australia/Sydney zone directly so it stays correct across daylight
 // saving (UTC+10 in winter, UTC+11 in summer) regardless of the viewer's zone.
-function nextPickupDate(dayName) {
+/** The next delivery day by Sydney's calendar, as a UTC-midnight Date. */
+function nextPickupDay(dayName) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Australia/Sydney",
     year: "numeric", month: "numeric", day: "numeric", weekday: "short",
@@ -1254,7 +1259,20 @@ function nextPickupDate(dayName) {
   // Saturday orders close Thursday night, so from Friday they go to the Saturday after.
   // The Worker applies the same rule when it saves the order.
   if (dayName === "Saturday" && todayIdx === DAY_INDEX.Friday) ahead += 7;
-  const d = new Date(base + ahead * 86400 * 1000);
+  return new Date(base + ahead * 86400 * 1000);
+}
+
+function nextPickupDate(dayName) {
+  const d = nextPickupDay(dayName);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+/**
+ * The first Thursday a weekly (1) or fortnightly (2) order charges the saved card: two days
+ * before its second delivery. The Worker counts the same way (startSubscription).
+ */
+function repeatChargeDate(every) {
+  const d = new Date(nextPickupDay("Saturday").getTime() + (7 * every - 2) * 86400 * 1000);
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 const DAY_BEFORE = {
