@@ -41,6 +41,7 @@ const receipt = {
 
 let lastOrderMessage = "";
 let lastOrderId = null;
+let lastOrderFp = "";
 let referral = null;
 
 const OPEN_CHECKOUT_KEY = "yolko_open_checkout";
@@ -57,6 +58,7 @@ function bookingFingerprint(b) {
     b.remind ? "remind" : "",
     b.deliveryStreet || "",
     b.ref || "",
+    b.repeat || "",
   ].join("|");
 }
 
@@ -111,6 +113,7 @@ function saveFormDraft() {
         bundle: currentBundle(),
         quantity: currentQuantity(),
         remind: !!document.getElementById("remind")?.checked,
+        repeat: currentRepeat(),
       })
     );
   } catch {
@@ -458,6 +461,21 @@ function currentBundle() {
 
 const DELIVERY_FEE = 5;
 
+// Weekly (1) or fortnightly (2) orders: same prices, free delivery, and only for the main tray.
+const REPEAT_KEYS = ["tray1", "tray2", "box"];
+const oftenPicker = document.getElementById("often-picker");
+
+function currentRepeat() {
+  if (!oftenPicker || !REPEAT_KEYS.includes(currentBundle())) return 0;
+  const n = Number(oftenPicker.querySelector('input[name="repeat"]:checked')?.value);
+  return n === 1 || n === 2 ? n : 0;
+}
+
+/** What the pay button says: the form's messages name it, so they follow it. */
+function buyWord() {
+  return currentRepeat() ? "Subscribe" : "Buy now";
+}
+
 function currentFulfillment() {
   // Storefront is delivery-only (no market pickup).
   return "delivery";
@@ -538,7 +556,7 @@ function money(n) {
 function placeThumbs() {
   if (!form) return;
   form.querySelectorAll(".picker").forEach((track) => {
-    const input = track.querySelector('input[name="bundle"]:checked');
+    const input = track.querySelector('input[type="radio"]:checked');
     const label = input ? input.closest(".bundle-opt") : null;
     track.classList.add("has-thumb");
     track.classList.toggle("no-pick", !label);
@@ -569,7 +587,27 @@ function refreshSubmitPrice() {
     if (pickEggs) pickEggs.textContent = `${eggs} eggs`;
     if (pickEach) pickEach.textContent = `${perEggText(b.price, eggs)} an egg`;
   }
-  if (buyTotal) buyTotal.textContent = money(b.price * currentQuantity() + DELIVERY_FEE);
+  // How often: on a weekly or fortnightly order the fee goes, the button says Subscribe, and the
+  // reminder row gives way to one that says when the card is charged.
+  if (oftenPicker) oftenPicker.hidden = !REPEAT_KEYS.includes(key);
+  const repeat = currentRepeat();
+  const total = b.price * currentQuantity() + (repeat ? 0 : DELIVERY_FEE);
+  if (buyTotal) buyTotal.textContent = money(total);
+  const buyBtn = document.getElementById("buynow-btn");
+  const buyLabel = document.getElementById("buynow-label");
+  if (buyLabel && buyBtn?.getAttribute("aria-busy") !== "true") buyLabel.textContent = buyWord();
+  // "Subscribe" or a total in the hundreds needs more of a phone's button than "Buy now $30".
+  buyBtn?.closest(".pay-bar")?.classList.toggle("is-tight", Boolean(repeat) || money(total).length > 3);
+  const fee = document.getElementById("order-fee");
+  if (fee) fee.textContent = repeat ? "Free delivery" : `$${DELIVERY_FEE} delivery`;
+  const remindRow = document.getElementById("remind-row");
+  const repeatNote = document.getElementById("repeat-note");
+  if (remindRow) remindRow.hidden = Boolean(repeat);
+  if (repeatNote) {
+    repeatNote.hidden = !repeat;
+    const terms = document.getElementById("repeat-terms");
+    if (terms && repeat) terms.textContent = `${money(total)} today, then every ${repeat === 2 ? "second " : ""}Thursday night`;
+  }
   placeThumbs();
 }
 
@@ -597,7 +635,7 @@ function syncFulfillmentUI() {
 
 // One listener on the form, because the dozens and other trays are drawn in later.
 form?.addEventListener("change", (e) => {
-  if (e.target && e.target.name === "bundle") refreshSubmitPrice();
+  if (e.target && (e.target.name === "bundle" || e.target.name === "repeat")) refreshSubmitPrice();
 });
 
 // Price cards on the suburb and bulk pages link to /?b=<pack>#order to pick that pack.
@@ -1338,7 +1376,8 @@ function collectBooking() {
   const deliveryPostcode = String(data.get("deliveryPostcode") || "").replace(/\D/g, "").slice(0, 4);
   const bundle = BUNDLES[bundleKey] || BUNDLES.tray1;
   const quantity = currentQuantity();
-  const deliveryFee = fulfillment === "delivery" ? DELIVERY_FEE : 0;
+  const repeat = currentRepeat();
+  const deliveryFee = fulfillment === "delivery" && !repeat ? DELIVERY_FEE : 0;
 
   // Top to bottom, the way the form reads. Every problem shows at once; the first gets the focus.
   const problems = [];
@@ -1397,7 +1436,9 @@ function collectBooking() {
     quantity,
     total: bundle.price * quantity + deliveryFee,
     orderLabel: describeOrder(bundleKey, quantity),
-    remind: data.get("remind") === "1",
+    // A weekly or fortnightly order gets its own Thursday notice, so the reminder row is not shown.
+    remind: !repeat && data.get("remind") === "1",
+    repeat,
     ref: referral ? referral.code : "",
     company: String(data.get("yolko_hp") || data.get("company") || "").trim(),
   };
@@ -1551,12 +1592,15 @@ async function openCheckout(orderId) {
 /** Fast path: one request creates/reuses the order and returns a Stripe URL. */
 async function buyNowCheckout(b) {
   // Prefer existing unpaid order → /api/checkout (no geo, one Stripe call).
-  const reusedId = loadMatchingCheckout(b) || lastOrderId;
+  // Only the same order: anything changed on the form since (size, address, how often) starts a new one.
+  const fp = bookingFingerprint(b);
+  const reusedId = loadMatchingCheckout(b) || (lastOrderFp === fp ? lastOrderId : null);
   if (reusedId) {
     const reuse = await openCheckout(reusedId);
     if (reuse.ok) return { ok: true };
     clearOpenCheckout();
     lastOrderId = null;
+    lastOrderFp = "";
   }
 
   const token = (await ensureOrderToken()) || "";
@@ -1579,6 +1623,7 @@ async function buyNowCheckout(b) {
       deliveryAddress: b.deliveryAddress || "",
       yolko_hp: b.company || "",
       remind: !!b.remind,
+      repeat: b.repeat || 0,
       ref: b.ref || "",
       token,
     }),
@@ -1592,6 +1637,7 @@ async function buyNowCheckout(b) {
   if (!res.ok || !d.url) return { error: String(d.code || "failed"), message: String(d.error || "") };
   if (d.orderId || d.id) {
     lastOrderId = d.orderId || d.id;
+    lastOrderFp = fp;
     saveOpenCheckout(lastOrderId, b);
   }
   if (d.deliveryAddress) b.deliveryAddress = d.deliveryAddress;
@@ -1677,7 +1723,7 @@ async function startBuyNow() {
   const stopBusy = () => {
     buynowBtn.disabled = false;
     buynowBtn.removeAttribute("aria-busy");
-    buynowLabel.textContent = "Buy now";
+    buynowLabel.textContent = buyWord();
   };
   const failBuy = (msg) => {
     stopBusy();
@@ -1706,7 +1752,7 @@ async function startBuyNow() {
       return;
     }
     if (code === "rate") {
-      failBuy("Too many tries from this phone. Wait a minute, then tap Buy now again.");
+      failBuy(`Too many tries from this phone. Wait a minute, then tap ${buyWord()} again.`);
       return;
     }
     // Written for shoppers by the stock rules, e.g. "Free range trays are sold out this week."
@@ -1715,10 +1761,10 @@ async function startBuyNow() {
       return;
     }
     if (code.startsWith("token_")) {
-      failBuy("This page has been open a while. Refresh it, then tap Buy now again.");
+      failBuy(`This page has been open a while. Refresh it, then tap ${buyWord()} again.`);
       return;
     }
-    failBuy("Couldn’t open payment. Tap Buy now again.");
+    failBuy(`Couldn’t open payment. Tap ${buyWord()} again.`);
   } catch {
     failBuy("Couldn’t reach the shop. Check your connection and try again.");
   }
@@ -1787,6 +1833,8 @@ function applyFormDraft(d) {
   setQuantity(Number(d.quantity) || 1);
   const remind = document.getElementById("remind");
   if (remind) remind.checked = !!d.remind;
+  const often = oftenPicker?.querySelector(`input[name="repeat"][value="${d.repeat === 1 || d.repeat === 2 ? d.repeat : 0}"]`);
+  if (often) often.checked = true;
   refreshDeliveryZoneHint();
   refreshSubmitPrice();
 }
@@ -1897,13 +1945,16 @@ function clearReferral() {
 
 /**
  * After paying: which Saturday and what is coming, then the customer's own link to pass the
- * free delivery on (when they have one). `order` is { when: "Saturday 21 Nov", item: "2 egg trays (60 eggs)" }.
+ * free delivery on (when they have one). `order` is { when: "Saturday 21 Nov", item: "2 egg trays (60 eggs)" },
+ * and on a weekly or fortnightly order also { repeat: 1 | 2, next: "28 Nov" }.
  */
 function showShareSheet(link, order) {
   const short = link ? link.replace(/^https:\/\//, "") : "";
   const text = "Fresh eggs delivered on Saturday. Your first delivery is free with my link:";
   const when = order && /^Saturday \d{1,2} [A-Z][a-z]{2}$/.test(String(order.when || "")) ? order.when : "Saturday";
   const item = order && order.item ? String(order.item).slice(0, 80) : "";
+  const repeat = order && (order.repeat === 1 || order.repeat === 2) ? order.repeat : 0;
+  const next = repeat && /^\d{1,2} [A-Z][a-z]{2}$/.test(String(order.next || "")) ? order.next : "";
   const sheet = document.createElement("div");
   sheet.className = "share-sheet";
   sheet.innerHTML = `
@@ -1913,6 +1964,9 @@ function showShareSheet(link, order) {
       <h2 id="share-title">Your eggs are booked for ${escHtml(when)}</h2>${
         item ? `
       <p class="share-what">${escHtml(item)} · 6am&nbsp;to&nbsp;12pm</p>` : ""
+      }${
+        repeat ? `
+      <p class="share-repeat">Then every ${repeat === 2 ? "second " : ""}Saturday${next ? `, next on ${escHtml(next)}` : ""}. We email you the Thursday before, with a link to skip or cancel.</p>` : ""
       }${
         link
           ? `

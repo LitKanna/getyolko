@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "161";
+const CSS_V = "162";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -1270,7 +1270,8 @@ const HOME_FAQ = [
   ["Which suburbs do you cover?", `Nearly 700 suburbs across Sydney, from Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
   ["How much are the eggs?", `<strong>$${PRICE.tray1}</strong> for a tray of 30 (about ${perEgg(PRICE.tray1, 30)}¢ an egg), <strong>$${PRICE.tray2}</strong> for two trays, <strong>$${PRICE.box}</strong> for a box of 180. Delivery is $${PRICE.delivery} flat. See how that sits next to the supermarkets on <a href="${PRICES_PATH}">egg prices in Sydney</a>.`],
   ["How do I pay?", "By card when you order. Payment is handled by Stripe, so we never see your card number."],
-  ["Can delivery be free?", "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
+  ["Can I get eggs every week?", "Yes. Pick Weekly or Fortnightly when you order. The price is the same and delivery is free. We charge your card each Thursday night for that Saturday, and email you on the Thursday with a link to skip that delivery. You can pause or cancel any time."],
+  ["Can delivery be free?", "Yes. Weekly and fortnightly orders always deliver free. For a single order, you get a share link after you pay. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
   ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés and restaurants can ${contactLink("message us", "email us")} for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
 ];

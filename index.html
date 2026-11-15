@@ -94,7 +94,7 @@
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
   <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w, assets/chalk-tray/13-2048.webp?v=112 2048w" imagesizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=161">
+  <link rel="stylesheet" href="styles-modern.css?v=162">
 
   <script id="yolko-jsonld" type="application/ld+json">
   {
@@ -536,10 +536,18 @@
           },
           {
             "@type": "Question",
+            "name": "Can I get eggs every week?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Pick Weekly or Fortnightly when you order. The price is the same and delivery is free. We charge your card each Thursday night for that Saturday, and email you on the Thursday with a link to skip that delivery. You can pause or cancel any time."
+            }
+          },
+          {
+            "@type": "Question",
             "name": "Can delivery be free?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."
+              "text": "Yes. Weekly and fortnightly orders always deliver free. For a single order, you get a share link after you pay. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."
             }
           },
           {
@@ -750,7 +758,7 @@
 
               <div class="order-foot">
                 <p class="stock-note" id="stock-note" hidden></p>
-                <p class="order-fee">$5 delivery</p>
+                <p class="order-fee" id="order-fee">$5 delivery</p>
               </div>
             </div>
           </div>
@@ -809,13 +817,39 @@
               </div>
             </div>
 
-            <label class="remind-opt">
+            <fieldset class="picker picker-often" id="often-picker">
+              <legend class="sr-only">How often</legend>
+              <label class="bundle-opt">
+                <input type="radio" name="repeat" value="0" checked>
+                <span class="bo-name">Once</span>
+                <span class="bo-sub">$5 delivery</span>
+              </label>
+              <label class="bundle-opt">
+                <input type="radio" name="repeat" value="1">
+                <span class="bo-name">Weekly</span>
+                <span class="bo-sub">Free delivery</span>
+              </label>
+              <label class="bundle-opt">
+                <input type="radio" name="repeat" value="2">
+                <span class="bo-name">Fortnightly</span>
+                <span class="bo-sub">Free delivery</span>
+              </label>
+            </fieldset>
+
+            <label class="remind-opt" id="remind-row">
               <span class="remind-text">
                 <span class="remind-label">Reminder</span>
                 <span class="remind-what">Email me each Thursday</span>
               </span>
               <input type="checkbox" id="remind" name="remind" value="1" role="switch">
             </label>
+
+            <p class="remind-opt repeat-note" id="repeat-note" hidden>
+              <span class="remind-text">
+                <span class="remind-label" id="repeat-terms">$25 today, then every Thursday night</span>
+                <span class="remind-what">Skip or cancel any time</span>
+              </span>
+            </p>
 
             <!-- Messages get a row of their own, right above the pay bar. -->
             <div class="order-msgs" id="order-msgs" hidden>
@@ -1007,8 +1041,12 @@
             <p>By card when you order. Payment is handled by Stripe, so we never see your card number.</p>
           </details>
           <details>
+            <summary>Can I get eggs every week?</summary>
+            <p>Yes. Pick Weekly or Fortnightly when you order. The price is the same and delivery is free. We charge your card each Thursday night for that Saturday, and email you on the Thursday with a link to skip that delivery. You can pause or cancel any time.</p>
+          </details>
+          <details>
             <summary>Can delivery be free?</summary>
-            <p>Yes. After you order you get a share link. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free.</p>
+            <p>Yes. Weekly and fortnightly orders always deliver free. For a single order, you get a share link after you pay. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free.</p>
           </details>
           <details>
             <summary>What eggs are they?</summary>
@@ -1088,6 +1126,6 @@
   </footer>
 
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=159"></script>
+  <script src="app.js?v=160"></script>
 </body>
 </html>

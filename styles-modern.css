@@ -1405,6 +1405,52 @@ section {
   transform: translateX(1.375rem);
 }
 
+/* How often: the poster's switch again, on the cream page. Each choice carries what delivery
+   costs, so the reason to make it weekly sits on the choice itself. Main tray only: the script
+   hides it for any other egg. */
+.picker-often {
+  /* The longest word gets a little more of the track. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  margin: -0.875rem 0 0;
+  box-shadow: var(--shadow-card);
+}
+
+.picker-often .bundle-opt {
+  align-content: center;
+  gap: 1px;
+  min-height: 3.25rem;
+  padding: 0 0.125rem;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.bo-sub {
+  color: var(--muted);
+  font-size: 0.78125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  transition: color 180ms ease;
+}
+
+.bundle-opt.is-picked .bo-sub,
+.bundle-opt:has(input:checked) .bo-sub {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* On a weekly or fortnightly order the reminder row gives way to this one: what is paid today
+   and when the card is charged after that. A note, not a control, so it sits flat on the page. */
+.repeat-note {
+  background: var(--sand);
+  box-shadow: none;
+  cursor: default;
+}
+
+@media (max-width: 699px) {
+  .picker-often:not([hidden]) ~ .remind-opt {
+    margin-top: -1.25rem;
+  }
+}
+
 /* How many, and one button that carries the total */
 .pay-bar {
   display: grid;
@@ -1527,6 +1573,83 @@ section {
   }
 }
 
+/* A longer button ("Subscribe", or a total in the hundreds) on a phone: the script marks the
+   pay bar, and the words step down a size so the total never runs off the button. "Buy now $30"
+   is never marked, so it keeps its size. */
+@media (max-width: 430px) {
+  .pay-bar.is-tight .buy-btn {
+    gap: 0.5rem;
+    padding: 0 1.125rem 0 1.25rem;
+    font-size: 1.0625rem;
+  }
+
+  .pay-bar.is-tight .buy-total {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .pay-bar.is-tight {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .pay-bar.is-tight .stepper {
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+    padding: 0 0.25rem;
+  }
+
+  .pay-bar.is-tight .step-btn {
+    width: 2.5rem;
+  }
+
+  .pay-bar.is-tight .buy-btn {
+    padding: 0 1rem 0 1.125rem;
+    font-size: 1rem;
+  }
+
+  .pay-bar.is-tight .buy-total {
+    font-size: 1.1875rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .pay-bar.is-tight {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.375rem;
+  }
+
+  .pay-bar.is-tight .stepper {
+    grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+    padding: 0 0.125rem;
+  }
+
+  .pay-bar.is-tight .step-btn {
+    width: 2.25rem;
+  }
+
+  .pay-bar.is-tight .buy-btn {
+    gap: 0.375rem;
+    padding: 0 0.875rem;
+    font-size: 0.9375rem;
+  }
+
+  .pay-bar.is-tight .buy-total {
+    font-size: 1.125rem;
+  }
+
+}
+
+@media (max-width: 350px) {
+  .picker-often .bundle-opt {
+    font-size: 0.90625rem;
+  }
+
+  .picker-often .bo-sub {
+    font-size: 0.71875rem;
+  }
+}
+
 /* Tablets and up: the photo sits beside the words, and the form goes two across.
    Here the photo is framed in yolk, so the two sides never have to be the same height. */
 @media (min-width: 700px) {
@@ -1610,8 +1733,8 @@ section {
     align-items: start;
   }
 
-  /* The address is three boxes tall here, so the reminder goes under the two
-     details boxes to match it, and the pay bar runs the full width below. */
+  /* The address is three boxes tall here, so the how often switch goes under the two
+     details boxes to match it. Below, the reminder sits beside the pay bar. */
   .order-addr {
     grid-column: 1;
     grid-row: 1 / span 2;
@@ -1626,19 +1749,26 @@ section {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .remind-opt {
+  .picker-often {
     grid-column: 2;
     grid-row: 2;
     margin: -1.125rem 0 0;
   }
 
+  .remind-opt {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: 4rem;
+    margin: 0;
+  }
+
   .pay-bar {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 3;
   }
 
   .form-note {
-    grid-column: 1 / -1;
+    grid-column: 2;
     grid-row: 4;
     margin-top: -0.625rem;
   }
@@ -1649,12 +1779,26 @@ section {
     grid-row: 3;
   }
 
+  .order-details.has-msg .remind-opt,
   .order-details.has-msg .pay-bar {
     grid-row: 4;
   }
 
   .order-details.has-msg .form-note {
     grid-row: 5;
+  }
+
+  /* Another egg is picked, so there is no switch: the reminder takes its place, as before. */
+  .picker-often[hidden] ~ .remind-opt {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 3.875rem;
+    margin: -1.125rem 0 0;
+  }
+
+  .picker-often[hidden] ~ .pay-bar,
+  .picker-often[hidden] ~ .form-note {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1672,7 +1816,7 @@ section {
 }
 
 /* Wide screens: suburb, city and postcode share a row, so both sides are two boxes
-   tall; the reminder sits on the left beside the pay bar. */
+   tall; the how often switch sits on the left beside the pay bar, the reminder under it. */
 @media (min-width: 1100px) {
   .order-addr .order-fields {
     grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr);
@@ -1686,11 +1830,21 @@ section {
     grid-row: 1;
   }
 
-  .remind-opt {
+  .picker-often {
     grid-column: 1;
     grid-row: 2;
-    min-height: 4rem;
     margin: 0;
+  }
+
+  .picker-often .bundle-opt {
+    min-height: 3.375rem;
+  }
+
+  .remind-opt {
+    grid-column: 1;
+    grid-row: 3;
+    min-height: 4rem;
+    margin: -1.125rem 0 0;
   }
 
   .pay-bar {
@@ -1703,23 +1857,76 @@ section {
     grid-row: 3;
   }
 
+  /* A message takes the row under the address, and everything after it moves down one. */
   .order-msgs {
     grid-row: 2;
   }
 
-  .order-details.has-msg .remind-opt,
+  .order-details.has-msg .picker-often,
   .order-details.has-msg .pay-bar {
     grid-row: 3;
   }
 
+  .order-details.has-msg .remind-opt,
   .order-details.has-msg .form-note {
     grid-row: 4;
+  }
+
+  /* Another egg is picked, so there is no switch: the reminder sits beside the pay bar. */
+  .picker-often[hidden] ~ .remind-opt {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 4rem;
+    margin: 0;
+  }
+
+  .picker-often[hidden] ~ .pay-bar,
+  .picker-often[hidden] ~ .form-note {
+    grid-column: 2;
+  }
+
+  .order-details.has-msg .picker-often[hidden] ~ .remind-opt {
+    grid-row: 3;
+  }
   }
 }
 
 @media (max-width: 999px) and (min-width: 700px) {
   .buy-btn {
     padding: 0 1.25rem 0 1.375rem;
+  }
+}
+
+/* Small tablets: the pay bar has half the width here, so it takes the narrow phone's sizes. */
+@media (max-width: 839px) and (min-width: 700px) {
+  .pay-bar {
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .stepper {
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+    padding: 0 0.25rem;
+  }
+
+  .step-btn {
+    width: 2.5rem;
+  }
+
+  .buy-btn {
+    gap: 0.5rem;
+    padding: 0 1rem 0 1.125rem;
+    font-size: 1rem;
+  }
+
+  .buy-total {
+    font-size: 1.1875rem;
+  }
+
+  /* Another egg is picked: the pay bar runs the full width again, at its usual sizes. */
+  .picker-often[hidden] ~ .pay-bar {
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: 0.625rem;
   }
 }
 
@@ -3282,6 +3489,7 @@ body:has(> main > .notfound) > main {
   .showcase-photo > img.chalk-hold,
   .order-tray-photo > img.chalk-hold,
   .picker.has-thumb::before,
+  .bo-sub,
   .remind-opt input,
   .remind-opt input::before,
   .pick-num,

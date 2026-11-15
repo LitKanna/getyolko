@@ -20,6 +20,9 @@ export const EMAIL_TITLES = [
   { title: "Your eggs are booked for Saturday", mark: "Saturday", lines: ["Your eggs are booked", "for Saturday"], file: "title-booked-1.png" },
   { title: "Your refund is on its way", mark: "refund", lines: ["Your refund", "is on its way"], file: "title-refund-1.png" },
   { title: "Eggs this Saturday?", mark: "Saturday", lines: ["Eggs this Saturday?"], file: "title-reminder-1.png" },
+  // Weekly and fortnightly orders: Thursday's notice, and a card that would not charge.
+  { title: "Your eggs come this Saturday", mark: "Saturday", lines: ["Your eggs come", "this Saturday"], file: "title-coming-1.png" },
+  { title: "Your card didn’t go through", mark: "card", lines: ["Your card didn’t", "go through"], file: "title-card-1.png" },
 ];
 
 /** The picture for a heading: `{ file, width, height }`, or null when it has none. */

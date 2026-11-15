@@ -16,6 +16,7 @@
                     "test:email-titles":  "node infra/email-titles-test.mjs",
                     "test:share-preview":  "node infra/share-preview-test.mjs",
                     "test:phone-line":  "node infra/phone-line-test.mjs",
+                    "test:subscriptions":  "node infra/subscriptions-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {

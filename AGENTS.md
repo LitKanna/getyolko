@@ -335,6 +335,68 @@ makes a share code for each customer still to deliver and returns a QR code as S
 Worker with the `qrcode-generator` package) for `/r/<CODE>?m=card`. The admin prints four A6 cards
 per A4 sheet with print CSS; the `?m=card` tag shows card scans as `utm_medium=card`.
 
+### Weekly and fortnightly orders (15 Nov 2026)
+Kanna asked for a way to subscribe and settled on "weekly and fortnightly". Same prices as any
+order, never a discount: the pull is free delivery. Only the main tray repeats (1 tray, 2 trays,
+Full box), because it is the one thing the shop always has.
+
+How it works. It is a saved card that the Worker's own cron charges, not a Stripe Billing
+subscription (Stripe bills on a fixed UTC clock that cannot follow "Thursday night, Sydney time"
+through daylight saving, a one-week skip is awkward there, and it adds a fee to every charge).
+The first order is an ordinary Checkout with `customer_creation=always` and
+`payment_intent_data[setup_future_usage]=off_session`; `markOrderPaid` then starts the repeat
+order (`startSubscription`). After that, each week:
+- Thursday, 10am to 8pm Sydney: a notice email through the Zoho mailbox (CPaaS only as a fallback)
+  says the eggs come on Saturday and what will be charged, with one Skip button.
+- Friday, midnight to noon (`SUB_CHARGE_END_HOUR`), once orders have closed: the card is charged
+  with an off-session PaymentIntent and a normal paid order is written through `markOrderPaid`, so
+  stock, the confirmation email, the delivery run, receipts and refunds work as for any order.
+  Customer copy calls this "Thursday night".
+The schedule is one date on the record, `nextRun` (an anchor Saturday). `subNext` rolls it forward
+by 7 or 14 days, so a fortnightly order keeps its weeks through a pause. A skip just moves it on.
+A declined card writes no order, emails the customer an Update card button, and is not retried
+by the cron; a new card entered before Friday noon is charged at once. Two failures in a row pause
+the order (`pauseWhy: "card"`) until the card is updated. A Stripe outage blames nobody: the same
+charge is retried with the same idempotency key until noon, and the shop gets one alert email.
+Repeat orders are charged even when the shop shows sold out, so keep stock for them.
+
+KV: `sub:<id>`, `sub:index`, `sub:tok:<token>` (a plain id string, the secret in the customer's
+links), `sub:run:<id>:<saturday>` (the order id a charge uses, so a retry never makes a second
+order), `sub:off` (pause for everyone), `sub:lastrun`, `sub:alert:<saturday>`.
+
+The customer's page is `/subscription?t=<token>` (`subPage`, the shop's cream look, noindex):
+skip, undo, pause, start again, change size or rhythm, new card, cancel. A GET only ever asks;
+the change happens on a POST and answers with a 303, so mail scanners cannot skip or cancel for
+anyone. Cancelling detaches the saved card. A new address or a quantity above one is by reply.
+
+The order section: under Your details, one three-way switch (`#often-picker`: Once, Weekly,
+Fortnightly), each option with its delivery cost under it. Kanna's plan said one "Make it weekly"
+switch; with fortnightly added it became one switch with three choices, still no pop-up. Picking
+a repeat swaps the Thursday reminder row for a flat note (`#repeat-note`: "$25 today, then every
+Thursday night", "Skip or cancel any time"), drops the $5 and makes the button say Subscribe. The
+switch hides itself for other trays and dozens. Measure after touching it: the button must fit
+"Subscribe $720" on a 320px phone (`.pay-bar.is-tight`) and no option may wrap. The paid sheet
+adds one line on when the next one comes. `terms.html` and `privacy.html` say how the saved card is used.
+
+People with a repeat order that is not cancelled (active or paused) are left out of the ordinary
+Thursday "order again" reminder (`repeatOrderPeople`); it comes back after a cancel if they had
+opted in.
+
+Admin > Subscribers (`#subscribers`, `renderSubs`): three tiles (Active, the coming Saturday,
+Worth a week), then one card a person in the Customers style, the ones needing attention first.
+Manage opens a sheet with Skip (or Undo the skip), Pause or Resume, and Cancel order (the only
+action that asks first, because the card is let go). Pause all stops every charge. The nav badge
+counts failed cards. The delivery run shows repeat orders that are not charged yet as one line
+under "In the car"; once charged they are ordinary stops. Routes: `GET /api/admin/subscriptions`,
+`POST /api/admin/subscriptions` (`{ on }` or `{ id, action, for? }`), and
+`POST /api/admin/subscriptions/check`, which asks Stripe (without charging anything: it opens a
+card-saving checkout and expires it, then sends an empty charge request that must be refused for
+its missing amount) whether the key may do both. Run it once after a deploy that touches payments.
+
+`npm run test:subscriptions` runs the whole Worker in Node against a pretend Stripe, Zoho and
+clock: first order, notice, skip, charge, decline, card update, Stripe outage, pause, change,
+cancel and the admin routes. Never test this against the real Stripe account.
+
 ### Competitor egg prices (Admin > Competitors, Nov 2026)
 No Australian supermarket has a price API. `infra/price-watch.mjs` reads public pages that the
 shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
