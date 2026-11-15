@@ -65,16 +65,28 @@ Bulk eggs pages, so each of them says a thing once. Keep them this lean.
   distance from the top of the card, so the box does not move as matches arrive. No Questions
   section: the search answers them.
 - `/bulk-eggs-sydney`: hero, the per egg table (three rows), one wholesale card
-  (`.panel-split`: heading left, words and WhatsApp right), five questions, the yellow panel.
+  (`.panel-split`: heading left, words and one button right), six questions, the yellow panel.
   The wholesale heading and "Do you sell eggs wholesale?" are there for search: keep them.
-- A page without its own Questions section goes in `NO_FAQ`, so its Questions link opens the
-  homepage's. The yellow panel has one button; `ctaBand` takes it as `primary` (the bulk page's
-  opens the form with a box picked).
+- A page without its own Questions section goes in `NO_FAQ`, so its Questions links (header,
+  phone menu and footer) open the homepage's; on every other page all three open that page's
+  own questions. The yellow panel has one button; `ctaBand` takes it as `primary` (the bulk
+  page's opens the form with a box picked).
 - The hero line never repeats the three facts under it (Saturday, $5 flat, card).
 - The line under a Questions heading is "Can't find your answer? Message us." Kanna did not
   want "a real person will reply". No phone number there: the buttons open WhatsApp and email.
 - The map takes at most half its card (`min(29.375rem, 50%)`), so the search box beside it
   keeps its width on a small laptop.
+
+Round 5 (build 257), three things Kanna asked for on 15 Nov 2026:
+- No trail of links above a page's heading ("Home / Egg delivery Sydney / Delivery areas").
+  Kanna did not understand it beside the menu's own names (Delivery, Suburbs, Bulk eggs). Do
+  not bring it back. Each page still carries its `BreadcrumbList` data for search.
+- The bulk page says "boxes", never "a box": bulk means several boxes, up to 10 in one order.
+  The hero line says so and the buttons read "Order boxes".
+- The bulk page offers the weekly and fortnightly order to cafés, restaurants and grocers: the
+  wholesale card's button, "Order weekly", links to `/?b=box&repeat=1#order`. `repeat=1` picks
+  Weekly and `repeat=2` Fortnightly on the form's switch (`preselectRepeat` in `app.js`), as
+  `b=` picks the pack. The card no longer asks people to message for a standing order.
 
 Sizes are in rem (round 3, non-obvious). Every length in `styles-modern.css` is written in rem,
 where rem = px / 16 (13px is `0.8125rem`), and `html` sets `font-size: clamp(16px, 1vw, 20px)`.

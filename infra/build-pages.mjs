@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "163";
+const CSS_V = "164";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -529,28 +529,18 @@ ${menu(path)}
   </header>`;
 }
 
-function crumbsNav(trail) {
-  const parts = trail.map(([name, p], i) =>
-    i === trail.length - 1
-      ? `            <span aria-current="page">${name}</span>`
-      : `            <a href="${p}">${name}</a>\n            <span class="crumbs-sep" aria-hidden="true">/</span>`
-  );
-  return `          <nav class="crumbs" aria-label="Breadcrumb">
-${parts.join("\n")}
-          </nav>`;
-}
-
 const HERO_FACTS = `          <ul class="hero-facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$${PRICE.delivery} flat delivery</li>
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
           </ul>`;
 
-function heroSection({ trail, h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT }) {
+// No trail of links above the heading: Kanna found "Home / Egg delivery Sydney / Delivery areas"
+// confusing beside the menu's own names. Search engines still get it as BreadcrumbList data.
+function heroSection({ h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT }) {
   return `    <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-${crumbsNav(trail)}
           <h1>${h1}</h1>
           <p class="hero-sub">${sub}</p>
           <div class="hero-cta">
@@ -744,7 +734,7 @@ ${BRAND_FOOTER("/", "YOLKO home")}
         </nav>
         <nav class="foot-col" aria-label="Help">
           <p class="foot-h">Help</p>
-          <a href="/#faq">Questions</a>
+          <a href="${NO_FAQ.has(path) ? "/#faq" : "#faq"}">Questions</a>
           <a href="mailto:${EMAIL}">${EMAIL}</a>${WHATSAPP ? `
           <a href="${WHATSAPP}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ""}
         </nav>
@@ -854,7 +844,6 @@ function suburbPage(s) {
   }).join("\n");
   const body = `  <main>
 ${heroSection({
-    trail,
     h1: `Egg delivery in ${s.name}`,
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, at your door in ${s.name} on Saturday morning. Delivery is $${PRICE.delivery} flat.`,
     secondary: [`Suburbs near ${s.name}`, "#nearby"],
@@ -920,7 +909,6 @@ ${SUBURB_PAGES.map((s) => `              <li><a href="${suburbPath(s)}">${s.name
             </ul>`;
   const body = `  <main>
 ${heroSection({
-    trail,
     h1: "Egg delivery across Sydney",
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs.`,
     secondary: ["Check your suburb", "#map-title"],
@@ -949,6 +937,7 @@ function bulkPage() {
     ["Do you sell eggs wholesale?", `We sell by the box at one price for everyone. A box is the standard 15 dozen carton, 180 eggs, for <strong>$${PRICE.box}</strong>. You do not need an ABN or a trade account.`],
     ["How many eggs are in a box?", "180. That is six trays of 30, or 15 dozen, and about 10.5&nbsp;kg of eggs."],
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, ${contactLink("message us on WhatsApp", "email us")}.`],
+    ["Can I get boxes every week?", "Yes. Pick Weekly or Fortnightly when you order. The price is the same and delivery is free. We charge your card each Thursday night for that Saturday, and email you on the Thursday with a link to skip that delivery. You can pause or cancel any time."],
     ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
     ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."],
   ];
@@ -960,10 +949,10 @@ function bulkPage() {
   ];
   const body = `  <main>
 ${heroSection({
-    trail,
     h1: "Bulk eggs in Sydney",
-    sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg.`,
-    cta: "Order a box",
+    // Say "boxes": the page is for orders of several boxes, and 10 is the most in one order.
+    sub: `Boxes of 180 Pace Farm eggs for <strong>$${PRICE.box}</strong> each, about ${perEgg(PRICE.box, 180)}¢ an&nbsp;egg. Order up to 10 at a time.`,
+    cta: "Order boxes",
     ctaHref: "/?b=box#order",
     secondary: CONTACT_BUTTON,
     alt: `${HERO_ALT}. Six trays make a 180-egg box`,
@@ -984,12 +973,12 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
     <section class="band" aria-labelledby="wholesale-title">
       <div class="wrap">
         <div class="panel panel-split">
-          <h2 id="wholesale-title">Wholesale eggs for cafés and restaurants</h2>
+          <h2 id="wholesale-title">Wholesale eggs for cafés, restaurants and grocers</h2>
           <div class="panel-body">
             <p>The standard 15 dozen box at one price for everyone. No trade account and no contract.</p>
-            <p>For a weekly standing order, send us your name, address and how many boxes you need. We set them aside for every Saturday delivery.</p>
+            <p>Order weekly or fortnightly, up to 10 boxes, and delivery is free. Skip a week or cancel any time.</p>
             <div class="hero-cta">
-              <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
+              <a class="btn btn-ink" href="/?b=box&amp;repeat=1#order">Order weekly</a>
             </div>
           </div>
         </div>
@@ -998,7 +987,7 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
 
 ${faqSection("Bulk order questions", faqs)}
 
-${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, null, ["Order a box", "/?b=box#order"])}
+${ctaBand("Boxes this Saturday", `$${PRICE.box} a box of 180 eggs. Order by Thursday night.`, null, ["Order boxes", "/?b=box#order"])}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
@@ -1033,7 +1022,6 @@ function pricesPage() {
   ];
   const body = `  <main>
 ${heroSection({
-    trail,
     h1: "Egg prices in Sydney",
     sub: `What a tray or a dozen costs at Coles, Aldi and IGA right now, next to YOLKO's tray of 30 for <strong>$${PRICE.tray1}</strong>. Checked every 6 hours.`,
     secondary: ["See the prices", "#trays-title"],
@@ -1129,7 +1117,6 @@ function areasPage(existingHtml) {
 
   const body = `  <main>
 ${heroSection({
-    trail,
     h1: "Every suburb we deliver to",
     sub: `Saturday morning egg delivery to nearly 700 Sydney suburbs. Type yours below to check.`,
     secondary: ["Find your suburb", "#suburbs"],
@@ -1243,7 +1230,7 @@ const HOME_FAQ = [
   ["Can I get eggs every week?", "Yes. Pick Weekly or Fortnightly when you order. The price is the same and delivery is free. We charge your card each Thursday night for that Saturday, and email you on the Thursday with a link to skip that delivery. You can pause or cancel any time."],
   ["Can delivery be free?", "Yes. Weekly and fortnightly orders always deliver free. For a single order, you get a share link after you pay. A friend's first delivery through it is free, and so is your next one. When neighbours in the same building order for the same Saturday, every order after the first ships free."],
   ["What eggs are they?", EGGS_FAQ],
-  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs. Cafés and restaurants can ${contactLink("message us", "email us")} for a weekly standing order. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
+  ["Can I order in bulk?", `Yes. Order up to 10 boxes of 180 eggs, once, weekly or fortnightly. More on <a href="/bulk-eggs-sydney">bulk and wholesale eggs</a>.`],
 ];
 
 function fillMarker(html, name, content) {
