@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "165";
+const CSS_V = "166";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -112,8 +112,8 @@ const SUBURB_PAGES = [
   {
     slug: "concord", name: "Concord", postcode: "2137", region: "Canada Bay",
     nearby: ["Mortlake", "Breakfast Point", "Cabarita", "Concord West", "North Strathfield"],
-    faq: ["Can a café on Majors Bay Road get a weekly box?", `Yes. Order the $${PRICE.box} box (180 eggs) online, or ${contactLink("message us on WhatsApp", "email us")} to set up a weekly standing order.`],
-    local: `Concord is mostly houses, with a strip of cafés along Majors Bay Road. A café can order a 180-egg box online each week, or ${CONTACT_WORDS} to set up a standing order. Homes in Breakfast Point and Cabarita get the same Saturday delivery and the same $${PRICE.delivery} fee.`,
+    faq: ["Can a café on Majors Bay Road get a weekly box?", `Yes. Pick the $${PRICE.box} box (180 eggs) and Weekly when you order. Delivery is free on a weekly order, and you can skip a week.`],
+    local: `Concord is mostly houses, with a strip of cafés along Majors Bay Road. A café can put a 180-egg box on a weekly order, and delivery is then free. Homes in Breakfast Point and Cabarita get the same Saturday delivery and the same $${PRICE.delivery} fee.`,
   },
   {
     slug: "auburn", name: "Auburn", postcode: "2144", region: "Cumberland",
@@ -130,8 +130,8 @@ const SUBURB_PAGES = [
   {
     slug: "ashfield", name: "Ashfield", postcode: "2131", region: "Inner west",
     nearby: ["Summer Hill", "Croydon", "Haberfield", "Ashbury", "Dulwich Hill"],
-    faq: ["Do restaurants in Ashfield order boxes?", `Yes. A box is 180 eggs for $${PRICE.box}, up to 10 boxes an order. ${contactLink("Message us on WhatsApp", "Email us")} for a weekly standing order.`],
-    local: `Ashfield mixes apartment blocks near the station with older houses on the side streets. The Shanghainese and other Chinese restaurants along Liverpool Road can order 180-egg boxes, up to 10 at a time, or ${CONTACT_WORDS} for a weekly standing order.`,
+    faq: ["Do restaurants in Ashfield order boxes?", `Yes. A box is 180 eggs for $${PRICE.box}, up to 10 boxes an order. Pick Weekly or Fortnightly and delivery is free.`],
+    local: `Ashfield mixes apartment blocks near the station with older houses on the side streets. The Shanghainese and other Chinese restaurants along Liverpool Road can order 180-egg boxes, up to 10 at a time, once or every week.`,
   },
   {
     slug: "ryde", name: "Ryde", postcode: "2112", region: "Northern Sydney",
@@ -142,7 +142,7 @@ const SUBURB_PAGES = [
   {
     slug: "bankstown", name: "Bankstown", postcode: "2200", region: "South-west",
     nearby: ["Yagoona", "Punchbowl", "Condell Park", "Bass Hill", "Greenacre"],
-    faq: ["Can bakeries and sweet shops order in bulk?", `Yes. Order up to 10 boxes of 180 eggs ($${PRICE.box} each), or ${contactLink("message us on WhatsApp", "email us")} for a weekly standing order.`],
+    faq: ["Can bakeries and sweet shops order in bulk?", `Yes. Order up to 10 boxes of 180 eggs ($${PRICE.box} each), once, weekly or fortnightly.`],
     local: `Bankstown has apartments around the station and plenty of family homes in Yagoona, Condell Park and Greenacre. The Vietnamese bakeries and Lebanese sweet shops in Bankstown can order 180-egg boxes for $${PRICE.box} each, up to 10 at a time.`,
   },
   {
@@ -529,10 +529,12 @@ ${menu(path)}
   </header>`;
 }
 
+// The third fact is the weekly order: every page says on its first screen that it makes
+// delivery free. It took the place of "Pay by card", which the order form shows anyway.
 const HERO_FACTS = `          <ul class="hero-facts">
             <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Saturday 6am to 12pm</li>
-            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$${PRICE.delivery} flat delivery</li>
-            <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/></svg>Pay by card</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v10h-11zM13.5 10h4l3.5 3.5v3h-7.5z"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>$${PRICE.delivery} delivery</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2.5 20.5 6 17 9.5M3.5 11.5V10a4 4 0 0 1 4-4h13M7 21.5 3.5 18 7 14.5M20.5 12.5V14a4 4 0 0 1-4 4h-13"/></svg>Free on weekly orders</li>
           </ul>`;
 
 // No trail of links above the heading: Kanna found "Home / Egg delivery Sydney / Delivery areas"
@@ -587,10 +589,23 @@ ${steps.map(([when, t, d]) => `          <li>
 // The homepage's three steps, in the homepage's words: this is the page about delivery, so it
 // says how to change an order and what happens at an apartment.
 const DELIVERY_STEPS = [
-  ["By Thursday night", "Order online", "Pick one tray, two trays or a 180-egg box, and pay by card."],
+  ["By Thursday night", "Order online", "Pick one tray, two trays or a 180-egg box, once or every week, and pay by card."],
   ["Straight away", "Get your receipt", `We email your order and receipt as soon as you pay. Need a change? Reply to that email or ${CONTACT_WORDS}.`],
   ["Saturday, 6am to 12pm", "Eggs at your door", "We bring your eggs to your door. Live in an apartment? Add your unit number and we will message you if we need to be let in."],
 ];
+
+// The weekly order row: one wide card under the three price cards on the delivery, suburb and
+// price pages, and (as an <article>, in index.html) first in the homepage's "More ways to save".
+// Its button opens the order form with Weekly picked (/?repeat=1#order, see app.js).
+const WEEKLY_ORDER_HREF = "/?repeat=1#order";
+const WEEKLY_CARD = (tag) => `          <${tag} class="weekly-card">
+            <div class="wk-copy">
+              <h3>Weekly or fortnightly</h3>
+              <p>Same prices. Skip a week or cancel any time.</p>
+            </div>
+            <p class="wk-free">Free <span>delivery</span></p>
+            <a class="btn btn-ink btn-small" href="${WEEKLY_ORDER_HREF}">Order weekly</a>
+          </${tag}>`;
 
 function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.delivery} flat.`) {
   const cards = ["tray1", "tray2", "box"].map((k) => {
@@ -609,6 +624,7 @@ function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.
 ${sectionHead(title, sub, "prices-title")}
         <ul class="price-cards">
 ${cards}
+${WEEKLY_CARD("li")}
         </ul>
       </div>
     </section>`;
@@ -724,6 +740,7 @@ ${BRAND_FOOTER("/", "YOLKO home")}
         <nav class="foot-col" aria-label="Shop">
           <p class="foot-h">Shop</p>
           <a href="/#order">Order eggs</a>
+          <a href="${WEEKLY_ORDER_HREF}">Weekly orders</a>
           <a href="/bulk-eggs-sydney"${cur("/bulk-eggs-sydney")}>Bulk eggs</a>
           <a href="${PRICES_PATH}"${cur(PRICES_PATH)}>Egg prices</a>
         </nav>

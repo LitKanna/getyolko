@@ -663,6 +663,19 @@ form?.addEventListener("change", (e) => {
   radio.dispatchEvent(new Event("change", { bubbles: true }));
 })();
 
+// "Order weekly" links on this page (href="/?repeat=1#order") do the same without loading the
+// page again: pick Weekly, then go to the order form. A pack with no repeat option keeps the link.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest ? e.target.closest("a[data-repeat]") : null;
+  if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const radio = oftenPicker && !oftenPicker.hidden ? oftenPicker.querySelector(`input[name="repeat"][value="${a.dataset.repeat}"]`) : null;
+  if (!radio || !orderSection) return;
+  e.preventDefault();
+  radio.checked = true;
+  radio.dispatchEvent(new Event("change", { bubbles: true }));
+  orderSection.scrollIntoView();
+});
+
 const fulfillmentSeg = document.getElementById("fulfillment-seg");
 if (fulfillmentSeg) fulfillmentSeg.addEventListener("change", syncFulfillmentUI);
 

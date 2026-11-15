@@ -417,6 +417,24 @@ switch hides itself for other trays and dozens. Measure after touching it: the b
 "Subscribe $720" on a 320px phone (`.pay-bar.is-tight`) and no option may wrap. The paid sheet
 adds one line on when the next one comes. `terms.html` and `privacy.html` say how the saved card is used.
 
+Across the site (build 259; Kanna, 15 Nov 2026: "Use the new subscribe option on every screen u
+can"). The weekly order is said once on each screen it fits, in few words, and nowhere twice:
+- First screen of every page: the third hero fact is "Free on weekly orders" (`HERO_FACTS` in
+  `infra/build-pages.mjs`, by hand in `index.html`). It took the place of "Pay by card". The
+  middle fact reads "$5 delivery", so the two read as one thought.
+- The weekly row (`.weekly-card`, `WEEKLY_CARD` in the generator): one wide card, "Weekly or
+  fortnightly / Same prices. Skip a week or cancel any time. / Free delivery / Order weekly". It
+  sits under the three price cards on the Delivery, suburb and Prices pages, and first in the
+  homepage's "More ways to save". On a phone "delivery" goes under "Free" so the button fits
+  beside it. The Bulk eggs page has its own wholesale card instead (round 5).
+- Every "Order weekly" link is `/?repeat=1#order`. On the homepage the same links carry
+  `data-repeat="1"`, and `app.js` picks Weekly and scrolls to the form without a reload.
+- Step one of "How Saturday delivery works" says "once or every week"; the footer's Shop list
+  has "Weekly orders".
+- Suburb pages never ask anyone to message for a "standing order": they say to pick Weekly.
+Not touched on purpose: the black bar, the yellow band at the foot of a page, the phone order
+bar and the paid sheet (each already has one job).
+
 People with a repeat order that is not cancelled (active or paused) are left out of the ordinary
 Thursday "order again" reminder (`repeatOrderPeople`); it comes back after a cancel if they had
 opted in.
