@@ -52,7 +52,8 @@ phones and tablets (`.menu`, a `<details>` in the header written by `menu()` in
 `infra/build-pages.mjs`: Delivery, Suburbs, Bulk eggs, Questions; the header still carries no
 phone number), short ledes that wrap into even lines (`text-wrap: balance` on `.hero-sub`,
 `.section-head p`, `.cta-panel p`, so "$5 flat." is never left alone on a line), the two shop
-tables on `/egg-prices-sydney` sharing one set of columns, a reading width on full-width cards
+tables on `/egg-prices-sydney` sharing one set of columns (those tables are gone since the
+page was rebuilt, see "Public egg price page"), a reading width on full-width cards
 (`.panel > p`), the search box placeholder showing whole on phones, and wide screens (below).
 
 Round 4 (build 256): Kanna asked to "remove unnecessary things" from the Delivery, Suburbs and
@@ -419,9 +420,10 @@ adds one line on when the next one comes. `terms.html` and `privacy.html` say ho
 
 Across the site (build 259; Kanna, 15 Nov 2026: "Use the new subscribe option on every screen u
 can"). The weekly order is said once on each screen it fits, in few words, and nowhere twice:
-- First screen of every page: the third hero fact is "Free on weekly orders" (`HERO_FACTS` in
-  `infra/build-pages.mjs`, by hand in `index.html`). It took the place of "Pay by card". The
-  middle fact reads "$5 delivery", so the two read as one thought.
+- First screen of every page with a photo hero: the third hero fact is "Free on weekly orders"
+  (`HERO_FACTS` in `infra/build-pages.mjs`, by hand in `index.html`). It took the place of "Pay
+  by card". The middle fact reads "$5 delivery", so the two read as one thought. (The egg prices
+  page has a price board for a first screen and no hero facts; its weekly row says it.)
 - The weekly row (`.weekly-card`, `WEEKLY_CARD` in the generator): one wide card, "Weekly or
   fortnightly / Same prices. Skip a week or cancel any time. / Free delivery / Order weekly". It
   sits under the three price cards on the Delivery, suburb and Prices pages, and first in the
@@ -486,21 +488,57 @@ latest stock flip per egg, and name the egg by its group ("Cage 1.5kg tray"). Th
 change YOLKO's own prices. Routes: `GET /api/price-watch`, `POST /api/price-watch/poll`, both
 admin only.
 
-### Public egg price page (/egg-prices-sydney, 12 Nov 2026; Kanna approved naming the shops)
-The same price check, shown to shoppers: a tray table (YOLKO's tray in its place by price per
-egg), a dozens and 18 packs table, an egg sizes guide and FAQ. `infra/build-pages.mjs` writes
-`egg-prices-sydney.html` with empty tables between `<!-- prices-trays:start -->` style markers
-(YOLKO's own row and "checking the shops again"), and the Worker fills them on every request from
-`pricewatch:v2:latest` and the live `settings` (`pricesPageHtml`); if KV fails the page goes out
-as built. `infra/prices-page.mjs` holds the rules and is shared by the build, the Worker and
+### Public egg price page (/egg-prices-sydney; Kanna approved naming the shops, 12 Nov 2026)
+Rebuilt on 15 Nov 2026 (build 260). The first version was two tables of other shops' packs with
+YOLKO's row highlighted among them, red "Out of stock online" notes and a list of when each shop
+was "checked", under the chalk photo. Kanna asked for a "massive reconstruction" so that YOLKO
+does not sound or look "like creeps". It is a price guide now, sorted by the pack and the kind
+of egg, never shop against shop. Keep it that way:
+- The first screen is one ink board (`.board`), not the photo hero: the heading, one switch (A
+  dozen, 18 pack, Tray of 30), the price range of the picked pack in giant type, and a shelf for
+  each kind of egg (Cage, Cage free, Free range) with one egg drawn for every pack on sale, placed
+  along the shelf by its price and drawn to its size. Resting on an egg names it in the line
+  under the shelves; tapping one jumps to its row, which lights up (`:target`).
+- Under it, the same packs as a list (`.packs`): one white card with a column for each kind,
+  sorted by price, each row linking to the shop's own page.
+- YOLKO's own tray is one egg with a yolk in it on the tray board and one line under the
+  shelves ("YOLKO's tray is $13, delivered Saturday"). It is never a row among the shops' packs.
+- A pack that is out of stock is left off. Nobody is told a shop has run out.
+- One line says when the prices were updated. No "checked" time per shop, and no word like
+  checking, watching or comparing shops. The small print (`.guide-note`) says where the prices
+  come from and that YOLKO is not connected to the shops.
+- Then "How to compare egg prices": a price per egg sum on yolk (`.sum`, type a price, pick the
+  pack) beside the four egg sizes drawn to their weights (`.sizes`); then YOLKO's own prices,
+  the questions and the yellow panel.
+- This page has no chalk photo and no hero facts. Kanna has not asked for a picture here: do
+  not add a drawn or computer-made one.
+
+How it is built. `infra/build-pages.mjs` (`pricesPage`) writes `egg-prices-sydney.html` with two
+marked slots, `guide-board` and `guide-packs`, holding "Today's prices are on their way", and
+the Worker fills them on every request from `pricewatch:v2:latest` and the live `settings`
+(`pricesPageHtml`); if KV fails the page goes out as built. `infra/prices-page.mjs` holds the
+rules and the HTML of both slots and is shared by the build, the Worker and
 `infra/prices-page-test.mjs` (`npm run test:prices`), so keep it free of Node and Worker APIs.
+The switch works without script: the radios are inside `.guide`, and the stylesheet hides every
+`[data-pack]` but the picked one with `:has()`, so a new pack size needs its line there too (the
+test checks). The shelves are `aria-hidden`: they are a picture of the list under them. From
+901px the board is a two-column grid and each view's parts sit on it (`display: contents`); the
+board must fit under the header on a 1366x768 and a 1536x734 screen, so measure after touching
+it. `--u` scales the eggs. The phone order bar waits until the board has scrolled away
+(`data-order-bar-after`, read by `TOPBAR_SCRIPT`). The inline `PRICES_SCRIPT` only adds the
+egg's name on hover and the sum. The slot names changed with the rebuild on purpose: a Worker
+with the new module leaves an older pinned page alone instead of filling it with markup it has
+no styles for.
+
 Rules that must hold: only prices the Worker read itself (`source: "auto"`, so never the typed-in
-Woolworths or Costco), only from the last 24 hours (a shop that cannot be read drops off), every
-table says when it was checked in Sydney time, every pack links to the shop's own page (https and
-the shop's own host only), product names are escaped, and the copy never says cheapest, best or
-beats: the numbers are sorted and left to speak, even when a shop is cheaper than YOLKO. The page
-is served without an ETag so nobody gets a stale 304, and `/sitemap.xml` is rewritten on the way
-out so this page's `lastmod` is the day a price or stock last changed (`lastPriceChange`).
+Woolworths or Costco), only from the last 24 hours (a shop that cannot be read drops off), only
+packs in stock, the board says when the prices were updated in Sydney time, every pack links to
+the shop's own page (https and the shop's own host only), product names are escaped, and the
+copy never says cheapest, best or beats: the numbers are sorted and left to speak, even when a
+shop is cheaper than YOLKO. (The one question "What is the cheapest way to buy eggs?" is there
+because people search for it; its answer is about pack sizes, not shops.) The page is served
+without an ETag so nobody gets a stale 304, and `/sitemap.xml` is rewritten on the way out so
+this page's `lastmod` is the day a price or stock last changed (`lastPriceChange`).
 
 ### Egg news (Admin > News, Nov 2026)
 `infra/news-feed.mjs` gathers Australian egg news from public feeds: two Google News searches

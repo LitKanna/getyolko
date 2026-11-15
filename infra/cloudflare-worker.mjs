@@ -4181,9 +4181,9 @@ async function myPrices(env) {
 }
 
 /**
- * /egg-prices-sydney for the public: the built page with its tables filled from the same price
- * check Admin > Competitors shows, next to the shop's own live tray prices. If anything fails the
- * page goes out as built (YOLKO's prices and "checking the shops again"), never an error.
+ * /egg-prices-sydney for the public: the built page with its board and pack lists filled from
+ * the same price check Admin > Competitors shows, and the shop's own live tray price. If anything
+ * fails the page goes out as built ("Today's prices are on their way"), never an error.
  */
 async function pricesPageHtml(html, env) {
   try {
@@ -4193,7 +4193,6 @@ async function pricesPageHtml(html, env) {
       prices: settings.prices,
       trayWeight: settings.trayWeight,
       soldOut: Number(settings.traysAvailable) === 0,
-      delivery: SITE_DELIVERY_FEE,
       now: Date.now(),
     }).html;
   } catch (err) {

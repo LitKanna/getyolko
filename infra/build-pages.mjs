@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "166";
+const CSS_V = "167";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -781,12 +781,13 @@ function mobileCta(line, pack = "tray1") {
 // Shades the header once the page scrolls, and slides the phone order bar in
 // after the hero's own Order button has scrolled away (without JS it always shows).
 // It tucks away again at the closing band, which has its own Order button, so it
-// never sits over the footer.
+// never sits over the footer. A page without that button (the egg prices page) marks the
+// block the bar waits for with data-order-bar-after.
 const TOPBAR_SCRIPT = `  <script>
   (function () {
     var bar = document.querySelector(".topbar");
     var cta = document.querySelector(".mobile-cta");
-    var heroCta = document.querySelector(".hero .hero-cta");
+    var heroCta = document.querySelector(".hero .hero-cta, [data-order-bar-after]");
     var end = document.querySelector(".cta-band, .foot");
     function sync() {
       if (bar) bar.classList.toggle("scrolled", window.scrollY > 8);
@@ -1010,101 +1011,161 @@ ${ctaBand("Boxes this Saturday", `$${PRICE.box} a box of 180 eggs. Order by Thur
 }
 
 /**
- * Supermarket egg prices next to YOLKO's. The three slots are filled by the Worker on every
- * request (infra/prices-page.mjs) from the prices Admin > Competitors reads every 6 hours; what is
- * written here is only what shows if that read fails. Everything else on the page is fixed text.
+ * A guide to what eggs cost in Sydney today. The two slots are filled by the Worker on every
+ * request (infra/prices-page.mjs) from the prices Admin > Competitors reads every 6 hours; what
+ * is written here is only what shows if that read fails. Everything else on the page is fixed.
+ *
+ * Kanna, 15 Nov 2026: rebuild it "without us sounding or looking like creeps". So the page is
+ * about eggs, not about other shops: a price board on the first screen, the packs under it,
+ * then how to compare two packs. YOLKO's own prices come after all that, in their own section.
  */
+const EGG_SIZES = [
+  ["m", "Medium", 42, "500&nbsp;g", "1.25&nbsp;kg"],
+  ["l", "Large", 50, "600&nbsp;g", "1.5&nbsp;kg"],
+  ["xl", "Extra-large", 58, "700&nbsp;g", "1.75&nbsp;kg"],
+  ["j", "Jumbo", 67, "800&nbsp;g", "2&nbsp;kg"],
+];
+// The example the per egg sum starts with: a dozen at a price on the board most weeks.
+const SUM_EXAMPLE = { price: "6.60", eggs: 12 };
+
+// The board's line under the shelves says which pack the egg under the mouse or the finger is.
+// The sum divides a price by a pack. Both are extras: the page reads whole without script.
+const PRICES_SCRIPT = `  <script>
+  (function () {
+    var guide = document.querySelector(".guide");
+    var tipOf = function (egg) {
+      var view = egg.closest(".board-view");
+      return view && view.querySelector("[data-tip]");
+    };
+    var eggOf = function (e) { return e.target.closest && e.target.closest("a.egg"); };
+    if (guide) {
+      ["mouseover", "focusin"].forEach(function (on) {
+        guide.addEventListener(on, function (e) {
+          var egg = eggOf(e), tip = egg && tipOf(egg);
+          if (!tip) return;
+          if (!tip.dataset.rest) tip.dataset.rest = tip.textContent;
+          tip.textContent = egg.getAttribute("data-says");
+          tip.classList.add("is-egg");
+        });
+      });
+      ["mouseout", "focusout"].forEach(function (off) {
+        guide.addEventListener(off, function (e) {
+          var egg = eggOf(e), tip = egg && tipOf(egg);
+          if (!tip || !tip.dataset.rest) return;
+          tip.textContent = tip.dataset.rest;
+          tip.classList.remove("is-egg");
+        });
+      });
+    }
+
+    var sum = document.querySelector(".sum");
+    if (!sum) return;
+    var form = sum.querySelector("form");
+    var price = sum.querySelector("#sum-price");
+    var out = sum.querySelector(".sum-out");
+    var num = sum.querySelector(".sum-num");
+    var unit = sum.querySelector(".sum-unit");
+    var dozen = sum.querySelector(".sum-dozen");
+    var show = function () {
+      var p = parseFloat(String(price.value).replace(/[^0-9.]/g, ""));
+      var picked = form.querySelector("input[name=eggs]:checked");
+      var eggs = picked ? +picked.value : 0;
+      var ok = p > 0 && p < 1000 && eggs > 0;
+      var each = ok ? (p / eggs) * 100 : 0;
+      var dollars = each >= 100;
+      out.classList.toggle("is-dollars", dollars);
+      num.textContent = dollars ? (each / 100).toFixed(2) : String(Math.round(each));
+      unit.textContent = dollars ? "$" : "¢";
+      dozen.textContent = !ok ? "Type the price" : eggs === 12 ? "" : "$" + ((p / eggs) * 12).toFixed(2) + " a dozen";
+    };
+    form.addEventListener("input", show);
+    form.addEventListener("submit", function (e) { e.preventDefault(); price.blur(); });
+    price.addEventListener("focus", function () { price.select(); });
+    sum.classList.add("is-live");
+    form.hidden = false;
+    show();
+  })();
+  </script>
+
+`;
+
 function pricesPage() {
   const path = PRICES_PATH;
-  const title = "Egg Prices in Sydney | Coles, Aldi and IGA Compared | YOLKO";
-  const description = `What a tray of 30 eggs or a dozen costs at Coles, Aldi and IGA in Sydney, checked every 6 hours, with the price per egg and per kilo. YOLKO delivers 30 for $${PRICE.tray1}.`;
+  const title = "Egg Prices in Sydney Today | Coles, Aldi and IGA | YOLKO";
+  const description = "What a dozen, an 18 pack and a tray of 30 eggs cost in Sydney today at Coles, Aldi and IGA, for cage, cage free and free range. With the price per egg and an egg size guide.";
   const trail = [["Home", "/"], ["Egg prices Sydney", path]];
   const faqs = [
-    ["How much is a tray of 30 eggs in Sydney?", `It depends on the kind and the size. Cage and barn laid trays usually cost the least, and free range trays cost the most. The table at the top of this page shows what each shop charges now. YOLKO's tray of 30 extra-large cage eggs is <strong>$${PRICE.tray1}</strong>, delivered on Saturday.`],
-    ["What is the cheapest way to buy eggs?", `Buy a bigger pack, and compare the price per kilo as well as the price per egg. A tray of 30 usually costs less per egg than a dozen, and a box of 180 costs less again. At YOLKO a box works out at $${PRICE.box / 6} a tray, about ${perEgg(PRICE.box, 180)}¢ an egg.`],
-    ["Why compare eggs by the kilo?", "Eggs come in sizes. A tray of 30 large eggs weighs 1.5&nbsp;kg and a tray of 30 extra-large eggs weighs 1.75&nbsp;kg, which is about 17% more egg for the same count."],
-    ["Are these prices the same in every store?", "Not always. They are the prices each shop shows on its website when we check. A store near you can charge a little more or less, and specials come and go."],
-    ["How often are the prices checked?", "Every 6 hours. Each table shows the time of the last check. If a shop cannot be read for a day, its prices come off the page until it can."],
-    ["Why are Woolworths and Costco not listed?", "Their websites do not let us read prices automatically, so we leave them out instead of showing a number that could be old."],
+    ["How much is a dozen eggs in Sydney?", "It depends on the kind and the size. Cage eggs cost the least, then cage free (barn laid), then free range, and bigger eggs cost more. The board at the top of this page shows today's prices."],
+    ["How much is a tray of 30 eggs in Sydney?", `Pick Tray of 30 on the board at the top of this page for today's prices. YOLKO's tray of 30 extra-large cage eggs is <strong>$${PRICE.tray1}</strong>, delivered on Saturday.`],
+    ["What is the cheapest way to buy eggs?", `Buy a bigger pack. A tray of 30 usually costs less per egg than a dozen, and a box of 180 costs less again. At YOLKO a box works out at $${PRICE.box / 6} a tray, about ${perEgg(PRICE.box, 180)}¢ an egg.`],
+    ["What do egg sizes mean?", "Eggs are sold by weight. A dozen large eggs weighs 600&nbsp;g and a dozen extra-large eggs weighs 700&nbsp;g, which is about 17% more egg for the same count."],
+    ["Are these prices the same in every store?", "Not always. They are the prices each shop lists on its website. A store near you can charge a little more or less, and specials come and go."],
+    ["Which shops are in this guide?", "Coles, Aldi, IGA and Umall, which list their egg prices online. The guide is updated a few times a day, and a price more than a day old comes off."],
     ["Does YOLKO deliver?", `Yes. Saturday morning, 6am to 12pm, to nearly 700 Sydney suburbs. Delivery is $${PRICE.delivery} an order. Order by Thursday night.`],
   ];
   const graph = [webPage(path, "Egg prices in Sydney", description), breadcrumbs(path, trail), faqPage(path, faqs), BUSINESS_REF];
-  // Until the Worker fills them: YOLKO's own tray and a line saying the shops are being checked.
-  const blank = pricesBlocks({ latest: null, prices: PRICE, delivery: PRICE.delivery });
-  const sizes = [
-    ["Medium", "500&nbsp;g", "1.25&nbsp;kg", "42&nbsp;g"],
-    ["Large", "600&nbsp;g", "1.5&nbsp;kg", "50&nbsp;g"],
-    ["Extra-large", "700&nbsp;g", "1.75&nbsp;kg", "58&nbsp;g"],
-    ["Jumbo", "800&nbsp;g", "2&nbsp;kg", "67&nbsp;g"],
-  ];
+  // Until the Worker fills them: a line saying today's prices are on their way.
+  const blank = pricesBlocks({ latest: null, prices: PRICE });
+  // Each egg's drawn area follows its weight, so the row shows the sizes true to each other.
+  const eggs = EGG_SIZES.map(([id, name, grams, dozen, tray]) => `              <li class="size-${id}">
+                <span class="size-egg" style="--w:${Math.sqrt(grams / EGG_SIZES[3][2]).toFixed(3)}"><b>${grams}&nbsp;g</b></span>
+                <strong>${name}</strong>
+                <span>${dozen} a dozen</span>
+                <span>${tray} a tray</span>
+              </li>`).join("\n");
+  const sumFig = perEgg(Number(SUM_EXAMPLE.price), SUM_EXAMPLE.eggs);
+  const packOptions = [6, 10, 12, 18, 30].map((n) => `                <label class="bundle-opt"><input type="radio" name="eggs" value="${n}"${n === SUM_EXAMPLE.eggs ? " checked" : ""}><span>${n}</span></label>`).join("\n");
   const body = `  <main>
-${heroSection({
-    h1: "Egg prices in Sydney",
-    sub: `What a tray or a dozen costs at Coles, Aldi and IGA right now, next to YOLKO's tray of 30 for <strong>$${PRICE.tray1}</strong>. Checked every 6 hours.`,
-    secondary: ["See the prices", "#trays-title"],
-  })}
-
-    <section class="band" aria-labelledby="trays-title">
+    <section class="guide" aria-labelledby="guide-title">
       <div class="wrap">
-${sectionHead("A tray of 30 eggs", "Sorted by price per egg. Each pack links to the shop's own page.", "trays-title")}
-          ${slot("prices-trays", blank["prices-trays"])}
-      </div>
-    </section>
-
-    <section class="band" aria-labelledby="packs-title">
-      <div class="wrap">
-${sectionHead("Dozens and 18 packs", "The lowest-priced pack of each size and kind at Coles and Aldi.", "packs-title")}
-          ${slot("prices-packs", blank["prices-packs"])}
+        <div class="board" data-order-bar-after>
+          <h1 id="guide-title">Egg prices in Sydney</h1>
+          ${slot("guide-board", blank["guide-board"])}
+        </div>
+          ${slot("guide-packs", blank["guide-packs"])}
+        <p class="guide-note">These are the prices each shop lists on its own website, so a store near you can differ. Coles and Aldi sell more eggs than this: the guide shows their lowest-priced pack of each size and kind. Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a>.</p>
       </div>
     </section>
 
     <section class="band" aria-labelledby="compare-title">
       <div class="wrap">
-${sectionHead("How to compare egg prices", "Two numbers tell you what a pack really costs.", "compare-title")}
-      </div>
-      <div class="wrap local-row">
-        <div class="panel">
-          <h2>Price per egg</h2>
-          <p>Divide the price by the number of eggs. It is the quickest way to set a dozen against a tray of 30, and the bigger pack usually wins.</p>
-        </div>
-        <div class="panel">
-          <h2>Price per kilo</h2>
-          <p>Eggs are sold by size, so two packs of 30 can hold different amounts of egg. Price per kilo shows what you really pay.</p>
-        </div>
-      </div>
-      <div class="wrap">
-        <table class="price-table all-cols">
-          <caption class="sr-only">Egg sizes in Australia by pack weight</caption>
-          <thead><tr><th scope="col">Size</th><th scope="col">A dozen</th><th scope="col">Tray of 30</th><th scope="col">Each egg</th></tr></thead>
-          <tbody>
-${sizes.map(([name, dozen, tray, each]) => `            <tr><th scope="row">${name}</th><td>${dozen}</td><td>${tray}</td><td>${each}</td></tr>`).join("\n")}
-          </tbody>
-        </table>
-        <p class="cmp-note">Each egg is the average for its size. YOLKO's tray is extra-large: 1.75&nbsp;kg, about 17% more egg than a 1.5&nbsp;kg tray of large eggs.</p>
-      </div>
-    </section>
-
-    <section class="band" aria-labelledby="sources-title">
-      <div class="wrap">
-        <div class="panel panel-split">
-          <h2 id="sources-title">Where these prices come from</h2>
-          <div class="panel-body">
-            <p>We read each shop's own website every 6 hours. From Coles and Aldi we list the lowest-priced pack of each size and kind. From IGA and Umall we check one tray of 30.</p>
-            <p>These are the prices each shop shows on its website. A store near you can charge a little more or less, and a price can change between checks. If a shop cannot be read for a day, its prices come off this page until it can.</p>
-            <p>Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a> and we will fix it.</p>
-            ${slot("prices-sources", blank["prices-sources"])}
+${sectionHead("How to compare egg prices", "Two things matter: what each egg costs, and how big it is.", "compare-title")}
+        <div class="maths">
+          <div class="sum">
+            <h3>Price per egg</h3>
+            <p class="sum-how">Divide the price by the number of eggs. A $${SUM_EXAMPLE.price} dozen is ${sumFig}¢ an egg.</p>
+            <form hidden novalidate>
+              <div class="sum-field">
+                <label for="sum-price">Price on the pack</label>
+                <label class="sum-price" for="sum-price"><span aria-hidden="true">$</span><input id="sum-price" type="text" inputmode="decimal" autocomplete="off" maxlength="6" value="${SUM_EXAMPLE.price}"></label>
+              </div>
+              <fieldset class="sum-field">
+                <legend>Eggs in the pack</legend>
+                <div class="picker sum-picker">
+${packOptions}
+                </div>
+              </fieldset>
+            </form>
+            <p class="sum-out" aria-live="polite"><span class="sum-fig"><span class="sum-num">${sumFig}</span><span class="sum-unit">¢</span></span><span class="sum-what"><b>an egg</b><span class="sum-dozen"></span></span></p>
+          </div>
+          <div class="sizes">
+            <h3>Egg sizes</h3>
+            <ul class="size-row">
+${eggs}
+            </ul>
+            <p>The weight is the average egg in the pack. YOLKO's trays are extra-large.</p>
           </div>
         </div>
       </div>
     </section>
 
-${priceCards("YOLKO prices", `Pace Farm extra-large eggs, delivered on Saturday morning. Delivery is $${PRICE.delivery} flat.`)}
+${priceCards("YOLKO prices", `Extra-large eggs in trays of 30, delivered on Saturday morning. Delivery is $${PRICE.delivery} flat.`)}
 
 ${faqSection("Egg price questions", faqs)}
 
-${ctaBand("Eggs to your door this Saturday", `A tray of 30 is $${PRICE.tray1}. Order by Thursday night.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
+${ctaBand("Eggs to your door this Saturday", `A tray of 30 is $${PRICE.tray1}. Order by Thursday night.`)}
   </main>`;
-  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
+  return page({ path, title, description, graph, hero: false, body, mobile: `Saturday delivery · $${PRICE.delivery}`, scripts: PRICES_SCRIPT });
 }
 
 function areasPage(existingHtml) {
