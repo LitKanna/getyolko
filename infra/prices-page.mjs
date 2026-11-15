@@ -1,33 +1,64 @@
 /**
- * The public page /egg-prices-sydney: what eggs cost at the shops Admin > Competitors already
- * reads (price-watch.mjs), next to YOLKO's own tray.
+ * The public page /egg-prices-sydney: a guide to what eggs cost in Sydney today, from the shops
+ * Admin > Competitors already reads (price-watch.mjs).
  *
- * infra/build-pages.mjs writes egg-prices-sydney.html with three marked slots. The Worker fills
- * the slots on every request from the same KV record the admin page shows, so the public page
- * and the admin never disagree. This file uses no Node or Worker APIs, so the generator, the
- * Worker and the test (node infra/prices-page-test.mjs) all share it.
+ * infra/build-pages.mjs writes egg-prices-sydney.html with two marked slots. The Worker fills
+ * them on every request from the same KV record the admin page shows, so the public page and
+ * the admin never disagree. This file uses no Node or Worker APIs, so the generator, the Worker
+ * and the test (node infra/prices-page-test.mjs) all share it.
+ *
+ * How it reads (Kanna, 15 Nov 2026: the first version was tables of other shops with YOLKO's
+ * row highlighted among them, and it made YOLKO look like it was watching them). It is a price
+ * guide now, sorted by the pack and the kind of egg, not by shop:
+ *   - the board: one switch (a dozen, 18 pack, tray of 30), the price range in big type, and
+ *     a shelf for each kind of egg with one egg drawn for each pack, placed by its price;
+ *   - the packs: the same packs as a list under each kind, each linking to the shop's own page.
+ * YOLKO's own tray is one egg with a yolk on the tray board and nothing more. It is never a row
+ * among the shops' packs.
  *
  * Rules for what may show (these are other businesses' prices on a public page):
  *   - only prices the Worker read itself from the shop's own website (never typed-in ones);
  *   - only prices read in the last 24 hours; an older one comes off the page;
- *   - every table says when it was checked, and every pack links to the shop's own page;
- *   - plain numbers, sorted by price per egg. No "cheapest" or "best" claims about anyone.
+ *   - only packs that are in stock, so nobody is told a shop has run out;
+ *   - the board says once when the prices were last updated, and every pack links to the shop's
+ *     own page;
+ *   - plain numbers, sorted by price. No "cheapest" or "best" claims about anyone.
  * Copy rules are the site's: plain words, no em dashes.
  */
 
 const PRICES_PATH = "/egg-prices-sydney";
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const SLOTS = ["prices-trays", "prices-packs", "prices-sources"];
-const KINDS = { caged: "Cage", barn: "Cage free (barn laid)", free_range: "Free range" };
-const KIND_ORDER = ["caged", "barn", "free_range"];
-const KIND_HEAD = { caged: "Cage eggs", barn: "Cage free eggs (barn laid)", free_range: "Free range eggs" };
+const SLOTS = ["guide-board", "guide-packs"];
+// The three kinds, in the order Kanna files them (barn laid is cage free).
+const KINDS = [
+  { id: "caged", name: "Cage", also: "" },
+  { id: "barn", name: "Cage free", also: "barn laid" },
+  { id: "free_range", name: "Free range", also: "" },
+];
+// The pack sizes the price check keeps (price-watch.mjs groupOf).
+const PACKS = [
+  { eggs: 12, id: "dozen", tab: "A dozen", head: "A dozen eggs" },
+  { eggs: 18, id: "pack18", tab: "18 pack", head: "An 18 pack" },
+  { eggs: 30, id: "tray", tab: "Tray of 30", head: "A tray of 30 eggs" },
+];
+// Egg sizes by the weight of one egg (a dozen weighs 500, 600, 700 or 800 g).
+const SIZES = [
+  { id: "m", name: "medium", upTo: 46 },
+  { id: "l", name: "large", upTo: 54 },
+  { id: "xl", name: "extra-large", upTo: 62.5 },
+  { id: "j", name: "jumbo", upTo: Infinity },
+];
 // A pack's name may only link to the shop it came from.
 const SHOP_HOSTS = { Coles: "coles.com.au", Aldi: "aldi.com.au", IGA: "igashop.com.au", Umall: "umall.com.au" };
 // The main tray, by the Admin > Stock & prices "tray weight" setting.
-const MAIN_TRAY = {
-  "1.75": { grams: 1750, name: "Pace Farm extra-large cage eggs, 30" },
-  "1.5": { grams: 1500, name: "Pace Farm large cage eggs, 30" },
-};
+const MAIN_TRAY = { "1.75": 1750, "1.5": 1500 };
+// Where YOLKO's egg on the board leads: the shop's own prices, further down the page.
+const OWN_PRICES = "#prices-title";
+// Two eggs on one shelf closer than this (as a share of the shelf's width) sit on top of each
+// other; a little further apart they lean on each other, the way eggs do (each has an ink edge,
+// so two that touch still read as two). On the narrowest phone the shelf is about 220px and an
+// egg about 18px, so at this gap the one behind still shows at least half of itself.
+const EGG_GAP = 4.5;
 
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -35,11 +66,13 @@ function esc(s) {
 
 const money = (n) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`);
 const cents = (perEgg) => `${Math.round(perEgg * 100)}¢`;
-const perKilo = (price, grams) => (grams > 0 ? price / (grams / 1000) : null);
+const span = (lo, hi, show) => (show(lo) === show(hi) ? show(lo) : `${show(lo)} to ${show(hi)}`);
+const list = (words) => (words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
 
-function weightText(grams) {
-  if (!(grams > 0)) return "";
-  return grams >= 1000 ? `${String(grams / 1000)}&nbsp;kg` : `${grams}&nbsp;g`;
+function sizeOf(grams, eggs) {
+  if (!(grams > 0) || !(eggs > 0)) return null;
+  const each = grams / eggs;
+  return SIZES.find((s) => each < s.upTo);
 }
 
 /** "Thursday 12 November, 11:45am", Sydney time. */
@@ -67,9 +100,10 @@ function shopLink(o) {
 
 /** Shop prices that may show: read by the Worker itself, in the last 24 hours, and complete. */
 function freshOffers(latest, now) {
+  const kinds = new Set(KINDS.map((k) => k.id));
   const out = [];
   for (const o of latest?.offers || []) {
-    if (!o || o.source !== "auto" || !SHOP_HOSTS[o.shop] || !KINDS[o.housing]) continue;
+    if (!o || o.source !== "auto" || !SHOP_HOSTS[o.shop] || !kinds.has(o.housing)) continue;
     const price = Number(o.price_aud);
     const eggs = Number(o.pack_eggs);
     const at = Date.parse(o.checked_at);
@@ -84,7 +118,6 @@ function freshOffers(latest, now) {
       grams,
       price,
       perEgg: price / eggs,
-      perKilo: perKilo(price, grams),
       out: o.stock === "out_of_stock",
       limit: String(o.limit || "").slice(0, 60),
       url: shopLink(o),
@@ -94,121 +127,155 @@ function freshOffers(latest, now) {
   return out;
 }
 
-// In stock first, then by price per egg, then by price.
-const byValue = (a, b) => Number(a.out) - Number(b.out) || a.perEgg - b.perEgg || a.price - b.price || a.shop.localeCompare(b.shop);
+const byPrice = (a, b) => a.price - b.price || a.shop.localeCompare(b.shop) || a.title.localeCompare(b.title);
 
-/** YOLKO's own tray as a row, from the live shop settings. null when the tray has no price. */
+/** YOLKO's own tray as it sits on the tray board, from the live shop settings. null without a price. */
 function ownTray({ prices, trayWeight, soldOut }) {
   const price = Number(prices?.tray1);
   if (!(price > 0)) return null;
-  const tray = MAIN_TRAY[trayWeight] || null;
-  return {
-    us: true,
-    shop: "YOLKO",
-    title: tray ? tray.name : "Tray of 30 eggs",
-    housing: tray ? "caged" : null,
-    eggs: 30,
-    grams: tray ? tray.grams : null,
-    price,
-    perEgg: price / 30,
-    perKilo: tray ? perKilo(price, tray.grams) : null,
-    out: !!soldOut,
-    limit: "",
-    url: "/#order",
-    at: null,
-  };
+  return { us: true, housing: "caged", eggs: 30, grams: MAIN_TRAY[trayWeight] || null, price, perEgg: price / 30, soldOut: !!soldOut };
 }
 
-function row(o) {
-  const meta = [];
-  if (o.housing) meta.push(esc(KINDS[o.housing]));
-  if (o.grams) meta.push(weightText(o.grams));
-  if (o.us) meta.push("delivered Saturday");
-  if (o.limit) meta.push(esc(o.limit));
-  if (o.out) meta.push(`<span class="cmp-out">${o.us ? "Sold out this week" : "Out of stock online"}</span>`);
-  const name = o.url
-    ? o.us
-      ? `<a href="${esc(o.url)}">${esc(o.title)}</a>`
-      : `<a href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${esc(o.title)}</a>`
-    : esc(o.title);
-  const kilo = o.perKilo ? `${money(Math.round(o.perKilo * 100) / 100)}<span class="cmp-unit"> a kilo</span>` : "";
-  return `            <tr${o.us ? ' class="cmp-us"' : ""}>
-              <th scope="row">${esc(o.shop)}</th>
-              <td class="cmp-pack">${name}<span class="cmp-meta">${meta.join(" · ")}</span></td>
-              <td class="cmp-price">${money(o.price)}</td>
-              <td class="cmp-num">${cents(o.perEgg)}<span class="cmp-unit"> an egg</span></td>
-              <td class="cmp-num">${kilo}</td>
-            </tr>`;
-}
-
-function table(rows, caption) {
-  return `          <table class="cmp-table">
-            <caption class="sr-only">${caption}</caption>
-            <thead><tr><th scope="col">Shop</th><th scope="col">Pack</th><th scope="col">Price</th><th scope="col">Per egg</th><th scope="col">Per kilo</th></tr></thead>
-            <tbody>
-${rows.join("\n")}
-            </tbody>
-          </table>`;
-}
-
-const waiting = `          <p class="cmp-note">We are checking the shops' prices again. Look back in a little while.</p>`;
-
-/** The three blocks of the page, as HTML, from the latest price check and the shop's own settings. */
-function pricesBlocks({ latest = null, prices = {}, trayWeight = "1.75", soldOut = false, delivery = 5, now = Date.now() } = {}) {
-  const offers = freshOffers(latest, now);
-  const checked = offers.length ? Math.max(...offers.map((o) => o.at)) : null;
-  const us = ownTray({ prices, trayWeight, soldOut });
-  const stamp = checked ? `          <p class="cmp-checked">Checked ${timeTag(checked)}, Sydney time.</p>\n` : "";
-
-  /* Trays of 30, with YOLKO's tray in its place. */
-  const shopTrays = offers.filter((o) => o.eggs === 30);
-  const trayRows = [...shopTrays, ...(us ? [us] : [])].sort(byValue);
-  const inStock = shopTrays.filter((o) => !o.out).map((o) => o.price);
-  let range = "";
-  if (inStock.length) {
-    const lo = Math.min(...inStock);
-    const hi = Math.max(...inStock);
-    range = lo === hi
-      ? `A pack of 30 in stock at these shops is ${money(lo)}.`
-      : `Packs of 30 in stock at these shops run from ${money(lo)} to ${money(hi)}.`;
-    if (us) range += ` YOLKO's tray of 30 is ${money(us.price)}.`;
+/** A price line that holds every value: whole steps of $1, $2, $5 and so on, five at most. */
+function priceLine(values) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  for (const step of [1, 2, 5, 10, 20, 50, 100]) {
+    const lo = Math.floor(min / step) * step;
+    let hi = Math.ceil(max / step) * step;
+    if (hi === lo) hi = lo + step;
+    if ((hi - lo) / step > 5) continue;
+    const ticks = [];
+    for (let t = lo; t <= hi; t += step) ticks.push(t);
+    return { lo, hi, ticks };
   }
-  const two = Number(prices?.tray2);
-  const box = Number(prices?.box);
-  const more = [];
-  if (us && two > 0) more.push(`two trays are ${money(two)} (${money(two / 2)} each)`);
-  if (us && box > 0) more.push(`a box of six is ${money(box)} (${money(box / 6)} each)`);
-  const own = us
-    ? `          <p class="cmp-note">At YOLKO ${more.length ? `${more.join(" and ")}. ` : ""}Delivery is ${money(Number(delivery))} an order, however many trays you buy.</p>`
+  return { lo: min, hi: max > min ? max : min + 1, ticks: [] };
+}
+
+/** Where each egg sits: across by price, and up a row when the egg before it is too close. */
+function placeEggs(eggs, line) {
+  const rows = [];
+  return [...eggs].sort((a, b) => a.price - b.price || Number(!!a.us) - Number(!!b.us)).map((o) => {
+    const x = ((o.price - line.lo) / (line.hi - line.lo)) * 100;
+    let r = rows.findIndex((last) => x - last >= EGG_GAP);
+    if (r < 0) r = rows.length;
+    rows[r] = x;
+    return { o, x: Math.round(x * 100) / 100, r };
+  });
+}
+
+function eggMark({ o, x, r }) {
+  const size = sizeOf(o.grams, o.eggs);
+  const cls = `egg${size ? ` egg-${size.id}` : ""}${o.us ? " egg-us" : ""}`;
+  const says = o.us
+    ? `YOLKO, ${money(o.price)} a tray, delivered Saturday`
+    : `${o.shop}, ${money(o.price)}: ${o.title}`;
+  return `                  <a class="${cls}" href="${o.us ? OWN_PRICES : `#${o.id}`}" style="--x:${x};--r:${r}" tabindex="-1" data-says="${esc(says)}"></a>`;
+}
+
+/** One pack size on the board: the price range in big type, then a shelf for each kind. */
+function boardView(pack, packs, us) {
+  const prices = packs.map((o) => o.price);
+  const lo = Math.min(...prices);
+  const hi = Math.max(...prices);
+  const line = priceLine([...prices, ...(us ? [us.price] : [])]);
+  const shelves = KINDS.map((k) => {
+    const mine = packs.filter((o) => o.housing === k.id);
+    const eggs = [...mine, ...(us && us.housing === k.id ? [us] : [])];
+    if (!eggs.length) return "";
+    const placed = placeEggs(eggs, line);
+    const rows = Math.max(...placed.map((p) => p.r)) + 1;
+    const range = mine.length ? span(Math.min(...mine.map((o) => o.price)), Math.max(...mine.map((o) => o.price)), money) : "";
+    return `              <div class="shelf">
+                <p class="shelf-name"><b>${k.name}</b>${range ? `<span>${range}</span>` : ""}</p>
+                <div class="shelf-line" style="--rows:${rows}">
+${placed.map(eggMark).join("\n")}
+                </div>
+              </div>`;
+  }).filter(Boolean);
+  const perEgg = span(lo / pack.eggs, hi / pack.eggs, cents);
+  const long = money(lo).length > 3;
+  const what = lo === hi
+    ? `<b>${pack.tab.toLowerCase()}</b><span>${perEgg} an egg</span>`
+    : `<b>to ${money(hi)}</b><span>${perEgg} an egg</span>`;
+  const key = us
+    ? `
+            <p class="board-key"><span class="egg egg-us" aria-hidden="true"></span><span>YOLKO's tray is ${money(us.price)}, ${us.soldOut ? "sold out this week" : `<a href="${OWN_PRICES}">delivered Saturday</a>`}</span></p>`
     : "";
-  const trays = [
-    stamp + (range ? `          <p class="cmp-lead">${range}</p>` : ""),
-    trayRows.length ? table(trayRows.map(row), "Price of a tray of 30 eggs at each shop") : "",
-    shopTrays.length ? "" : waiting,
-    own,
-  ].filter((s) => s.trim()).join("\n");
+  return `          <div class="board-view" data-pack="${pack.id}">
+            <div class="board-price">
+              <p class="bp-num${long ? " is-long" : ""}">${lo === hi ? "" : '<span class="bp-from">From</span>'}<span class="bp-cur">$</span>${money(lo).slice(1)}</p>
+              <p class="bp-what">${what}</p>
+            </div>
+            <div class="shelves" aria-hidden="true">
+${shelves.join("\n")}
+              <ol class="shelf-axis">
+${line.ticks.map((t) => `                <li style="--x:${Math.round(((t - line.lo) / (line.hi - line.lo)) * 10000) / 100}">${money(t)}</li>`).join("\n")}
+              </ol>
+            </div>
+            <p class="board-tip" data-tip>Each egg is a pack. Bigger eggs are drawn bigger. Tap one to see it.</p>${key}
+          </div>`;
+}
 
-  /* Dozens and 18 packs, grouped by kind. */
-  const small = offers.filter((o) => o.eggs !== 30);
-  const groups = KIND_ORDER.map((k) => [k, small.filter((o) => o.housing === k).sort(byValue)]).filter(([, list]) => list.length);
-  const packRows = groups.flatMap(([k, list]) => [
-    `            <tr class="cmp-group"><th colspan="5" scope="colgroup">${KIND_HEAD[k]}</th></tr>`,
-    ...list.map(row),
-  ]);
-  const dozen = us ? `          <p class="cmp-note">YOLKO sells by the tray. 30 eggs for ${money(us.price)} works out at ${money(Math.round((us.price / 30) * 12 * 100) / 100)} a dozen.</p>` : "";
-  const packs = [stamp.trimEnd(), packRows.length ? table(packRows, "Price of a dozen or an 18 pack of eggs at each shop") : waiting, dozen]
-    .filter((s) => s.trim())
-    .join("\n");
+function packRow(o) {
+  const size = sizeOf(o.grams, o.eggs);
+  const meta = [`<b>${esc(o.shop)}</b>`];
+  // Hard spaces, so a narrow card breaks the line between two facts and never inside one.
+  if (size) meta.push(`${size.name}&nbsp;eggs`);
+  meta.push(`${cents(o.perEgg)}&nbsp;an&nbsp;egg`);
+  if (o.limit) meta.push(esc(o.limit));
+  const inner = `<span class="pk-price">${money(o.price)}</span><span class="pk-name">${esc(o.title)}</span><span class="pk-meta">${meta.join(" · ")}</span>`;
+  return `                <li id="${o.id}" data-c="${Math.round(o.perEgg * 100)}">${o.url
+    ? `<a href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+    : `<div>${inner}</div>`}</li>`;
+}
 
-  /* When each shop was last read. */
-  const shops = [...new Set(offers.map((o) => o.shop))].sort();
-  const sources = shops.length
-    ? `          <ul class="cmp-sources">
-${shops.map((s) => `            <li><strong>${esc(s)}</strong> checked ${timeTag(Math.max(...offers.filter((o) => o.shop === s).map((o) => o.at)))}</li>`).join("\n")}
-          </ul>`
-    : waiting;
+/** One pack size as a list: a card for each kind of egg, its packs sorted by price. */
+function packCards(pack, packs) {
+  const cards = KINDS.map((k) => {
+    const mine = packs.filter((o) => o.housing === k.id);
+    if (!mine.length) return "";
+    return `            <section class="kind-card">
+              <h3>${k.name}${k.also ? ` <span>${k.also}</span>` : ""}</h3>
+              <ul>
+${mine.map(packRow).join("\n")}
+              </ul>
+            </section>`;
+  }).filter(Boolean);
+  return `          <div class="packs" data-pack="${pack.id}">
+            <header class="section-head">
+              <h2>${pack.head}</h2>
+              <p>${packs.length === 1 ? "One pack today." : `${packs.length} packs today, sorted by price.`}</p>
+            </header>
+            <div class="kind-cards" data-cards="${cards.length}">
+${cards.join("\n")}
+            </div>
+          </div>`;
+}
 
-  return { "prices-trays": trays, "prices-packs": packs, "prices-sources": sources, checked };
+const waiting = `          <p class="board-wait">Today's prices are on their way. Look back in a little while.</p>`;
+
+/** The two blocks of the page, as HTML, from the latest price check and the shop's own settings. */
+function pricesBlocks({ latest = null, prices = {}, trayWeight = "1.75", soldOut = false, now = Date.now() } = {}) {
+  const fresh = freshOffers(latest, now);
+  const checked = fresh.length ? Math.max(...fresh.map((o) => o.at)) : null;
+  const us = ownTray({ prices, trayWeight, soldOut });
+  // A pack nobody can buy today is left off, and so is a size the guide has no switch for.
+  const views = PACKS.map((pack) => {
+    const packs = fresh.filter((o) => !o.out && o.eggs === pack.eggs).sort(byPrice).map((o, i) => ({ ...o, id: `${pack.id}-${i + 1}` }));
+    return { pack, packs };
+  }).filter((v) => v.packs.length);
+  if (!views.length) return { "guide-board": waiting, "guide-packs": "", checked };
+
+  const shops = [...new Set(views.flatMap((v) => v.packs.map((o) => o.shop)))].sort();
+  const picker = `          <fieldset class="picker board-picker">
+            <legend class="sr-only">Pack size</legend>
+${views.map(({ pack }, i) => `            <label class="bundle-opt"><input type="radio" name="pack" id="pack-${pack.id}" value="${pack.id}"${i === 0 ? " checked" : ""}><span>${pack.tab}</span></label>`).join("\n")}
+          </fieldset>`;
+  const foot = `          <p class="board-foot"><span>Online prices at ${list(shops.map(esc))}</span><span>Updated ${timeTag(checked)}</span></p>`;
+  const board = [picker, ...views.map(({ pack, packs }) => boardView(pack, packs, pack.eggs === 30 ? us : null)), foot].join("\n");
+  const packs = views.map(({ pack, packs: p }) => packCards(pack, p)).join("\n");
+  return { "guide-board": board, "guide-packs": packs, checked };
 }
 
 /** One slot as it sits in the page: the content between its two marker comments. */
@@ -243,4 +310,4 @@ function sitemapWithPriceChange(xml, changedMs) {
   );
 }
 
-export { pricesBlocks, fillPricesPage, sitemapWithPriceChange, slot, freshOffers, sydneyTime, PRICES_PATH, SLOTS, MAX_AGE_MS };
+export { pricesBlocks, fillPricesPage, sitemapWithPriceChange, slot, freshOffers, sydneyTime, sizeOf, priceLine, placeEggs, PRICES_PATH, SLOTS, MAX_AGE_MS };
