@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "162";
+const CSS_V = "163";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -486,11 +486,12 @@ const NAV = [
   ["Questions", "#faq"],
 ];
 
-const NO_FAQ = new Set(["/404", "/privacy", "/terms", "/data-deletion"]);
+const NO_FAQ = new Set(["/404", "/privacy", "/terms", "/data-deletion", "/egg-delivery-sydney", "/egg-delivery-areas"]);
 
 function navLinks(path, indent) {
   return NAV.map(([label, href]) => {
-    // The 404 page and the three plain pages have no FAQ of their own.
+    // The 404 page, the three plain pages and the Delivery and Suburbs pages have no FAQ of
+    // their own (on those two every answer is already on the page).
     if (href === "#faq" && NO_FAQ.has(path)) href = "/#faq";
     const current = href === path ? ' aria-current="page"' : "";
     return `${indent}<a href="${href}"${current}>${label}</a>`;
@@ -593,10 +594,12 @@ ${steps.map(([when, t, d]) => `          <li>
     </section>`;
 }
 
-const STEPS = (last) => [
-  ["By Thursday night", "Order online", "Choose a tray, two trays or a 180-egg box, and pay by card."],
-  ["Straight away", "Get your receipt", "We email your order and receipt as soon as you pay."],
-  ["Saturday, 6am to 12pm", "Eggs at your door", last],
+// The homepage's three steps, in the homepage's words: this is the page about delivery, so it
+// says how to change an order and what happens at an apartment.
+const DELIVERY_STEPS = [
+  ["By Thursday night", "Order online", "Pick one tray, two trays or a 180-egg box, and pay by card."],
+  ["Straight away", "Get your receipt", `We email your order and receipt as soon as you pay. Need a change? Reply to that email or ${CONTACT_WORDS}.`],
+  ["Saturday, 6am to 12pm", "Eggs at your door", "We bring your eggs to your door. Live in an apartment? Add your unit number and we will message you if we need to be let in."],
 ];
 
 function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.delivery} flat.`) {
@@ -642,8 +645,9 @@ function suburbCheck(id) {
             </form>`;
 }
 
-// `after` sits under the panel, close to it (the A to Z fold on the suburbs page).
-function mapPanel(title, text, extra = "", after = "") {
+// The suburbs page writes its own card (the search and its matches beside the map), with the
+// A to Z fold under it.
+function mapPanel(title, text, extra = "") {
   return `    <section class="areas" aria-labelledby="map-title">
       <div class="wrap">
         <div class="areas-panel">
@@ -653,7 +657,7 @@ function mapPanel(title, text, extra = "", after = "") {
 ${extra}
           </div>
 ${mapFigure()}
-        </div>${after ? `\n${after}` : ""}
+        </div>
       </div>
     </section>`;
 }
@@ -673,7 +677,7 @@ function faqSection(title, faqs) {
       <div class="wrap faq-layout">
         <div class="faq-intro">
           <h2 id="faq-title">${title}</h2>
-          <p>Can't find your answer? Message us and a real person will reply.</p>
+          <p>Can't find your answer? Message us.</p>
 ${CONTACT_ROW}
         </div>
         <div class="faq-grid">
@@ -685,7 +689,7 @@ ${items.join("\n")}
 
 // "Thursday night" stays on one line: the lede wraps into even lines, and it must not end one
 // on "Thursday".
-function ctaBand(title, text, secondary) {
+function ctaBand(title, text, secondary, primary = ["Order now", "/#order"]) {
   return `    <section class="cta-band">
       <div class="wrap">
         <div class="cta-panel">
@@ -694,7 +698,7 @@ function ctaBand(title, text, secondary) {
             <p>${text.replace("Thursday night", "Thursday&nbsp;night")}</p>
           </div>
           <div class="hero-cta">
-            <a class="btn btn-ink btn-lg" href="/#order">Order now</a>${secondary ? `
+            <a class="btn btn-ink btn-lg" href="${primary[1]}">${primary[0]}</a>${secondary ? `
             <a class="btn btn-ghost btn-lg" href="${secondary[1]}"${secondary[1].startsWith("http") ? ' target="_blank" rel="noopener noreferrer"' : ""}>${secondary[0]}</a>` : ""}
           </div>
         </div>
@@ -894,12 +898,6 @@ function sydneyPage() {
   const title = `Egg Delivery Sydney | Saturday Trays from $${PRICE.tray1} | YOLKO`;
   const description = `Cheap, fresh Pace Farm eggs delivered across Sydney every Saturday morning. 30-egg tray $${PRICE.tray1}, flat $${PRICE.delivery} delivery within 45 km. Order online with YOLKO.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", path]];
-  const faqs = [
-    ["When is egg delivery in Sydney?", "Saturday, between 6am and 12pm. Order by Thursday night."],
-    ["How far do you deliver?", `Most of Sydney: the inner west, Parramatta, Ryde, Bankstown, Liverpool, Hornsby, Chatswood, Hurstville, Bondi and Cronulla. <a href="/egg-delivery-areas">Find your suburb</a>. We check your address before you pay.`],
-    ["How much are the eggs and delivery?", PRICE_FAQ],
-    ["How do I order?", `Use the <a href="/#order">order form</a> and pay by card. We deliver the next Saturday morning.`],
-  ];
   const list = {
     "@type": "ItemList",
     "@id": `${pageUrl(path)}#suburbs`,
@@ -911,45 +909,30 @@ function sydneyPage() {
       url: pageUrl(suburbPath(s)),
     })),
   };
-  const graph = [webPage(path, "Egg delivery in Sydney", description), breadcrumbs(path, trail), list, faqPage(path, faqs), BUSINESS_REF];
-  const cards = SUBURB_PAGES.map((s) => `          <li>
-            <a href="${suburbPath(s)}">
-              <strong>${s.name}</strong>
-              <span>${s.postcode} · ${s.region}</span>
-            </a>
-          </li>`).join("\n") + `
-          <li class="all">
-            <a href="/egg-delivery-areas">
-              <strong>All suburbs</strong>
-              <span>Nearly 700, A to Z</span>
-            </a>
-          </li>`;
+  // No Questions section here: when, where, how much and how to order are each said once, in
+  // the steps, the map card and the prices, so a list of questions only repeated the page.
+  const graph = [webPage(path, "Egg delivery in Sydney", description), breadcrumbs(path, trail), list, BUSINESS_REF];
+  // The suburb pages are linked from the map card, under the search, as chips: the same card
+  // the homepage has.
+  const popular = `            <ul class="chips" id="suburbs">
+${SUBURB_PAGES.map((s) => `              <li><a href="${suburbPath(s)}">${s.name}</a></li>`).join("\n")}
+              <li class="chip-strong"><a href="/egg-delivery-areas">See all suburbs</a></li>
+            </ul>`;
   const body = `  <main>
 ${heroSection({
     trail,
     h1: "Egg delivery across Sydney",
-    sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs. Delivery is $${PRICE.delivery} flat.`,
+    sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs.`,
     secondary: ["Check your suburb", "#map-title"],
   })}
 
-${timeline("How Saturday delivery works", STEPS(`To your door, $${PRICE.delivery} flat, anywhere in the delivery area.`))}
+${timeline("How Saturday delivery works", DELIVERY_STEPS, "One delivery run a week keeps the price low.")}
 
-${mapPanel("We deliver to nearly 700 Sydney suburbs", `From Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla. Same Saturday run, same $${PRICE.delivery} delivery.`, suburbCheck("map-q"))}
-
-    <section class="band" id="suburbs" aria-labelledby="suburbs-title">
-      <div class="wrap">
-${sectionHead("Popular suburbs", `Local pages for the suburbs we deliver to most. <a href="/egg-delivery-areas">See all suburbs</a>.`, "suburbs-title")}
-        <ul class="local-suburbs">
-${cards}
-        </ul>
-      </div>
-    </section>
+${mapPanel("We deliver to nearly 700 Sydney suburbs", "From Parramatta and Liverpool to Hornsby, Chatswood, Bondi and Cronulla.", `${suburbCheck("map-q")}\n${popular}`)}
 
 ${priceCards("Prices")}
 
-${faqSection("Sydney delivery questions", faqs)}
-
-${ctaBand("Fresh eggs this Saturday", `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`, ["All suburbs", "/egg-delivery-areas"])}
+${ctaBand("Fresh eggs this Saturday", `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`)}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
 }
@@ -960,28 +943,26 @@ function bulkPage() {
   const title = `Bulk and Wholesale Eggs Sydney | 180-Egg Box $${PRICE.box} | YOLKO`;
   const description = `Bulk eggs in Sydney with no trade account. A box of 180 Pace Farm XL cage eggs is $${PRICE.box} (${perEgg(PRICE.box, 180)}¢ an egg), up to 10 boxes. Saturday delivery for cafés and bakers.`;
   const trail = [["Home", "/"], ["Bulk eggs Sydney", path]];
+  // Five questions the page does not already answer. The price of a box is in the heading and
+  // the table, and the wholesale card covers cafés and restaurants.
   const faqs = [
-    ["How much is a bulk box of eggs?", `A full box is 180 Pace Farm extra-large eggs (six trays of 30) for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivery is <strong>$${PRICE.delivery}</strong> flat.`],
     ["Do you sell eggs wholesale?", `We sell by the box at one price for everyone. A box is the standard 15 dozen carton, 180 eggs, for <strong>$${PRICE.box}</strong>. You do not need an ABN or a trade account.`],
     ["How many eggs are in a box?", "180. That is six trays of 30, or 15 dozen, and about 10.5&nbsp;kg of eggs."],
     ["How many boxes can I order?", `Up to 10 boxes (1,800 eggs) in one order. For more, ${contactLink("message us on WhatsApp", "email us")}.`],
-    ["Do you supply cafés and restaurants?", "Yes. Cafés, restaurants, bakeries and caterers can order full boxes for Saturday delivery, and can set up a weekly standing order."],
     ["Which eggs are in the box?", "Pace Farm extra-large eggs (cage), 30 to a 1.75&nbsp;kg tray, six trays to a box."],
     ["When is bulk delivery?", "Saturday, between 6am and 12pm, with the tray orders. Order by Thursday night. Stock is limited each week, so order early for big amounts."],
-    ["How should I store 180 eggs?", "In the fridge, in their trays, stacked flat. Use them by the best-before date on the pack."],
   ];
   const graph = [webPage(path, "Bulk eggs in Sydney", description), breadcrumbs(path, trail), PRODUCT_BOX, RETURNS, faqPage(path, faqs), BUSINESS_REF];
   const rows = [
     ["1 tray", 30, PRICE.tray1],
     ["2 trays", 60, PRICE.tray2],
     ["Full box", 180, PRICE.box, true],
-    ["10 boxes", 1800, PRICE.box * 10],
   ];
   const body = `  <main>
 ${heroSection({
     trail,
     h1: "Bulk eggs in Sydney",
-    sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg. Delivered on Saturday morning, $${PRICE.delivery} flat.`,
+    sub: `180 Pace Farm eggs for <strong>$${PRICE.box}</strong>, about ${perEgg(PRICE.box, 180)}¢ an egg.`,
     cta: "Order a box",
     ctaHref: "/?b=box#order",
     secondary: CONTACT_BUTTON,
@@ -1002,21 +983,14 @@ ${rows.map(([name, eggs, price, best]) => `            <tr${best ? ' class="best
 
     <section class="band" aria-labelledby="wholesale-title">
       <div class="wrap">
-${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 dozen box at one price for everyone. No trade account and no contract.", "wholesale-title")}
-      </div>
-      <div class="wrap local-row">
-        <div class="panel">
-          <h2>Weekly standing orders</h2>
-          <p>For cafés, restaurants, bakers, caterers and big families. Send us your name, address and how many boxes you need each week, and we set them aside for every Saturday delivery.</p>
-          <div class="hero-cta">
-            <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
-          </div>
-        </div>
-        <div class="panel">
-          <h2>Order online</h2>
-          <p>Pick the full box at checkout and choose how many, up to 10. Pay by card, and we deliver on Saturday morning.</p>
-          <div class="hero-cta">
-            <a class="btn btn-solid" href="/?b=box#order">Order a box</a>
+        <div class="panel panel-split">
+          <h2 id="wholesale-title">Wholesale eggs for cafés and restaurants</h2>
+          <div class="panel-body">
+            <p>The standard 15 dozen box at one price for everyone. No trade account and no contract.</p>
+            <p>For a weekly standing order, send us your name, address and how many boxes you need. We set them aside for every Saturday delivery.</p>
+            <div class="hero-cta">
+              <a class="btn btn-ink" href="${CONTACT_BUTTON[1]}"${WHATSAPP ? ' target="_blank" rel="noopener noreferrer"' : ""}>${CONTACT_BUTTON[0]}</a>
+            </div>
           </div>
         </div>
       </div>
@@ -1024,7 +998,7 @@ ${sectionHead("Wholesale eggs for cafés and restaurants", "The standard 15 doze
 
 ${faqSection("Bulk order questions", faqs)}
 
-${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, CONTACT_BUTTON)}
+${ctaBand("A box this Saturday", `180 eggs for $${PRICE.box}. Order up to 10 boxes online.`, null, ["Order a box", "/?b=box#order"])}
   </main>`;
   return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
@@ -1133,12 +1107,8 @@ function areasPage(existingHtml) {
   const title = "Egg Delivery Areas Sydney | Nearly 700 Suburbs We Cover | YOLKO";
   const description = `Every Sydney suburb YOLKO delivers eggs to, with postcodes. Nearly 700 suburbs within about 45 km get Saturday morning delivery for a flat $${PRICE.delivery}.`;
   const trail = [["Home", "/"], ["Egg delivery Sydney", "/egg-delivery-sydney"], ["Delivery areas", path]];
-  const faqs = [
-    ["Is my suburb covered?", "If the search on this page finds it, yes. We check your exact street and postcode before you pay."],
-    ["My suburb doesn't come up. Can I still order?", `Try the <a href="/#order">order form</a> anyway, or ${contactLink("message us on WhatsApp", "email us")}. Some places have unusual names in the postcode data.`],
-    ["Does delivery cost more further out?", `No. It is <strong>$${PRICE.delivery}</strong> flat anywhere in the delivery area.`],
-    ["When do you deliver?", "Saturday, between 6am and 12pm. Order by Thursday night."],
-  ];
+  // No Questions section here: the search answers "is my suburb covered", its no-match line
+  // says what to do when a suburb does not come up, and the day and the fee are in the heading.
   const service = {
     "@type": "Service",
     "@id": `${pageUrl(path)}#service`,
@@ -1148,7 +1118,7 @@ function areasPage(existingHtml) {
     areaServed: { "@type": "City", name: "Sydney", containedInPlace: { "@type": "State", name: "New South Wales" } },
     offers: { "@type": "Offer", price: PRICE.delivery.toFixed(2), priceCurrency: "AUD", description: "Flat Saturday delivery fee" },
   };
-  const graph = [webPage(path, "Egg delivery areas in Sydney", description), breadcrumbs(path, trail), service, faqPage(path, faqs), BUSINESS_REF];
+  const graph = [webPage(path, "Egg delivery areas in Sydney", description), breadcrumbs(path, trail), service, BUSINESS_REF];
 
   // Keep the suburb list that build-areas-page.mjs generated.
   const start = existingHtml.indexOf("        <!-- areas:start");
@@ -1161,35 +1131,35 @@ function areasPage(existingHtml) {
 ${heroSection({
     trail,
     h1: "Every suburb we deliver to",
-    sub: `Saturday morning egg delivery to nearly 700 Sydney suburbs, $${PRICE.delivery} flat. Type yours below to check.`,
+    sub: `Saturday morning egg delivery to nearly 700 Sydney suburbs. Type yours below to check.`,
     secondary: ["Find your suburb", "#suburbs"],
   })}
 
-    <section id="suburbs" class="band areas-finder" aria-labelledby="finder-title">
+    <section id="suburbs" class="areas areas-finder" aria-labelledby="finder-title">
       <div class="wrap">
-        <div class="panel">
-          <h2 id="finder-title">Find your suburb</h2>
-          <p>Type a suburb or postcode. We check your exact address before you pay.</p>
-          <div class="suburb-check" role="search">
-            <label class="sr-only" for="area-q">Suburb or postcode</label>
-            <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
+        <div class="areas-panel">
+          <div class="areas-copy">
+            <h2 id="finder-title">Find your suburb</h2>
+            <p>Type a suburb or postcode. We deliver from Hornsby to Campbelltown and from Blacktown to Bondi.</p>
+            <div class="suburb-check" role="search">
+              <label class="sr-only" for="area-q">Suburb or postcode</label>
+              <input id="area-q" type="search" inputmode="search" autocomplete="off" placeholder="e.g. Marrickville or 2204">
+            </div>
+            <p class="area-status" id="area-status" aria-live="polite"></p>
+            <ul class="areas-list area-results" id="area-results" hidden></ul>
           </div>
-          <p class="area-status" id="area-status" aria-live="polite"></p>
-          <ul class="areas-list area-results" id="area-results" hidden></ul>
+${mapFigure()}
         </div>
-      </div>
-    </section>
-
-${mapPanel("Our Saturday delivery area", `From Hornsby to Campbelltown and from Blacktown to Bondi. Dark dots are suburbs we deliver to.`, "", `        <details class="az-all">
+        <details class="az-all">
           <summary>All suburbs, A to Z</summary>
           <div class="az-list">
 ${list}
           </div>
-        </details>`)}
+        </details>
+      </div>
+    </section>
 
-${faqSection("Delivery area questions", faqs)}
-
-${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.tray2}, and a box of 180 is $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`, ["Bulk eggs", "/bulk-eggs-sydney"])}
+${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.tray2}, and a box of 180 is $${PRICE.box}. Delivery is $${PRICE.delivery} anywhere on this page.`)}
   </main>`;
   // The search reads the A to Z list further down the page and shows matches under the box.
   const scripts = `  <script>
