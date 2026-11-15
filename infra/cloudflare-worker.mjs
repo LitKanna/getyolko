@@ -4209,20 +4209,14 @@ async function myPrices(env) {
 }
 
 /**
- * /egg-prices-sydney for the public: the built page with its board and pack lists filled from
- * the same price check Admin > Competitors shows, and the shop's own live tray price. If anything
- * fails the page goes out as built ("Today's prices are on their way"), never an error.
+ * /egg-prices-sydney for the public: the built page with its poster and kind cards filled from
+ * the same price check Admin > Competitors shows. YOLKO's own prices are in a section of their
+ * own that the build writes, so nothing here reads them. If anything fails the page goes out as
+ * built ("Today's prices are on their way"), never an error.
  */
 async function pricesPageHtml(html, env) {
   try {
-    const [latest, settings] = await Promise.all([latestShopPrices(env), getSettings(env)]);
-    return fillPricesPage(html, {
-      latest,
-      prices: settings.prices,
-      trayWeight: settings.trayWeight,
-      soldOut: Number(settings.traysAvailable) === 0,
-      now: Date.now(),
-    }).html;
+    return fillPricesPage(html, { latest: await latestShopPrices(env), now: Date.now() }).html;
   } catch (err) {
     console.log("prices page fill failed", String(err?.message || err));
     return html;

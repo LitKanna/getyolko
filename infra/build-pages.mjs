@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { SUBURBS, quoteDelivery, haversineKm } from "./delivery-zones.mjs";
 import { buildCoverageMap } from "./coverage-map.mjs";
-import { pricesBlocks, slot, PRICES_PATH } from "./prices-page.mjs";
+import { pricesBlocks, slot, PRICES_PATH, POSTER_SLOT, KINDS_SLOT } from "./prices-page.mjs";
 import { logoMaster, logoReuse, LOGO_MOTION, iconLinks } from "./brand.mjs";
 import { shareImage, SHARE_IMG_PX } from "./share-preview.mjs";
 
@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "168";
+const CSS_V = "169";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -1051,87 +1051,28 @@ ${ctaBand("Boxes this Saturday", `$${PRICE.box} a box of 180 eggs. Order by Thur
  * is written here is only what shows if that read fails. Everything else on the page is fixed.
  *
  * Kanna, 15 Nov 2026: rebuild it "without us sounding or looking like creeps". So the page is
- * about eggs, not about other shops: a price board on the first screen, the packs under it,
- * then how to compare two packs. YOLKO's own prices come after all that, in their own section.
+ * about eggs, not about other shops. The first screen is the order section's yolk poster with a
+ * real photograph of a tray, one switch and one giant price; under it a card for each kind of
+ * egg. YOLKO's own prices come after all that, in their own section. Keep it this spare.
  */
-const EGG_SIZES = [
-  ["m", "Medium", 42, "500&nbsp;g", "1.25&nbsp;kg"],
-  ["l", "Large", 50, "600&nbsp;g", "1.5&nbsp;kg"],
-  ["xl", "Extra-large", 58, "700&nbsp;g", "1.75&nbsp;kg"],
-  ["j", "Jumbo", 67, "800&nbsp;g", "2&nbsp;kg"],
-];
-// The example the per egg sum starts with: a dozen at a price on the board most weeks.
-const SUM_EXAMPLE = { price: "6.60", eggs: 12 };
-
-// The board's line under the shelves says which pack the egg under the mouse or the finger is.
-// The sum divides a price by a pack. Both are extras: the page reads whole without script.
-const PRICES_SCRIPT = `  <script>
-  (function () {
-    var guide = document.querySelector(".guide");
-    var tipOf = function (egg) {
-      var view = egg.closest(".board-view");
-      return view && view.querySelector("[data-tip]");
-    };
-    var eggOf = function (e) { return e.target.closest && e.target.closest("a.egg"); };
-    if (guide) {
-      ["mouseover", "focusin"].forEach(function (on) {
-        guide.addEventListener(on, function (e) {
-          var egg = eggOf(e), tip = egg && tipOf(egg);
-          if (!tip) return;
-          if (!tip.dataset.rest) tip.dataset.rest = tip.textContent;
-          tip.textContent = egg.getAttribute("data-says");
-          tip.classList.add("is-egg");
-        });
-      });
-      ["mouseout", "focusout"].forEach(function (off) {
-        guide.addEventListener(off, function (e) {
-          var egg = eggOf(e), tip = egg && tipOf(egg);
-          if (!tip || !tip.dataset.rest) return;
-          tip.textContent = tip.dataset.rest;
-          tip.classList.remove("is-egg");
-        });
-      });
-    }
-
-    var sum = document.querySelector(".sum");
-    if (!sum) return;
-    var form = sum.querySelector("form");
-    var price = sum.querySelector("#sum-price");
-    var out = sum.querySelector(".sum-out");
-    var num = sum.querySelector(".sum-num");
-    var unit = sum.querySelector(".sum-unit");
-    var dozen = sum.querySelector(".sum-dozen");
-    var show = function () {
-      var p = parseFloat(String(price.value).replace(/[^0-9.]/g, ""));
-      var picked = form.querySelector("input[name=eggs]:checked");
-      var eggs = picked ? +picked.value : 0;
-      var ok = p > 0 && p < 1000 && eggs > 0;
-      var each = ok ? (p / eggs) * 100 : 0;
-      var dollars = each >= 100;
-      out.classList.toggle("is-dollars", dollars);
-      num.textContent = dollars ? (each / 100).toFixed(2) : String(Math.round(each));
-      unit.textContent = dollars ? "$" : "¢";
-      dozen.textContent = !ok ? "Type the price" : eggs === 12 ? "" : "$" + ((p / eggs) * 12).toFixed(2) + " a dozen";
-    };
-    form.addEventListener("input", show);
-    form.addEventListener("submit", function (e) { e.preventDefault(); price.blur(); });
-    price.addEventListener("focus", function () { price.select(); });
-    sum.classList.add("is-live");
-    form.hidden = false;
-    show();
-  })();
-  </script>
-
-`;
+// The photograph on the poster: "Eggs Chicken" by safaritravelplus, Wikimedia Commons, CC0
+// (https://commons.wikimedia.org/wiki/File:Eggs_Chicken.jpg). A real photograph of a tray of
+// brown eggs. It is not a picture of YOLKO's eggs, so the page never says it is.
+const GUIDE_PHOTO_V = "1";
+const GUIDE_PHOTO_WIDTHS = [720, 1200, 1800];
+const guidePhotoSet = (ext) => GUIDE_PHOTO_WIDTHS.map((w) => `/assets/price-guide/tray-${w}.${ext}?v=${GUIDE_PHOTO_V} ${w}w`).join(", ");
+// Phones show the photo full width, 16 to 10. From 700px it fills a square half of the poster,
+// and the picture is 3 to 2, so it is drawn one and a half times as wide as that square.
+const GUIDE_PHOTO_SIZES = "(max-width: 699px) calc(100vw - 40px), (min-width: 1600px) 56vw, (min-width: 1296px) 900px, 70vw";
 
 function pricesPage() {
   const path = PRICES_PATH;
   const title = "Egg Prices in Sydney Today | Coles, Aldi and IGA | YOLKO";
-  const description = "What a dozen, an 18 pack and a tray of 30 eggs cost in Sydney today at Coles, Aldi and IGA, for cage, cage free and free range. With the price per egg and an egg size guide.";
+  const description = "What a dozen, an 18 pack and a tray of 30 eggs cost in Sydney today at Coles, Aldi and IGA, for cage, cage free and free range, with the price per egg.";
   const trail = [["Home", "/"], ["Egg prices Sydney", path]];
   const faqs = [
-    ["How much is a dozen eggs in Sydney?", "It depends on the kind and the size. Cage eggs cost the least, then cage free (barn laid), then free range, and bigger eggs cost more. The board at the top of this page shows today's prices."],
-    ["How much is a tray of 30 eggs in Sydney?", `Pick Tray of 30 on the board at the top of this page for today's prices. YOLKO's tray of 30 extra-large cage eggs is <strong>$${PRICE.tray1}</strong>, delivered on Saturday.`],
+    ["How much is a dozen eggs in Sydney?", "It depends on the kind and the size. Cage eggs cost the least, then cage free (barn laid), then free range, and bigger eggs cost more. The top of this page shows today's prices."],
+    ["How much is a tray of 30 eggs in Sydney?", `Pick Tray of 30 at the top of this page for today's prices. YOLKO's tray of 30 extra-large cage eggs is <strong>$${PRICE.tray1}</strong>, delivered on Saturday.`],
     ["What is the cheapest way to buy eggs?", `Buy a bigger pack. A tray of 30 usually costs less per egg than a dozen, and a box of 180 costs less again. At YOLKO a box works out at $${PRICE.box / 6} a tray, about ${perEgg(PRICE.box, 180)}¢ an egg.`],
     ["What do egg sizes mean?", "Eggs are sold by weight. A dozen large eggs weighs 600&nbsp;g and a dozen extra-large eggs weighs 700&nbsp;g, which is about 17% more egg for the same count."],
     ["Are these prices the same in every store?", "Not always. They are the prices each shop lists on its website. A store near you can charge a little more or less, and specials come and go."],
@@ -1140,57 +1081,29 @@ function pricesPage() {
   ];
   const graph = [webPage(path, "Egg prices in Sydney", description), breadcrumbs(path, trail), faqPage(path, faqs), BUSINESS_REF];
   // Until the Worker fills them: a line saying today's prices are on their way.
-  const blank = pricesBlocks({ latest: null, prices: PRICE });
-  // Each egg's drawn area follows its weight, so the row shows the sizes true to each other.
-  const eggs = EGG_SIZES.map(([id, name, grams, dozen, tray]) => `              <li class="size-${id}">
-                <span class="size-egg" style="--w:${Math.sqrt(grams / EGG_SIZES[3][2]).toFixed(3)}"><b>${grams}&nbsp;g</b></span>
-                <strong>${name}</strong>
-                <span>${dozen} a dozen</span>
-                <span>${tray} a tray</span>
-              </li>`).join("\n");
-  const sumFig = perEgg(Number(SUM_EXAMPLE.price), SUM_EXAMPLE.eggs);
-  const packOptions = [6, 10, 12, 18, 30].map((n) => `                <label class="bundle-opt"><input type="radio" name="eggs" value="${n}"${n === SUM_EXAMPLE.eggs ? " checked" : ""}><span>${n}</span></label>`).join("\n");
+  const blank = pricesBlocks({ latest: null });
   const body = `  <main>
     <section class="guide" aria-labelledby="guide-title">
       <div class="wrap">
-        <div class="board" data-order-bar-after>
-          <h1 id="guide-title">Egg prices in Sydney</h1>
-          ${slot("guide-board", blank["guide-board"])}
+        <div class="order-stage guide-poster" data-order-bar-after>
+          <div class="order-photo">
+            <div class="order-tray-rotator">
+              <picture class="order-tray-photo is-active">
+                <source type="image/webp" srcset="${guidePhotoSet("webp")}" sizes="${GUIDE_PHOTO_SIZES}">
+                <img src="/assets/price-guide/tray-1200.jpg?v=${GUIDE_PHOTO_V}" srcset="${guidePhotoSet("jpg")}" sizes="${GUIDE_PHOTO_SIZES}" width="1200" height="800" fetchpriority="high" decoding="async" alt="Brown eggs in a paper tray">
+              </picture>
+            </div>
+          </div>
+          <div class="order-pick">
+            <header class="order-head">
+              <h1 id="guide-title">Egg prices in Sydney</h1>
+              <p>What a pack costs at the shops today.</p>
+            </header>
+          ${slot(POSTER_SLOT, blank[POSTER_SLOT])}
+          </div>
         </div>
-          ${slot("guide-packs", blank["guide-packs"])}
+          ${slot(KINDS_SLOT, blank[KINDS_SLOT])}
         <p class="guide-note">These are the prices each shop lists on its own website, so a store near you can differ. Coles and Aldi sell more eggs than this: the guide shows their lowest-priced pack of each size and kind. Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a>.</p>
-      </div>
-    </section>
-
-    <section class="band" aria-labelledby="compare-title">
-      <div class="wrap">
-${sectionHead("How to compare egg prices", "Two things matter: what each egg costs, and how big it is.", "compare-title")}
-        <div class="maths">
-          <div class="sum">
-            <h3>Price per egg</h3>
-            <p class="sum-how">Divide the price by the number of eggs. A $${SUM_EXAMPLE.price} dozen is ${sumFig}¢ an egg.</p>
-            <form hidden novalidate>
-              <div class="sum-field">
-                <label for="sum-price">Price on the pack</label>
-                <label class="sum-price" for="sum-price"><span aria-hidden="true">$</span><input id="sum-price" type="text" inputmode="decimal" autocomplete="off" maxlength="6" value="${SUM_EXAMPLE.price}"></label>
-              </div>
-              <fieldset class="sum-field">
-                <legend>Eggs in the pack</legend>
-                <div class="picker sum-picker">
-${packOptions}
-                </div>
-              </fieldset>
-            </form>
-            <p class="sum-out" aria-live="polite"><span class="sum-fig"><span class="sum-num">${sumFig}</span><span class="sum-unit">¢</span></span><span class="sum-what"><b>an egg</b><span class="sum-dozen"></span></span></p>
-          </div>
-          <div class="sizes">
-            <h3>Egg sizes</h3>
-            <ul class="size-row">
-${eggs}
-            </ul>
-            <p>The weight is the average egg in the pack. YOLKO's trays are extra-large.</p>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -1200,7 +1113,7 @@ ${faqSection("Egg price questions", faqs)}
 
 ${ctaBand("Eggs to your door this Saturday", `A tray of 30 is $${PRICE.tray1}. Order by Thursday night.`)}
   </main>`;
-  return page({ path, title, description, graph, hero: false, body, mobile: `Saturday delivery · $${PRICE.delivery}`, scripts: PRICES_SCRIPT });
+  return page({ path, title, description, graph, hero: false, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
 }
 
 function areasPage(existingHtml) {
