@@ -44,7 +44,8 @@ picture. Round 1 (build 251): the plain pages got the shop header and footer; on
 `/egg-delivery-areas` the A to Z fold (`.az-all`) sits under the map and the search card is one
 row; on phones the hero facts stack and suburb chips inside a card become a two-column grid;
 paired cards with a button (`.panel:has(> .hero-cta)`) line their buttons up; short pages
-(`.legal`, `.notfound`) push the footer to the bottom of the screen.
+(`.legal`, `.notfound`) push the footer to the bottom of the screen. Round 2 (build 252) went
+through every state of the order form and checkout: see "Messages in the form" below.
 
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
@@ -90,6 +91,25 @@ frame. `refreshSubmitPrice()` in `app.js` sets the big price and the button's to
 `placeThumbs()` slides the switch's ink pill; with no script the chosen option paints itself.
 Each option keeps its eggs and price in hidden text (`.bo-eggs`, `.bo-price`) for screen readers
 and for `setTrayVariety`.
+
+Messages in the form (polish round 2, 15 Nov 2026, build 252). The form is `novalidate`: the
+browser's own bubble never shows. Pressing Buy now checks the boxes top to bottom the way the form
+reads; every box that needs fixing turns red at once and says what it needs on a `.field-error`
+line right under it (`markInvalid`), and the first one is brought to the middle of the screen.
+Suburb and postcode sit side by side, so they share the line under the address
+(`#delivery-zone-hint`, `setZoneHint`), which is also where the delivery check speaks: "We deliver
+to Strathfield", "We don't deliver to Penrith yet", or "We can't find that suburb" with the
+WhatsApp and email links. That line never shows a distance and nothing a shopper can see names
+Sydney Markets, including the errors `delivery-zones.mjs` sends back. `#form-msg`, above the pay
+bar, is only for things no box can fix: the shop could not open payment, no connection, a variety
+sold out, or the note that a reorder link filled the form. Never print the Worker's raw `error`
+there; `startBuyNow` picks the words from its `code` (only the stock sentences from
+`catalogue.mjs` are shown as sent). An address the shop turns away is said once, on the address
+line, with the suburb and postcode boxes red. Buy now keeps what was typed in `sessionStorage`
+(`yolko_form_draft`, this tab, one hour, dropped once paid), so stepping back from Stripe's page
+does not empty the form. After paying, the sheet names the Saturday and the order
+(`order: { when, item }` from `/api/confirm-payment`) before it asks to share the link. A long
+stock note ("Sold out this week. Check back Wednesday.") wraps beside the fee, never under it.
 
 ### Brand and logo (12 Nov 2026)
 The logo is the Brush egg: one brush stroke that draws an egg, a yellow yolk inside, and YOLKO in

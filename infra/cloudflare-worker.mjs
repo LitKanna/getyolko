@@ -3369,7 +3369,7 @@ async function handleApi(request, env, url, ctx) {
     return done;
   }
 
-  // Public: check delivery suburb / postcode is within 45 km of Sydney Markets
+  // Public: check delivery suburb / postcode is inside the delivery area
   if (url.pathname === "/api/delivery-check" && request.method === "POST") {
     if (!isAllowedOrigin(request)) {
       return json({ error: "forbidden", code: "origin" }, 403);
@@ -4477,6 +4477,7 @@ async function handleApi(request, env, url, ctx) {
     let meta = null;
     let purchase = null;
     let share = null;
+    let booked = null;
     if (paid && orderId) {
       let order = await env.DATA.get(orderId, "json");
       if (order) {
@@ -4514,12 +4515,20 @@ async function handleApi(request, env, url, ctx) {
         };
         const code = await ensureRefCode(env, order.phone, order.name).catch(() => null);
         if (code) share = { code, link: shareLink(code) };
+        // What the paid screen says back: which Saturday, and what is coming.
+        booked = {
+          when: `Saturday${order.pickupDate ? " " + order.pickupDate : ""}`,
+          item: isBundle(order.bundle)
+            ? emailItem(Math.max(1, Number(order.quantity) || 1), bundleLabel(order.bundle)).replace(/ /g, " ")
+            : "",
+        };
       }
     }
     return json({
       paid,
       purchase,
       share,
+      order: booked,
       meta: meta
         ? { ok: meta.ok, skipped: !!meta.skipped, reason: meta.reason || null, error: meta.error || null }
         : null,

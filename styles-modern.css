@@ -927,26 +927,35 @@ section {
   font-weight: 600;
 }
 
+/* The stock note and the fee share one row. A long note ("Sold out this week. Check back
+   Wednesday.") wraps in two even lines beside the fee, with its dot on the first line. */
 .order-foot {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 4px 12px;
+  gap: 4px 16px;
   padding-top: 16px;
   border-top: 1.5px solid rgba(20, 18, 14, 0.14);
   font-size: 14.5px;
   font-weight: 700;
+  line-height: 1.45;
 }
 
 .order-foot p {
   margin: 0;
 }
 
+.order-fee {
+  flex: none;
+  margin-left: auto;
+}
+
 .stock-note {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
+  min-width: 0;
+  text-wrap: balance;
 }
 
 .stock-note::before {
@@ -954,6 +963,8 @@ section {
   flex: none;
   width: 8px;
   height: 8px;
+  margin-top: 0.45em;
+  margin-top: calc((1lh - 8px) / 2);
   border-radius: 50%;
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
@@ -1081,35 +1092,71 @@ section {
   background: #fff6f5;
 }
 
-.field-error {
-  margin: 6px 2px 0 19.5px;
-  color: var(--red);
-  font-size: 13px;
-  font-weight: 600;
-}
-
+/* The line under a box: what it needs (red), or what the delivery check found. One size,
+   one indent (the box's own text edge), so every message reads as part of its box. */
+.field-error,
 .field-hint {
-  margin: 2px 2px 0 19.5px;
+  margin: 8px 2px 2px 19.5px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
 }
 
+.field-error,
+.field-hint-fix {
+  color: var(--red);
+}
+
+.order-fields > .field-hint {
+  margin-top: 0;
+}
+
+/* The delivery check: a tick or a cross drawn in the line's own colour, then plain words. */
+.field-hint-ok,
+.field-hint-out {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.field-hint-ok::before,
+.field-hint-out::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 0.12em;
+  margin-top: calc((1lh - 16px) / 2);
+  background: currentColor;
+  -webkit-mask: center / 16px 16px no-repeat var(--hint-icon);
+  mask: center / 16px 16px no-repeat var(--hint-icon);
+}
+
 .field-hint-ok {
+  --hint-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 8.5 3.2 3.2L13 4.8'/%3E%3C/svg%3E");
   color: var(--green);
 }
 
 .field-hint-out {
+  --hint-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M4 4l8 8M12 4l-8 8'/%3E%3C/svg%3E");
   color: var(--red);
 }
 
+/* We could not place the suburb: not a mistake, so it is said in ink with the two ways to ask. */
 .field-hint-unknown {
-  color: #8a5a12;
+  color: var(--ink);
 }
 
 .field-hint-unknown a {
   color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.field-hint-unknown a:hover {
+  text-decoration-color: var(--ink);
 }
 
 .hp-field {
@@ -1132,6 +1179,7 @@ section {
   background: #fff6cc;
   font-size: 15px;
   font-weight: 600;
+  text-wrap: balance;
 }
 
 .form-msg {
@@ -1142,6 +1190,7 @@ section {
   background: #fff1ef;
   font-size: 15px;
   font-weight: 600;
+  text-wrap: balance;
 }
 
 .form-msg.info {
@@ -2895,11 +2944,13 @@ body:has(> main > .notfound) > main {
   outline: none;
 }
 
+/* The heading starts under the close button, so it can use the card's full width. */
 .share-card h2 {
-  margin: 4px 48px 0 0;
+  margin: 10px 0 0;
   font-size: 26px;
   line-height: 1.15;
   letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
 .share-card p {
@@ -2914,6 +2965,21 @@ body:has(> main > .notfound) > main {
   color: var(--green);
   font-size: 14px;
   font-weight: 700;
+}
+
+/* What is coming, in ink: the first thing someone who has just paid looks for. */
+.share-card .share-what {
+  margin-top: 10px;
+  color: var(--ink);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* The ask to pass the link on is a second thought, set apart by a hairline. */
+.share-ask {
+  margin-top: 20px;
+  padding-top: 8px;
+  border-top: 1.5px solid var(--line);
 }
 
 .share-card .share-link {
@@ -2945,17 +3011,17 @@ body:has(> main > .notfound) > main {
   right: 12px;
   width: 44px;
   height: 44px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
-  color: var(--muted);
-  background: var(--sand);
-  font-size: 24px;
-  line-height: 1;
+  background: var(--sand) center / 16px 16px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2314120e' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3.5 3.5l9 9M12.5 3.5l-9 9'/%3E%3C/svg%3E");
   cursor: pointer;
+  transition: background-color 150ms ease;
 }
 
 .share-close:hover {
-  color: var(--ink);
+  background-color: var(--line);
 }
 
 /* ---------- Motion ---------- */

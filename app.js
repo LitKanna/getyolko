@@ -92,6 +92,50 @@ function clearOpenCheckout() {
   }
 }
 
+// Someone who steps back from the pay page finds the form as they left it, not empty.
+// Kept for this tab only, for an hour, and dropped as soon as they have paid.
+const FORM_DRAFT_KEY = "yolko_form_draft";
+const DRAFT_FIELDS = ["delivery-street", "delivery-suburb", "delivery-city", "delivery-postcode", "name", "phone"];
+
+function saveFormDraft() {
+  try {
+    const fields = {};
+    DRAFT_FIELDS.forEach((id) => {
+      fields[id] = String(document.getElementById(id)?.value || "").slice(0, 120);
+    });
+    sessionStorage.setItem(
+      FORM_DRAFT_KEY,
+      JSON.stringify({
+        at: Date.now(),
+        fields,
+        bundle: currentBundle(),
+        quantity: currentQuantity(),
+        remind: !!document.getElementById("remind")?.checked,
+      })
+    );
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearFormDraft() {
+  try {
+    sessionStorage.removeItem(FORM_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadFormDraft() {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(FORM_DRAFT_KEY) || "null");
+    if (d && d.fields && Date.now() - Number(d.at || 0) < 3600 * 1000) return d;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------- Hero / order tray image auto-rotate ---------- */
@@ -569,62 +613,68 @@ form?.addEventListener("change", (e) => {
 const fulfillmentSeg = document.getElementById("fulfillment-seg");
 if (fulfillmentSeg) fulfillmentSeg.addEventListener("change", syncFulfillmentUI);
 
+/* ---------- The line under the address ---------- */
+// One line speaks for the suburb and postcode: the delivery check ("We deliver to Strathfield")
+// and anything wrong with those two boxes. It never shows a distance or names a depot.
+const zoneHint = document.getElementById("delivery-zone-hint");
+const suburbInput = document.getElementById("delivery-suburb");
+const postcodeInput = document.getElementById("delivery-postcode");
+// What the line is saying: "" (nothing), "ok", "out", "unknown" or "fix" (a box needs filling in).
+let zoneState = "";
+
+function setZoneHint(state, text) {
+  if (!zoneHint) return;
+  zoneState = state;
+  zoneHint.hidden = !state;
+  zoneHint.className = state ? `field-hint field-hint-${state}` : "field-hint";
+  zoneHint.textContent = state ? text : "";
+}
+
+/** "We can't find that suburb", with the two ways to ask. WhatsApp shows only while config.js names YOLKO's own line. */
+function setZoneUnknown() {
+  setZoneHint("unknown", "");
+  const wa = String(config.whatsappNumber || "").replace(/\D/g, "");
+  const mail = '<a href="mailto:orders@getyolko.com">orders@getyolko.com</a>';
+  zoneHint.innerHTML = wa
+    ? `We can't find that suburb. <a href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> or email ${mail} to check.`
+    : `We can't find that suburb. Email ${mail} to check.`;
+}
+
+function typedSuburb() {
+  return String(suburbInput?.value || "").trim().replace(/\s+/g, " ").slice(0, 40);
+}
+
+let zoneCheckRun = 0;
 async function refreshDeliveryZoneHint() {
-  const hint = document.getElementById("delivery-zone-hint");
-  if (!hint || currentFulfillment() !== "delivery") return;
-  const suburb = String(document.getElementById("delivery-suburb")?.value || "").trim();
+  if (!zoneHint || currentFulfillment() !== "delivery") return;
+  const suburb = typedSuburb();
   const city = String(document.getElementById("delivery-city")?.value || "Sydney").trim();
-  const postcode = String(document.getElementById("delivery-postcode")?.value || "").replace(/\D/g, "").slice(0, 4);
+  const postcode = String(postcodeInput?.value || "").replace(/\D/g, "").slice(0, 4);
+  const run = ++zoneCheckRun;
   if (!suburb && !postcode) {
-    hint.hidden = true;
-    hint.className = "field-hint";
-    hint.textContent = "";
-    hint.style.color = "";
+    if (zoneState !== "fix") setZoneHint("");
     return;
   }
   try {
     const res = await fetch(`${API_BASE}/api/delivery-check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        street: document.getElementById("delivery-street")?.value || "Address check",
-        suburb,
-        city,
-        postcode,
-      }),
+      // The check is about the suburb, so a half-typed street never fails it.
+      body: JSON.stringify({ street: "Address check", suburb, city, postcode }),
     });
     const d = await res.json().catch(() => ({}));
+    // An older answer, or one for boxes that have since been flagged, must not write over the line.
+    if (run !== zoneCheckRun || zoneState === "fix") return;
     if (d.deliver) {
-      hint.hidden = false;
-      hint.className = "field-hint field-hint-ok";
-      hint.textContent = `✓ ${d.matchedSuburb || suburb} · ~${d.roadKmEstimate} km`;
-      hint.style.color = "";
-    } else if (d.code === "out_of_range") {
-      hint.hidden = false;
-      hint.className = "field-hint field-hint-out";
-      hint.textContent = `✗ Outside 45 km (~${d.roadKmEstimate} km). We can't deliver there yet`;
-      hint.style.color = "";
-    } else if (d.code === "unknown_suburb") {
-      hint.hidden = false;
-      hint.className = "field-hint field-hint-unknown";
-      // WhatsApp shows only while config.js names a number (YOLKO's own line, once WhatsApp is live on it).
-      const wa = String(config.whatsappNumber || "").replace(/\D/g, "");
-      const mail = '<a href="mailto:orders@getyolko.com">orders@getyolko.com</a>';
-      hint.innerHTML = wa
-        ? `We could not match that suburb or postcode. <a href="https://wa.me/${wa}" target="_blank" rel="noopener noreferrer">WhatsApp us</a> or email ${mail} and we will check if we can deliver.`
-        : `We could not match that suburb or postcode. Email ${mail} and we will check if we can deliver.`;
-      hint.style.color = "";
-    } else {
-      hint.hidden = false;
-      hint.className = "field-hint field-hint-out";
-      hint.textContent = d.error || "Enter suburb and postcode to check delivery.";
-      hint.style.color = "";
+      setZoneHint("ok", `We deliver to ${d.matchedSuburb || suburb}`);
+      // Boxes the shop had turned red for the old suburb are fine again.
+      [suburbInput, postcodeInput].forEach((input) => input && input.value && clearInvalid(input));
     }
+    else if (d.code === "out_of_range") setZoneHint("out", `We don't deliver to ${d.matchedSuburb || suburb || "that suburb"} yet`);
+    else if (d.code === "unknown_suburb") setZoneUnknown();
+    else setZoneHint("");
   } catch {
-    hint.hidden = true;
-    hint.className = "field-hint";
-    hint.textContent = "";
-    hint.style.color = "";
+    if (run === zoneCheckRun && zoneState !== "fix") setZoneHint("");
   }
 }
 
@@ -638,7 +688,6 @@ async function refreshDeliveryZoneHint() {
 
 /* ---------- Australian mobile handling ---------- */
 const phoneInput = document.getElementById("phone");
-const phoneError = document.getElementById("phone-error");
 
 // Normalise any way people type their number (+61 433..., 61433..., 0433..., 433...)
 // down to local digits: 04XXXXXXXX
@@ -661,20 +710,42 @@ function formatAuMobile(digits) {
 
 phoneInput.addEventListener("input", () => {
   phoneInput.value = formatAuMobile(normaliseAuMobile(phoneInput.value));
-  phoneError.hidden = true;
 });
 
 /* ---------- Field validation feedback ---------- */
-function flagInvalid(input) {
+// The form is `novalidate`, so the browser's own bubble never shows: every box that needs
+// fixing turns red at once and says what it needs on a line right under it. Suburb and
+// postcode sit side by side, so they share the line under the address.
+function markInvalid(input, text) {
   const field = input.closest(".field");
-  field.classList.add("error", "shake");
+  field.classList.add("error");
   input.setAttribute("aria-invalid", "true");
-  input.focus();
+  const line = field.querySelector(".field-error");
+  if (line && text) {
+    line.textContent = text;
+    line.hidden = false;
+  }
+  input.addEventListener("input", () => clearInvalid(input), { once: true });
+}
+
+function clearInvalid(input) {
+  const field = input.closest(".field");
+  field.classList.remove("error", "shake");
+  input.removeAttribute("aria-invalid");
+  const line = field.querySelector(".field-error");
+  if (line) line.hidden = true;
+  if ((input === suburbInput || input === postcodeInput) && zoneState === "fix") setZoneHint("");
+}
+
+/** Bring the first box that needs fixing into view (clear of the sticky header) and into focus. */
+function showFirstInvalid(input) {
+  const field = input.closest(".field");
+  field.classList.remove("shake");
+  void field.offsetWidth;
+  field.classList.add("shake");
   field.addEventListener("animationend", () => field.classList.remove("shake"), { once: true });
-  input.addEventListener("input", () => {
-    field.classList.remove("error");
-    input.removeAttribute("aria-invalid");
-  }, { once: true });
+  input.focus({ preventScroll: true });
+  field.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
 }
 
 /* ---------- Live prices and stock from the shop API ---------- */
@@ -1208,6 +1279,8 @@ function trackMetaPurchase(purchase) {
 
 const paidSession = new URLSearchParams(location.search).get("paid");
 if (paidSession && paidSession.startsWith("cs_")) {
+  clearFormDraft();
+  clearOpenCheckout();
   history.replaceState(null, "", location.pathname);
   const fbp = cookieValue("_fbp");
   const fbc = cookieValue("_fbc");
@@ -1219,7 +1292,7 @@ if (paidSession && paidSession.startsWith("cs_")) {
     .then((d) => {
       if (d && d.paid) {
         clearReferral();
-        showShareSheet(d.share && d.share.link);
+        showShareSheet(d.share && d.share.link, d.order);
         trackMetaPurchase(d.purchase);
       }
     })
@@ -1253,31 +1326,39 @@ function collectBooking() {
   const quantity = currentQuantity();
   const deliveryFee = fulfillment === "delivery" ? DELIVERY_FEE : 0;
 
-  if (!name) {
-    flagInvalid(document.getElementById("name"));
-    return null;
+  // Top to bottom, the way the form reads. Every problem shows at once; the first gets the focus.
+  const problems = [];
+  if (fulfillment === "delivery") {
+    if (deliveryStreet.length < 3) problems.push([document.getElementById("delivery-street"), "Add your street address"]);
+    const noSuburb = !deliverySuburb;
+    const badPostcode = !/^2\d{3}$/.test(deliveryPostcode);
+    if (noSuburb) problems.push([suburbInput, ""]);
+    if (badPostcode) problems.push([postcodeInput, ""]);
+    if (noSuburb || badPostcode) {
+      setZoneHint(
+        "fix",
+        noSuburb && !deliveryPostcode
+          ? "Add your suburb and postcode"
+          : noSuburb
+            ? "Add your suburb"
+            : deliveryPostcode
+              ? "Enter a 4-digit Sydney postcode"
+              : "Add your postcode"
+      );
+    }
+  }
+  // The shop turns away one or two letters and anything that looks like a link.
+  if (name.length < 2 || /^[a-z]{1,2}$/i.test(name) || /https?:|www\.|@/i.test(name)) {
+    problems.push([document.getElementById("name"), name ? "Add your full name" : "Add your name"]);
   }
   if (!isValidAuMobile(phoneDigits)) {
-    phoneError.hidden = false;
-    flagInvalid(phoneInput);
-    return null;
+    problems.push([phoneInput, phoneDigits ? "Enter an Australian mobile, like 0412 345 678" : "Add your mobile number"]);
   }
-  if (fulfillment === "delivery") {
-    if (deliveryStreet.length < 3) {
-      flagInvalid(document.getElementById("delivery-street"));
-      showFormMessage("Add a street address for delivery.");
-      return null;
-    }
-    if (!deliverySuburb) {
-      flagInvalid(document.getElementById("delivery-suburb"));
-      showFormMessage("Add your suburb for delivery.");
-      return null;
-    }
-    if (!/^2\d{3}$/.test(deliveryPostcode)) {
-      flagInvalid(document.getElementById("delivery-postcode"));
-      showFormMessage("Enter a valid NSW postcode.");
-      return null;
-    }
+  if (problems.length) {
+    formMsg.hidden = true;
+    problems.forEach(([input, text]) => markInvalid(input, text));
+    showFirstInvalid(problems[0][0]);
+    return null;
   }
 
   const deliveryAddress =
@@ -1492,15 +1573,9 @@ async function buyNowCheckout(b) {
   orderTokenAt = 0;
   prefetchOrderToken();
   const d = await res.json().catch(() => ({}));
-  if (res.status === 403 && d.code === "geo") return { error: "geo" };
   if (res.status === 429) return { error: "rate" };
-  if (!res.ok) {
-    if (d.code === "delivery_day") return { error: "delivery_day" };
-    if (d.code === "delivery_range") return { error: "delivery_range", message: d.error };
-    if (d.code === "delivery_address") return { error: "delivery_address", message: d.error };
-    return { error: "blocked", message: d.detail || d.error || "checkout failed" };
-  }
-  if (!d.url) return { error: "blocked", message: d.error || "checkout failed" };
+  // The shop's own words are only shown for stock (see startBuyNow); `code` picks the line.
+  if (!res.ok || !d.url) return { error: String(d.code || "failed"), message: String(d.error || "") };
   if (d.orderId || d.id) {
     lastOrderId = d.orderId || d.id;
     saveOpenCheckout(lastOrderId, b);
@@ -1578,45 +1653,60 @@ const buynowLabel = document.getElementById("buynow-label");
 async function startBuyNow() {
   const booking = collectBooking();
   if (!booking) return;
+  // Kept for this tab, so stepping back from the pay page does not empty the form.
+  saveFormDraft();
 
   buynowBtn.disabled = true;
   buynowBtn.setAttribute("aria-busy", "true");
   buynowLabel.textContent = "Opening…";
 
-  const failBuy = (msg) => {
+  const stopBusy = () => {
     buynowBtn.disabled = false;
     buynowBtn.removeAttribute("aria-busy");
     buynowLabel.textContent = "Buy now";
-    showFormMessage(msg || "Couldn’t open payment. Try again.");
+  };
+  const failBuy = (msg) => {
+    stopBusy();
+    showFormMessage(msg);
     formMsg.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
+  };
+  // The address is outside the area, or the shop can't place it: the line under the address
+  // says so once, beside the boxes to change. No second message above the button.
+  const failAddress = async (code) => {
+    await refreshDeliveryZoneHint();
+    if (zoneState !== "out" && zoneState !== "unknown") {
+      if (code === "delivery_range") setZoneHint("out", `We don't deliver to ${typedSuburb() || "that suburb"} yet`);
+      else setZoneUnknown();
+    }
+    stopBusy();
+    [suburbInput, postcodeInput].forEach((input) => markInvalid(input, ""));
+    zoneHint.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
   };
 
   try {
     const result = await buyNowCheckout(booking);
     if (result?.ok) return;
-    if (result?.error === "rate") {
-      failBuy("Too many bookings from this phone or connection. Try again in a minute.");
+    const code = String(result?.error || "");
+    if (code === "delivery_range" || code === "delivery_address") {
+      await failAddress(code);
       return;
     }
-    if (result?.error === "geo") {
-      failBuy("Bookings are for the Sydney area only.");
+    if (code === "rate") {
+      failBuy("Too many tries from this phone. Wait a minute, then tap Buy now again.");
       return;
     }
-    if (result?.error === "delivery_day") {
-      failBuy("Delivery is Saturday only.");
+    // Written for shoppers by the stock rules, e.g. "Free range trays are sold out this week."
+    if (["sold_out", "stock", "not_sold"].includes(code) && result.message) {
+      failBuy(result.message);
       return;
     }
-    if (result?.error === "delivery_range") {
-      failBuy(result.message || "We only deliver within 45 km.");
+    if (code.startsWith("token_")) {
+      failBuy("This page has been open a while. Refresh it, then tap Buy now again.");
       return;
     }
-    if (result?.error === "delivery_address") {
-      failBuy(result.message || "Check your delivery street, suburb, and postcode.");
-      return;
-    }
-    failBuy(result?.message || "Couldn’t open Stripe checkout. Tap Buy now again.");
+    failBuy("Couldn’t open payment. Tap Buy now again.");
   } catch {
-    failBuy("Couldn’t open payment. Check your connection and try again.");
+    failBuy("Couldn’t reach the shop. Check your connection and try again.");
   }
 }
 
@@ -1673,13 +1763,35 @@ function applyReorder(d) {
   showFormMessage(`Your last order is filled in for Saturday ${nextPickupDate("Saturday")}. Check it, then tap Buy now.`, false);
 }
 
+/* ---------- Back from the pay page without paying ---------- */
+function applyFormDraft(d) {
+  DRAFT_FIELDS.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && d.fields[id]) el.value = d.fields[id];
+  });
+  selectBundle(d.bundle);
+  setQuantity(Number(d.quantity) || 1);
+  const remind = document.getElementById("remind");
+  if (remind) remind.checked = !!d.remind;
+  refreshDeliveryZoneHint();
+  refreshSubmitPrice();
+}
+
+if (!window.YOLKO_REORDER && !paidSession) {
+  const draft = loadFormDraft();
+  // Only into an untouched form, once the live stock is in (it can change what may be picked).
+  if (draft) settingsReady.then(() => {
+    if (DRAFT_FIELDS.every((id) => id === "delivery-city" || !document.getElementById(id)?.value)) applyFormDraft(draft);
+  });
+}
+
 if (window.YOLKO_REORDER) {
   const reorder = fetch(`${API_BASE}/api/reorder?t=${window.YOLKO_REORDER}`)
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
   Promise.all([reorder, settingsReady]).then(([d]) => {
     if (d && d.ok) applyReorder(d);
-    else showFormMessage("That reorder link has expired. Pick your eggs below.", false);
+    else showFormMessage("That reorder link has expired. Fill in your order as usual.", false);
   });
 }
 
@@ -1751,24 +1863,34 @@ function clearReferral() {
     .catch(() => saved && showReferral(saved));
 })();
 
-/** After paying: the customer's own link, to pass the free delivery on (when they have one). */
-function showShareSheet(link) {
+/**
+ * After paying: which Saturday and what is coming, then the customer's own link to pass the
+ * free delivery on (when they have one). `order` is { when: "Saturday 21 Nov", item: "2 egg trays (60 eggs)" }.
+ */
+function showShareSheet(link, order) {
   const short = link ? link.replace(/^https:\/\//, "") : "";
   const text = "Fresh eggs delivered on Saturday. Your first delivery is free with my link:";
+  const when = order && /^Saturday \d{1,2} [A-Z][a-z]{2}$/.test(String(order.when || "")) ? order.when : "Saturday";
+  const item = order && order.item ? String(order.item).slice(0, 80) : "";
   const sheet = document.createElement("div");
   sheet.className = "share-sheet";
   sheet.innerHTML = `
     <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" tabindex="-1">
-      <button type="button" class="share-close" aria-label="Close">&times;</button>
+      <button type="button" class="share-close" aria-label="Close"></button>
       <p class="share-kicker">Payment received</p>
-      <h2 id="share-title">Your eggs are booked for Saturday</h2>${
+      <h2 id="share-title">Your eggs are booked for ${escHtml(when)}</h2>${
+        item ? `
+      <p class="share-what">${escHtml(item)} · 6am&nbsp;to&nbsp;12pm</p>` : ""
+      }${
         link
           ? `
-      <p>Know someone nearby who buys eggs? Send them your link. Their first delivery is free, and so is your next one.</p>
-      <p class="share-link"></p>
-      <div class="share-actions">
-        <button type="button" class="btn btn-ink" data-share>Share link</button>
-        <button type="button" class="btn btn-ghost" data-copy>Copy</button>
+      <div class="share-ask">
+        <p>Know someone nearby who buys eggs? Send them your link. Their first delivery is free, and so is your next one.</p>
+        <p class="share-link"></p>
+        <div class="share-actions">
+          <button type="button" class="btn btn-ink" data-share>Share link</button>
+          <button type="button" class="btn btn-ghost" data-copy>Copy</button>
+        </div>
       </div>`
           : ""
       }
