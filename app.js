@@ -642,7 +642,14 @@ form?.addEventListener("change", (e) => {
   if (e.target && (e.target.name === "bundle" || e.target.name === "repeat")) refreshSubmitPrice();
 });
 
-// Price cards on the suburb and bulk pages link to /?b=<pack>#order to pick that pack.
+// The date helpers (nextPickupDay, repeatChargeDate, further down) read these. They sit here
+// because a link that arrives with ?repeat=1 picks Weekly right below, which writes the repeat
+// note's date while this file is still loading: declared any later, that threw.
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAY_INDEX = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Price cards on the delivery, suburb and price pages link to /?b=<pack>#order to pick that pack.
 (function preselectBundle() {
   const b = new URLSearchParams(location.search).get("b");
   if (!["tray1", "tray2", "box"].includes(b)) return;
@@ -652,8 +659,8 @@ form?.addEventListener("change", (e) => {
   radio.dispatchEvent(new Event("change", { bubbles: true }));
 })();
 
-// The bulk page's "Order weekly" button links to /?b=box&repeat=1#order: 1 picks Weekly and
-// 2 picks Fortnightly on the "how often" switch.
+// The price cards (their switch on Weekly or Fortnightly) and the bulk page link to
+// /?b=box&repeat=1#order: 1 picks Weekly and 2 picks Fortnightly on the "how often" switch.
 (function preselectRepeat() {
   const n = new URLSearchParams(location.search).get("repeat");
   if (n !== "1" && n !== "2") return;
@@ -1247,9 +1254,7 @@ function formatTime(hhmm) {
   return m === 0 ? `${hour12} ${suffix}` : `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
-const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const DAY_INDEX = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// (WEEK_DAYS, DAY_INDEX and MONTHS are declared further up, before the links that pick Weekly.)
 
 // Next pickup date for a weekday, Sydney time, always at least tomorrow.
 // Booking today for today isn't possible; orders roll to the next market day.

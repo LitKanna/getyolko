@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "167";
+const CSS_V = "168";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -594,20 +594,16 @@ const DELIVERY_STEPS = [
   ["Saturday, 6am to 12pm", "Eggs at your door", "We bring your eggs to your door. Live in an apartment? Add your unit number and we will message you if we need to be let in."],
 ];
 
-// The weekly order row: one wide card under the three price cards on the delivery, suburb and
-// price pages, and (as an <article>, in index.html) first in the homepage's "More ways to save".
-// Its button opens the order form with Weekly picked (/?repeat=1#order, see app.js).
+// The weekly order in the Prices section: the order form's own switch (Once, Weekly,
+// Fortnightly) sits in the section's head, and it says what delivery costs, so the line under
+// the heading does not. Picking Weekly or Fortnightly turns each Order button into Subscribe,
+// the word the order form's own button uses, and sends it to the form with that pick
+// (/?b=tray2&repeat=1#order, see app.js). PRICE_OFTEN_SCRIPT does that; without it every
+// button orders once. The footer's "Weekly orders" link opens the form with Weekly picked.
 const WEEKLY_ORDER_HREF = "/?repeat=1#order";
-const WEEKLY_CARD = (tag) => `          <${tag} class="weekly-card">
-            <div class="wk-copy">
-              <h3>Weekly or fortnightly</h3>
-              <p>Same prices. Skip a week or cancel any time.</p>
-            </div>
-            <p class="wk-free">Free <span>delivery</span></p>
-            <a class="btn btn-ink btn-small" href="${WEEKLY_ORDER_HREF}">Order weekly</a>
-          </${tag}>`;
+const PRICE_OFTEN = [["Once", `$${PRICE.delivery} delivery`], ["Weekly", "Free delivery"], ["Fortnightly", "Free delivery"]];
 
-function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.delivery} flat.`) {
+function priceCards(title, sub = "Same eggs in every pack.") {
   const cards = ["tray1", "tray2", "box"].map((k) => {
     const p = PACKS[k];
     return `          <li>
@@ -615,20 +611,59 @@ function priceCards(title, sub = `Same eggs in every pack. Delivery is $${PRICE.
             <p class="pc-meta">${p.eggs} eggs · ${perEgg(p.price, p.eggs)}¢ an egg</p>
             <div class="pc-row">
               <span class="pc-price">$${p.price}</span>
-              <a class="btn btn-solid btn-small" href="/?b=${k}#order" aria-label="Order ${p.name.toLowerCase()}">Order</a>
+              <a class="btn btn-solid btn-small" href="/?b=${k}#order" data-pack="${k}" data-pack-name="${p.name.toLowerCase()}" aria-label="Order ${p.name.toLowerCase()}">Order</a>
             </div>
           </li>`;
   }).join("\n");
+  const often = PRICE_OFTEN.map(([name, what], i) => `            <label class="bundle-opt">
+              <input type="radio" name="often" value="${i}" autocomplete="off"${i ? "" : " checked"}>
+              <span class="bo-name">${name}</span>
+              <span class="bo-sub">${what}</span>
+            </label>`).join("\n");
   return `    <section class="band" aria-labelledby="prices-title">
       <div class="wrap">
-${sectionHead(title, sub, "prices-title")}
+        <header class="section-head price-head">
+          <div>
+            <h2 id="prices-title">${title}</h2>
+            <p>${sub}</p>
+          </div>
+          <fieldset class="picker price-often" data-price-often>
+            <legend class="sr-only">How often</legend>
+${often}
+          </fieldset>
+        </header>
         <ul class="price-cards">
 ${cards}
-${WEEKLY_CARD("li")}
         </ul>
       </div>
     </section>`;
 }
+
+// The switch in the Prices head. It runs again when a page comes back from the back button,
+// where the browser may have kept the last pick.
+const PRICE_OFTEN_SCRIPT = `  <script>
+  (function () {
+    var often = document.querySelector("[data-price-often]");
+    if (!often) return;
+    function sync() {
+      var on = often.querySelector("input:checked");
+      var n = on ? Number(on.value) : 0;
+      often.querySelectorAll(".bundle-opt").forEach(function (o) {
+        o.classList.toggle("is-picked", o.querySelector("input") === on);
+      });
+      document.querySelectorAll(".price-cards [data-pack]").forEach(function (a) {
+        var name = a.getAttribute("data-pack-name");
+        a.href = "/?b=" + a.getAttribute("data-pack") + (n ? "&repeat=" + n : "") + "#order";
+        a.textContent = n ? "Subscribe" : "Order";
+        a.setAttribute("aria-label", n ? "Subscribe to " + name + (n === 1 ? " weekly" : " fortnightly") : "Order " + name);
+      });
+    }
+    often.addEventListener("change", sync);
+    window.addEventListener("pageshow", sync);
+    sync();
+  })();
+  </script>
+`;
 
 function mapFigure() {
   const labels = MAP.labels
@@ -811,7 +846,7 @@ ${body}
 
 ${mobile ? mobileCta(mobile, pack) + "\n\n" : ""}${footer(path)}
 
-${scripts}${TOPBAR_SCRIPT}
+${scripts}${body.includes("data-price-often") ? PRICE_OFTEN_SCRIPT : ""}${TOPBAR_SCRIPT}
 </body>
 </html>
 `;
@@ -891,7 +926,7 @@ ${chips([["Sydney", "/egg-delivery-sydney"], ...DELIVERY_PAGES.slice(0, -1).filt
       </div>
     </section>
 
-${priceCards(`Egg prices in ${s.name}`, `Same eggs in every pack. Delivery to ${s.name} is $${PRICE.delivery} flat.`)}
+${priceCards(`Egg prices in ${s.name}`, `Same eggs in every pack, delivered to ${s.name}.`)}
 
 ${faqSection(`${s.name} delivery questions`, faqs)}
 
@@ -1159,7 +1194,7 @@ ${eggs}
       </div>
     </section>
 
-${priceCards("YOLKO prices", `Extra-large eggs in trays of 30, delivered on Saturday morning. Delivery is $${PRICE.delivery} flat.`)}
+${priceCards("YOLKO prices", "Extra-large eggs in trays of 30, delivered on Saturday morning.")}
 
 ${faqSection("Egg price questions", faqs)}
 

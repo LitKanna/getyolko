@@ -1636,11 +1636,13 @@ section {
 }
 
 @media (max-width: 350px) {
-  .picker-often .bundle-opt {
+  .picker-often .bundle-opt,
+  .price-often .bundle-opt {
     font-size: 0.90625rem;
   }
 
-  .picker-often .bo-sub {
+  .picker-often .bo-sub,
+  .price-often .bo-sub {
     font-size: 0.71875rem;
   }
 }
@@ -2145,58 +2147,111 @@ section {
   margin-top: 0.375rem;
 }
 
-/* ---------- The weekly order row ---------- */
-/* One wide card that says what a weekly or fortnightly order gives: first in "More ways to
-   save" on the homepage, and under the three price cards on the delivery and price pages.
-   It reads like a price card laid flat: name and a line on the left, the figure and button
-   on the right. */
-.save-grid .weekly-card,
-.price-cards .weekly-card {
+/* ---------- The weekly order ---------- */
+/* Homepage, first in "More ways to save": an ink band with one giant yolk figure, the way the
+   order poster holds its price. What it is on the left, "$0 delivery" in the middle, one yolk
+   button on the right. (Kanna, 15 Nov 2026, called the first version, a white strip with
+   small words, a weak design.) */
+.weekly-band {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 0.25rem clamp(1.25rem, 2.4vw, 2rem);
-  padding: clamp(1.5rem, 2.4vw, 2rem);
+  gap: 1.5rem clamp(1.75rem, 3.6vw, 3.5rem);
+  padding: clamp(1.75rem, 3.2vw, 2.75rem) clamp(1.5rem, 3.4vw, 3rem);
   border-radius: var(--r-lg);
-  background: var(--paper);
+  color: var(--white);
+  background: var(--ink);
+}
+
+.weekly-band .wb-copy {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.weekly-band h3 {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.6vw + 1.125rem, 2.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.weekly-band .wb-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.wb-figure {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin: 0;
+}
+
+.wb-num {
+  color: var(--yolk);
+  font-size: clamp(4rem, 4.6vw + 1.5rem, 6rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+}
+
+.wb-what {
+  display: grid;
+  gap: 0.1875rem;
+}
+
+.wb-what b {
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.wb-what span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.weekly-band .btn:focus-visible {
+  outline-color: var(--white);
+}
+
+/* Delivery, suburb and price pages: the order form's own switch sits in the head of the
+   Prices section, heading on the left, switch on the right. It has no sliding pill here (no
+   app.js on these pages): the picked option paints itself. */
+.price-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1.5rem 2.5rem;
+}
+
+.price-head > div {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.price-often {
+  /* The longest word gets a little more of the track. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  width: 24rem;
   box-shadow: var(--shadow-card);
 }
 
-.weekly-card .wk-copy {
-  display: grid;
-  gap: 0.25rem;
+.price-often .bundle-opt {
+  align-content: center;
+  gap: 1px;
+  min-height: 3.25rem;
+  padding: 0 0.125rem;
+  white-space: nowrap;
+  transition: background-color 200ms ease, color 180ms ease;
 }
 
-.weekly-card h3 {
-  margin: 0;
-  font-size: 1.5rem;
-  letter-spacing: -0.015em;
-}
-
-.weekly-card .wk-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9375rem;
-}
-
-.weekly-card .wk-free {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(2.5rem, 2vw + 1.25rem, 3rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.045em;
-}
-
-.weekly-card .wk-free span {
-  color: var(--muted);
-  font-size: 1.0625rem;
-  font-weight: 700;
-  letter-spacing: 0;
+.price-often .bundle-opt.is-picked {
+  background: var(--ink);
 }
 
 /* ---------- Delivery areas ---------- */
@@ -4262,26 +4317,25 @@ body:has(> main > .notfound) > main {
     gap: 0.75rem;
   }
 
-  /* Stacked like a price card: the name and line, then the figure beside the button. On a
-     very narrow phone the button drops under the figure instead of squeezing it. */
-  .save-grid .weekly-card,
-  .price-cards .weekly-card {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 1.125rem 1rem;
+  /* The weekly band goes to two rows: the words, then the figure with the button beside it.
+     On a phone (the 640px block below) the button takes a row of its own. */
+  .weekly-band {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1.25rem 1.5rem;
   }
 
-  .weekly-card .wk-copy {
-    flex: 0 0 100%;
+  .weekly-band .wb-copy {
+    grid-column: 1 / -1;
   }
 
-  /* "delivery" sits under "Free", so the figure is as narrow as a price and the button fits
-     beside it. */
-  .weekly-card .wk-free {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
+  /* The Prices switch goes under the heading and keeps its own width; on a phone it is as
+     wide as the cards. */
+  .price-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .price-often {
+    justify-self: start;
   }
 
   .areas-panel {
@@ -4336,6 +4390,19 @@ body:has(> main > .notfound) > main {
 }
 
 @media (max-width: 640px) {
+  .weekly-band {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weekly-band .btn {
+    width: 100%;
+  }
+
+  .price-often {
+    justify-self: stretch;
+    width: auto;
+  }
+
   .announce.has-gift [data-next-run] {
     display: none;
   }
