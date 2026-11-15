@@ -408,8 +408,11 @@ the change in the admin (up to `SUB_QTY_SHOP_MAX`, 20).
 The order section: under Your details, one three-way switch (`#often-picker`: Once, Weekly,
 Fortnightly), each option with its delivery cost under it. Kanna's plan said one "Make it weekly"
 switch; with fortnightly added it became one switch with three choices, still no pop-up. Picking
-a repeat swaps the Thursday reminder row for a flat note (`#repeat-note`: "$25 today, then every
-Thursday night", "Skip or cancel any time"), drops the $5 and makes the button say Subscribe. The
+a repeat swaps the Thursday reminder row for a note with no box (`#repeat-note`, since build 257:
+"$25 every Thursday night" in bold, then "From 26 Nov. Skip or cancel any time."; the date is the
+first Thursday the saved card is charged, `repeatChargeDate` in app.js, counted the way the Worker
+does; today's payment is on the button). Kanna found the first version, a grey box that read
+"$25 today, then every Thursday night", unclear. It also drops the $5 and makes the button say Subscribe. The
 switch hides itself for other trays and dozens. Measure after touching it: the button must fit
 "Subscribe $720" on a 320px phone (`.pay-bar.is-tight`) and no option may wrap. The paid sheet
 adds one line on when the next one comes. `terms.html` and `privacy.html` say how the saved card is used.

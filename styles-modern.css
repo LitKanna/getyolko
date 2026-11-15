@@ -1405,17 +1405,44 @@ section {
   color: rgba(255, 255, 255, 0.72);
 }
 
-/* On a weekly or fortnightly order the reminder row gives way to this one: what is paid today
-   and when the card is charged after that. A note, not a control, so it sits flat on the page. */
-.repeat-note {
-  background: var(--sand);
+/* On a weekly or fortnightly order the reminder row gives way to this note: what the card is
+   charged from here on, and from when. Plain words on the page with no box, so nobody takes it
+   for a field. It keeps the reminder row's place in the grid at every width. */
+.remind-opt.repeat-note {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: center;
+  gap: 0.125rem;
+  padding: 0 0.5rem;
+  background: none;
   box-shadow: none;
   cursor: default;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.repeat-what {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.repeat-more {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 @media (max-width: 699px) {
   .picker-often:not([hidden]) ~ .remind-opt {
     margin-top: -1.25rem;
+  }
+
+  /* With no box around it, the note sits midway between the switch and the pay bar. */
+  .picker-often:not([hidden]) ~ .remind-opt.repeat-note {
+    min-height: 0;
+    margin: -0.625rem 0;
   }
 }
 
