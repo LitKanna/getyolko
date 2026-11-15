@@ -36,9 +36,9 @@
   <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png?v=2">
   <link rel="manifest" href="/site.webmanifest">
   <link rel="preload" as="font" type="font/woff2" href="assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2" crossorigin>
-  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), 560px" fetchpriority="high">
+  <link rel="preload" as="image" type="image/webp" imagesrcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" imagesizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px" fetchpriority="high">
   <link rel="stylesheet" href="assets/fonts.css?v=77">
-  <link rel="stylesheet" href="styles-modern.css?v=160">
+  <link rel="stylesheet" href="styles-modern.css?v=161">
 
   <script type="application/ld+json">
   {
@@ -253,7 +253,7 @@
             <a href="#faq">Questions</a>
           </nav>
         </details>
-        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&!m.contains(e.target))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>
+        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&(e.target===m||!m.contains(e.target)))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>
       </div>
     </div>
   </header>
@@ -283,8 +283,8 @@
         <div class="hero-showcase">
           <div class="showcase-card">
             <picture class="showcase-photo is-active">
-              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px">
-              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), 560px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray. Delivered to Parramatta">
+              <source type="image/webp" srcset="assets/chalk-tray/13-640.webp?v=112 640w, assets/chalk-tray/13-928.webp?v=112 928w, assets/chalk-tray/13-1536.webp?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px">
+              <img src="assets/chalk-tray/13-1536.jpg?v=112" srcset="assets/chalk-tray/13-640.jpg?v=112 640w, assets/chalk-tray/13-928.jpg?v=112 928w, assets/chalk-tray/13-1536.jpg?v=112 1536w" sizes="(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px" width="1536" height="1536" fetchpriority="high" decoding="async" alt="Stacked trays of Pace Farm eggs under a chalkboard sign: fresh eggs, $13 a tray. Delivered to Parramatta">
             </picture>
           </div>
         </div>
@@ -410,7 +410,7 @@
         <div class="cta-panel">
           <div>
             <h2>Eggs in Parramatta this <span class="brush">Saturday</span></h2>
-            <p>Order by Thursday night. Delivery is $5 flat.</p>
+            <p>Order by Thursday&nbsp;night. Delivery is $5 flat.</p>
           </div>
           <div class="hero-cta">
             <a class="btn btn-ink btn-lg" href="/#order">Order now</a>

@@ -19,30 +19,35 @@
   --body: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 
-  --gutter: clamp(20px, 4vw, 48px);
-  --max: 1200px;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  --max: 75rem;
   /* --vvh / --app-height come from the visualViewport script in the page head */
   --vvh: 1svh;
   --vvw: 1vw;
   --app-height: 100svh;
   --app-width: 100vw;
   --frame-h: var(--app-height);
-  --announce-h: 40px;
-  --topbar-h: 76px;
-  --section: clamp(72px, 8.5vw, 120px);
-  --r-xl: clamp(26px, 2.8vw, 40px);
-  --r-lg: clamp(22px, 2.2vw, 32px);
-  --r-md: 18px;
-  --r-sm: 14px;
-  --shadow-card: 0 1px 2px rgba(20, 18, 14, 0.04), 0 4px 14px rgba(20, 18, 14, 0.04);
-  --shadow-float: 0 22px 48px -12px rgba(20, 18, 14, 0.24);
+  --announce-h: 2.5rem;
+  --topbar-h: 4.75rem;
+  --section: clamp(4.5rem, 8.5vw, 7.5rem);
+  --r-xl: clamp(1.625rem, 2.8vw, 2.5rem);
+  --r-lg: clamp(1.375rem, 2.2vw, 2rem);
+  --r-md: 1.125rem;
+  --r-sm: 0.875rem;
+  --shadow-card: 0 1px 2px rgba(20, 18, 14, 0.04), 0 0.25rem 0.875rem rgba(20, 18, 14, 0.04);
+  --shadow-float: 0 1.375rem 3rem -0.75rem rgba(20, 18, 14, 0.24);
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* Every size in this file is in rem, and 1rem is 16px on any screen up to 1600px wide, so
+   "0.8125rem" reads as 13px (rem = px / 16). Past 1600px the root grows with the screen, to
+   20px at 2000px, and the whole page grows with it: on a 1920 monitor it looks as it does
+   at 1600 rather than sitting small in the middle. Media queries stay in px. */
 html {
+  font-size: clamp(16px, 1vw, 20px);
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -60,7 +65,7 @@ body {
   color: var(--ink);
   background: var(--cream);
   font-family: var(--body);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -121,7 +126,7 @@ a {
 
 :focus-visible {
   outline: 2.5px solid var(--ink);
-  outline-offset: 3px;
+  outline-offset: 0.1875rem;
 }
 
 h1,
@@ -168,7 +173,7 @@ ol {
 }
 
 section {
-  scroll-margin-top: calc(var(--topbar-h) + 8px);
+  scroll-margin-top: calc(var(--topbar-h) + 0.5rem);
 }
 
 /* ---------- Announcement ---------- */
@@ -177,10 +182,10 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 9px var(--gutter);
+  padding: 0.5625rem var(--gutter);
   color: var(--white);
   background: var(--ink);
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.4;
   text-align: center;
 }
@@ -195,9 +200,9 @@ section {
 
 .announce-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 10px;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.625rem;
   border-radius: 50%;
   background: var(--yolk);
   vertical-align: 1px;
@@ -234,7 +239,7 @@ section {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 1.5rem;
 }
 
 .brand,
@@ -250,7 +255,7 @@ section {
 .brand-logo {
   display: block;
   width: auto;
-  height: 36px;
+  height: 2.25rem;
   overflow: visible;
   fill: currentColor;
 }
@@ -258,14 +263,14 @@ section {
 .topnav {
   display: flex;
   align-items: center;
-  gap: clamp(20px, 2.6vw, 36px);
+  gap: clamp(1.25rem, 2.6vw, 2.25rem);
 }
 
 .topnav a {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
-  text-underline-offset: 6px;
+  text-underline-offset: 0.375rem;
   text-decoration-thickness: 2px;
 }
 
@@ -277,7 +282,7 @@ section {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 /* The menu button is for phones and tablets, where the row of links is hidden (see the
@@ -287,8 +292,8 @@ section {
 }
 
 .menu summary {
-  width: 44px;
-  height: 44px;
+  width: 2.75rem;
+  height: 2.75rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -305,8 +310,8 @@ section {
 /* Two lines that cross into an X while the menu is open, like the plus on a question. */
 .menu-icon {
   position: relative;
-  width: 18px;
-  height: 10px;
+  width: 1.125rem;
+  height: 0.625rem;
 }
 
 .menu-icon::before,
@@ -334,12 +339,12 @@ section {
 }
 
 .menu[open] .menu-icon::before {
-  transform: translateY(4px) rotate(45deg);
+  transform: translateY(0.25rem) rotate(45deg);
   background: var(--white);
 }
 
 .menu[open] .menu-icon::after {
-  transform: translateY(-4px) rotate(-45deg);
+  transform: translateY(-0.25rem) rotate(-45deg);
   background: var(--white);
 }
 
@@ -349,17 +354,31 @@ section {
   top: 100%;
   left: 0;
   right: 0;
-  padding: 0 var(--gutter) 12px;
+  padding: 0 var(--gutter) 0.75rem;
   border-bottom: 1px solid var(--line);
   background: var(--cream);
-  box-shadow: 0 28px 32px -28px rgba(20, 18, 14, 0.22);
+  box-shadow: 0 1.75rem 2rem -1.75rem rgba(20, 18, 14, 0.22);
+}
+
+/* The page behind dims while the menu is open, so the links read as their own layer and the
+   buttons under them are not taken for part of the menu. A tap on the dimmed page closes it. */
+.menu[open]::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+  z-index: -1;
+  background: rgba(20, 18, 14, 0.38);
 }
 
 .menu-panel a {
   display: block;
-  padding: 17px 0;
+  padding: 1.0625rem 0;
   border-top: 1px solid var(--line);
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -369,20 +388,20 @@ section {
 .menu-panel a[aria-current="page"] {
   text-decoration: underline;
   text-decoration-thickness: 2px;
-  text-underline-offset: 6px;
+  text-underline-offset: 0.375rem;
 }
 
 /* ---------- Buttons ---------- */
 .btn {
-  min-height: 52px;
+  min-height: 3.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 0 26px;
+  gap: 0.625rem;
+  padding: 0 1.625rem;
   border: 1.5px solid transparent;
-  border-radius: 999px;
-  font-size: 16px;
+  border-radius: 62.4375rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1.1;
   text-align: center;
@@ -397,15 +416,15 @@ section {
 }
 
 .btn-small {
-  min-height: 44px;
-  padding: 0 20px;
-  font-size: 15px;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  font-size: 0.9375rem;
 }
 
 .btn-lg {
-  min-height: 60px;
-  padding: 0 34px;
-  font-size: 17px;
+  min-height: 3.75rem;
+  padding: 0 2.125rem;
+  font-size: 1.0625rem;
 }
 
 .btn-block {
@@ -456,8 +475,8 @@ section {
 
 .btn[aria-busy="true"]::before {
   content: "";
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
@@ -466,11 +485,11 @@ section {
 
 .text-link {
   width: fit-content;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   text-decoration: underline;
   text-decoration-thickness: 2px;
-  text-underline-offset: 4px;
+  text-underline-offset: 0.25rem;
 }
 
 .text-link::after {
@@ -479,18 +498,18 @@ section {
 
 /* ---------- Hero ---------- */
 .hero {
-  --hero-photo: min(560px, 44vw, calc(var(--frame-h) - var(--topbar-h) - var(--announce-h) - 96px));
+  --hero-photo: min(35rem, 44vw, calc(var(--frame-h) - var(--topbar-h) - var(--announce-h) - 6rem));
   display: flex;
   align-items: center;
   min-height: calc(var(--frame-h) - var(--topbar-h) - var(--announce-h));
-  padding: clamp(24px, 4 * var(--vvh), 48px) 0 clamp(40px, 6 * var(--vvh), 72px);
+  padding: clamp(1.5rem, 4 * var(--vvh), 3rem) 0 clamp(2.5rem, 6 * var(--vvh), 4.5rem);
 }
 
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: clamp(40px, 5vw, 72px);
+  gap: clamp(2.5rem, 5vw, 4.5rem);
 }
 
 /* Hero spacing steps up with the hierarchy: heading and line sit close (24),
@@ -504,21 +523,21 @@ section {
 }
 
 .hero .crumbs {
-  margin-bottom: clamp(16px, 2.4 * var(--vvh), 24px);
+  margin-bottom: clamp(1rem, 2.4 * var(--vvh), 1.5rem);
 }
 
 .hero .hero-sub {
-  margin-top: clamp(16px, 2.6 * var(--vvh), 24px);
+  margin-top: clamp(1rem, 2.6 * var(--vvh), 1.5rem);
 }
 
 .hero .hero-cta {
-  margin-top: clamp(28px, 4.4 * var(--vvh), 40px);
+  margin-top: clamp(1.75rem, 4.4 * var(--vvh), 2.5rem);
 }
 
 .hero h1 {
   max-width: 11.5ch;
   margin: 0;
-  font-size: clamp(42px, min(5.6vw, 10.4 * var(--vvh)), 80px);
+  font-size: clamp(2.625rem, min(5.6vw, 10.4 * var(--vvh)), 5rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
 }
@@ -529,7 +548,7 @@ section {
   max-width: 34ch;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(17px, 0.5vw + 14px, 21px);
+  font-size: clamp(1.0625rem, 0.5vw + 0.875rem, 1.3125rem);
   line-height: 1.5;
   text-wrap: balance;
 }
@@ -550,30 +569,30 @@ section {
 .hero-cta {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .hero-facts {
   display: flex;
   flex-wrap: wrap;
   align-self: stretch;
-  gap: 10px 28px;
-  margin-top: clamp(28px, 4.4 * var(--vvh), 40px);
-  padding-top: clamp(20px, 2.8 * var(--vvh), 24px);
+  gap: 0.625rem 1.75rem;
+  margin-top: clamp(1.75rem, 4.4 * var(--vvh), 2.5rem);
+  padding-top: clamp(1.25rem, 2.8 * var(--vvh), 1.5rem);
   border-top: 1px solid var(--line);
 }
 
 .hero-facts li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
 .hero-facts svg {
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -671,9 +690,9 @@ section {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
@@ -697,15 +716,15 @@ section {
 /* ---------- Section heads ---------- */
 .section-head {
   display: grid;
-  gap: 14px;
-  margin-bottom: clamp(32px, 4vw, 48px);
+  gap: 0.875rem;
+  margin-bottom: clamp(2rem, 4vw, 3rem);
 }
 
 .section-head h2,
 .h2 {
   max-width: 18ch;
   margin: 0;
-  font-size: clamp(34px, 3.2vw + 8px, 56px);
+  font-size: clamp(2.125rem, 3.2vw + 0.5rem, 3.5rem);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
@@ -714,7 +733,7 @@ section {
   max-width: 46ch;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(16px, 0.3vw + 14.5px, 19px);
+  font-size: clamp(1rem, 0.3vw + 0.90625rem, 1.1875rem);
   line-height: 1.5;
   text-wrap: balance;
 }
@@ -722,7 +741,7 @@ section {
 .section-head.split {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 16px 40px;
+  gap: 1rem 2.5rem;
 }
 
 .section-head.split h2 {
@@ -739,17 +758,17 @@ section {
    Sizes inside the poster follow its own width (cqw), so the words never grow taller
    than the square photo beside them. */
 .order {
-  padding: clamp(32px, 4vw, 56px) 0 var(--section);
+  padding: clamp(2rem, 4vw, 3.5rem) 0 var(--section);
 }
 
 .order-form {
   display: grid;
-  gap: 36px;
+  gap: 2.25rem;
   min-width: 0;
 }
 
 .order-stage {
-  --stage-r: 32px;
+  --stage-r: 2rem;
   --photo-pad: 0px;
   --photo-r: 0px;
   overflow: hidden;
@@ -798,21 +817,21 @@ section {
 
 .order-pick {
   display: grid;
-  gap: 22px;
+  gap: 1.375rem;
   min-width: 0;
-  padding: 26px 20px 20px;
-  padding: 26px clamp(20px, 5.7cqw, 36px) 20px;
+  padding: 1.625rem 1.25rem 1.25rem;
+  padding: 1.625rem clamp(1.25rem, 5.7cqw, 2.25rem) 1.25rem;
 }
 
 .order-head {
   display: grid;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .order-head h2 {
   margin: 0;
-  font-size: 36px;
-  font-size: clamp(30px, 10.8cqw, 44px);
+  font-size: 2.25rem;
+  font-size: clamp(1.875rem, 10.8cqw, 2.75rem);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
@@ -820,7 +839,7 @@ section {
 .order-head p {
   margin: 0;
   color: rgba(20, 18, 14, 0.78);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.45;
 }
@@ -832,7 +851,7 @@ section {
 
 .order-choose {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -842,12 +861,12 @@ section {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: 4px;
+  gap: 0.25rem;
   min-width: 0;
   margin: 0;
-  padding: 5px;
+  padding: 0.3125rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   background: var(--paper);
 }
 
@@ -857,10 +876,10 @@ section {
   display: grid;
   place-items: center;
   min-width: 0;
-  min-height: 50px;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 16px;
+  min-height: 3.125rem;
+  padding: 0 0.375rem;
+  border-radius: 62.4375rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1.15;
   text-align: center;
@@ -894,11 +913,11 @@ section {
 .picker.has-thumb::before {
   content: "";
   position: absolute;
-  top: 5px;
-  bottom: 5px;
+  top: 0.3125rem;
+  bottom: 0.3125rem;
   left: 0;
   width: var(--thumb-w, 0);
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   background: var(--ink);
   transform: translateX(var(--thumb-x, 0));
   transition: transform 280ms var(--ease), width 280ms var(--ease), opacity 160ms ease;
@@ -917,18 +936,18 @@ section {
 .kind-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 .kind-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 62.4375rem;
   background: rgba(255, 255, 255, 0.55);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease;
@@ -957,7 +976,7 @@ section {
 /* Dozens, when any are on sale: one more switch for each kind */
 #dozen-pickers {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 #dozen-pickers:empty {
@@ -972,10 +991,10 @@ section {
 }
 
 .picker-dozen legend {
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
   padding: 0;
   color: rgba(20, 18, 14, 0.78);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
@@ -984,23 +1003,23 @@ section {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px 16px;
-  margin-top: 4px;
+  gap: 0.5rem 1rem;
+  margin-top: 0.25rem;
 }
 
 .pick-num {
   display: flex;
   align-items: flex-start;
-  font-size: 112px;
-  font-size: clamp(88px, 34cqw, 136px);
+  font-size: 7rem;
+  font-size: clamp(5.5rem, 34cqw, 8.5rem);
   font-weight: 800;
   line-height: 0.78;
   letter-spacing: -0.065em;
 }
 
 .pick-num.is-long {
-  font-size: 84px;
-  font-size: clamp(64px, 25cqw, 100px);
+  font-size: 5.25rem;
+  font-size: clamp(4rem, 25cqw, 6.25rem);
 }
 
 .pick-num.swap {
@@ -1020,8 +1039,8 @@ section {
 }
 
 .pick-what b {
-  font-size: 24px;
-  font-size: clamp(20px, 7.4cqw, 28px);
+  font-size: 1.5rem;
+  font-size: clamp(1.25rem, 7.4cqw, 1.75rem);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.025em;
@@ -1029,7 +1048,7 @@ section {
 
 .pick-what span {
   color: rgba(20, 18, 14, 0.74);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -1039,10 +1058,10 @@ section {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 4px 16px;
-  padding-top: 16px;
+  gap: 0.25rem 1rem;
+  padding-top: 1rem;
   border-top: 1.5px solid rgba(20, 18, 14, 0.14);
-  font-size: 14.5px;
+  font-size: 0.90625rem;
   font-weight: 700;
   line-height: 1.45;
 }
@@ -1059,7 +1078,7 @@ section {
 .stock-note {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: 0.5625rem;
   min-width: 0;
   text-wrap: balance;
 }
@@ -1067,13 +1086,13 @@ section {
 .stock-note::before {
   content: "";
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
   margin-top: 0.45em;
-  margin-top: calc((1lh - 8px) / 2);
+  margin-top: calc((1lh - 0.5rem) / 2);
   border-radius: 50%;
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 0.1875rem rgba(255, 255, 255, 0.55);
 }
 
 .stock-note.is-out::before {
@@ -1083,13 +1102,13 @@ section {
 /* Under the poster: where to, who for, pay */
 .order-details {
   display: grid;
-  gap: 28px;
+  gap: 1.75rem;
   min-width: 0;
 }
 
 .form-group {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
   min-width: 0;
 }
 
@@ -1098,12 +1117,12 @@ section {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 2px 16px;
+  gap: 2px 1rem;
 }
 
 .form-head h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -1111,14 +1130,14 @@ section {
 .order-when {
   margin: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
 .order-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -1134,7 +1153,7 @@ section {
 
 .order-you {
   display: grid;
-  gap: 14px;
+  gap: 0.875rem;
   min-width: 0;
 }
 
@@ -1146,11 +1165,11 @@ section {
 
 .field label {
   position: absolute;
-  top: 10px;
-  left: 19.5px;
+  top: 0.625rem;
+  left: 1.21875rem;
   z-index: 1;
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.78125rem;
   font-weight: 600;
   line-height: 1.4;
   pointer-events: none;
@@ -1158,15 +1177,15 @@ section {
 
 .field input {
   width: 100%;
-  height: 62px;
-  padding: 27px 18px 9px;
+  height: 3.875rem;
+  padding: 1.6875rem 1.125rem 0.5625rem;
   border: 1.5px solid transparent;
-  border-radius: 16px;
+  border-radius: 1rem;
   color: var(--ink);
   background: var(--paper);
   box-shadow: var(--shadow-card);
   /* 16px minimum: iOS Safari zooms into smaller inputs */
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
@@ -1180,17 +1199,17 @@ section {
 .field input:focus {
   outline: none;
   border-color: var(--ink);
-  box-shadow: 0 0 0 4px rgba(20, 18, 14, 0.08);
+  box-shadow: 0 0 0 0.25rem rgba(20, 18, 14, 0.08);
 }
 
 .field input:-webkit-autofill {
   -webkit-text-fill-color: var(--ink);
   caret-color: var(--ink);
-  box-shadow: inset 0 0 0 100px var(--paper), var(--shadow-card);
+  box-shadow: inset 0 0 0 6.25rem var(--paper), var(--shadow-card);
 }
 
 .field input:-webkit-autofill:focus {
-  box-shadow: inset 0 0 0 100px var(--paper), 0 0 0 4px rgba(20, 18, 14, 0.08);
+  box-shadow: inset 0 0 0 6.25rem var(--paper), 0 0 0 0.25rem rgba(20, 18, 14, 0.08);
 }
 
 .field.error input {
@@ -1202,9 +1221,9 @@ section {
    one indent (the box's own text edge), so every message reads as part of its box. */
 .field-error,
 .field-hint {
-  margin: 8px 2px 2px 19.5px;
+  margin: 0.5rem 2px 2px 1.21875rem;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -1223,20 +1242,20 @@ section {
 .field-hint-out {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: 0.4375rem;
 }
 
 .field-hint-ok::before,
 .field-hint-out::before {
   content: "";
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   margin-top: 0.12em;
-  margin-top: calc((1lh - 16px) / 2);
+  margin-top: calc((1lh - 1rem) / 2);
   background: currentColor;
-  -webkit-mask: center / 16px 16px no-repeat var(--hint-icon);
-  mask: center / 16px 16px no-repeat var(--hint-icon);
+  -webkit-mask: center / 1rem 1rem no-repeat var(--hint-icon);
+  mask: center / 1rem 1rem no-repeat var(--hint-icon);
 }
 
 .field-hint-ok {
@@ -1258,7 +1277,7 @@ section {
   color: inherit;
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
+  text-underline-offset: 0.1875rem;
 }
 
 .field-hint-unknown a:hover {
@@ -1267,7 +1286,7 @@ section {
 
 .hp-field {
   position: absolute;
-  left: -10000px;
+  left: -625rem;
   top: auto;
   width: 1px;
   height: 1px;
@@ -1282,28 +1301,28 @@ section {
    or what stopped the order. app.js shows the row only while one of them is showing. */
 .order-msgs {
   display: grid;
-  gap: 10px;
+  gap: 0.625rem;
   min-width: 0;
-  margin-bottom: -14px;
+  margin-bottom: -0.875rem;
 }
 
 .ref-note {
   margin: 0;
-  padding: 14px 18px;
-  border-radius: 16px;
+  padding: 0.875rem 1.125rem;
+  border-radius: 1rem;
   background: #fff6cc;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   text-wrap: balance;
 }
 
 .form-msg {
   margin: 0;
-  padding: 14px 18px;
-  border-radius: 16px;
+  padding: 0.875rem 1.125rem;
+  border-radius: 1rem;
   color: var(--red);
   background: #fff1ef;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   text-wrap: balance;
 }
@@ -1318,12 +1337,12 @@ section {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 1rem;
   min-width: 0;
-  min-height: 62px;
-  margin: -14px 0 0;
-  padding: 9px 14px 9px 19.5px;
-  border-radius: 16px;
+  min-height: 3.875rem;
+  margin: -0.875rem 0 0;
+  padding: 0.5625rem 0.875rem 0.5625rem 1.21875rem;
+  border-radius: 1rem;
   background: var(--paper);
   box-shadow: var(--shadow-card);
   cursor: pointer;
@@ -1337,13 +1356,13 @@ section {
 
 .remind-label {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: 0.78125rem;
   font-weight: 600;
   line-height: 1.4;
 }
 
 .remind-what {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1.35;
 }
@@ -1352,10 +1371,10 @@ section {
 .remind-opt input {
   position: relative;
   flex: none;
-  width: 54px;
-  height: 32px;
+  width: 3.375rem;
+  height: 2rem;
   margin: 0;
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   background: var(--line-strong);
   -webkit-appearance: none;
   appearance: none;
@@ -1366,13 +1385,13 @@ section {
 .remind-opt input::before {
   content: "";
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 26px;
-  height: 26px;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.625rem;
+  height: 1.625rem;
   border-radius: 50%;
   background: var(--paper);
-  box-shadow: 0 1px 3px rgba(20, 18, 14, 0.22);
+  box-shadow: 0 1px 0.1875rem rgba(20, 18, 14, 0.22);
   transition: transform 220ms var(--ease), background 200ms ease;
 }
 
@@ -1383,37 +1402,37 @@ section {
 .remind-opt input:checked::before {
   background: var(--yolk);
   box-shadow: none;
-  transform: translateX(22px);
+  transform: translateX(1.375rem);
 }
 
 /* How many, and one button that carries the total */
 .pay-bar {
   display: grid;
-  grid-template-columns: 136px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.625rem;
   min-width: 0;
 }
 
 .stepper {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
   align-items: center;
-  height: 64px;
-  padding: 0 6px;
-  border-radius: 999px;
+  height: 4rem;
+  padding: 0 0.375rem;
+  border-radius: 62.4375rem;
   background: var(--paper);
   box-shadow: var(--shadow-card);
 }
 
 .step-btn {
-  width: 44px;
-  height: 44px;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
   color: var(--ink);
   background: transparent;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -1432,7 +1451,7 @@ section {
 
 .step-value {
   text-align: center;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
 }
 
@@ -1442,16 +1461,16 @@ section {
 
 .buy-btn {
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   min-width: 0;
-  min-height: 64px;
-  padding: 0 24px 0 26px;
-  font-size: 18px;
+  min-height: 4rem;
+  padding: 0 1.5rem 0 1.625rem;
+  font-size: 1.125rem;
   font-weight: 800;
 }
 
 .buy-total {
-  font-size: 22px;
+  font-size: 1.375rem;
   letter-spacing: -0.02em;
 }
 
@@ -1467,44 +1486,44 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin: -12px 0 0;
+  gap: 0.5rem;
+  margin: -0.75rem 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .form-note::before {
   content: "";
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   flex: none;
-  background: center / 16px 16px no-repeat
+  background: center / 1rem 1rem no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b675e' stroke-width='2'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5'/%3E%3Cpath d='M8 10.5V8a4 4 0 0 1 8 0v2.5'/%3E%3C/svg%3E");
 }
 
 /* Narrowest phones: the stepper and the button still share one row. */
 @media (max-width: 350px) {
   .pay-bar {
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 0.5rem;
   }
 
   .stepper {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
-    padding: 0 4px;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+    padding: 0 0.25rem;
   }
 
   .step-btn {
-    width: 40px;
+    width: 2.5rem;
   }
 
   .buy-btn {
-    padding: 0 16px 0 18px;
-    font-size: 16px;
+    padding: 0 1rem 0 1.125rem;
+    font-size: 1rem;
   }
 
   .buy-total {
-    font-size: 19px;
+    font-size: 1.1875rem;
   }
 }
 
@@ -1512,12 +1531,12 @@ section {
    Here the photo is framed in yolk, so the two sides never have to be the same height. */
 @media (min-width: 700px) {
   .order-form {
-    gap: clamp(40px, 4.4vw, 52px);
+    gap: clamp(2.5rem, 4.4vw, 3.25rem);
   }
 
   .order-stage {
-    --stage-r: clamp(32px, 3.7vw, 44px);
-    --photo-pad: 14px;
+    --stage-r: clamp(2rem, 3.7vw, 2.75rem);
+    --photo-pad: 0.875rem;
     --photo-r: calc(var(--stage-r) - var(--photo-pad));
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1529,65 +1548,65 @@ section {
   }
 
   .order-pick {
-    gap: 22px;
-    gap: clamp(16px, 2.17cqw, 26px);
-    padding: 28px 40px;
-    padding: clamp(20px, 3cqw, 36px) clamp(24px, 5.33cqw, 64px);
+    gap: 1.375rem;
+    gap: clamp(1rem, 2.17cqw, 1.625rem);
+    padding: 1.75rem 2.5rem;
+    padding: clamp(1.25rem, 3cqw, 2.25rem) clamp(1.5rem, 5.33cqw, 4rem);
   }
 
   .order-head {
-    gap: clamp(8px, 1.17cqw, 14px);
+    gap: clamp(0.5rem, 1.17cqw, 0.875rem);
   }
 
   .order-head h2 {
-    font-size: 44px;
-    font-size: clamp(32px, 4.67cqw, 56px);
+    font-size: 2.75rem;
+    font-size: clamp(2rem, 4.67cqw, 3.5rem);
   }
 
   .order-head p {
-    font-size: 16px;
-    font-size: clamp(15px, 1.5cqw, 18px);
+    font-size: 1rem;
+    font-size: clamp(0.9375rem, 1.5cqw, 1.125rem);
   }
 
   .bundle-opt {
-    min-height: 50px;
-    min-height: clamp(46px, 4.67cqw, 56px);
-    font-size: clamp(15px, 1.42cqw, 17px);
+    min-height: 3.125rem;
+    min-height: clamp(2.875rem, 4.67cqw, 3.5rem);
+    font-size: clamp(0.9375rem, 1.42cqw, 1.0625rem);
   }
 
   .pick-price {
-    gap: 8px clamp(14px, 1.83cqw, 22px);
-    margin-top: 6px;
+    gap: 0.5rem clamp(0.875rem, 1.83cqw, 1.375rem);
+    margin-top: 0.375rem;
   }
 
   .pick-num {
-    font-size: 136px;
-    font-size: clamp(96px, 14.67cqw, 176px);
+    font-size: 8.5rem;
+    font-size: clamp(6rem, 14.67cqw, 11rem);
   }
 
   .pick-num.is-long {
-    font-size: 100px;
-    font-size: clamp(72px, 10.6cqw, 128px);
+    font-size: 6.25rem;
+    font-size: clamp(4.5rem, 10.6cqw, 8rem);
   }
 
   .pick-what b {
-    font-size: 28px;
-    font-size: clamp(22px, 3cqw, 36px);
+    font-size: 1.75rem;
+    font-size: clamp(1.375rem, 3cqw, 2.25rem);
   }
 
   .pick-what span {
-    font-size: clamp(15px, 1.58cqw, 19px);
+    font-size: clamp(0.9375rem, 1.58cqw, 1.1875rem);
   }
 
   .order-foot {
-    padding-top: clamp(14px, 1.67cqw, 20px);
-    font-size: clamp(14.5px, 1.33cqw, 16px);
+    padding-top: clamp(0.875rem, 1.67cqw, 1.25rem);
+    font-size: clamp(0.90625rem, 1.33cqw, 1rem);
   }
 
   .order-details {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: clamp(24px, 4vw, 56px);
-    row-gap: 26px;
+    column-gap: clamp(1.5rem, 4vw, 3.5rem);
+    row-gap: 1.625rem;
     align-items: start;
   }
 
@@ -1610,7 +1629,7 @@ section {
   .remind-opt {
     grid-column: 2;
     grid-row: 2;
-    margin: -18px 0 0;
+    margin: -1.125rem 0 0;
   }
 
   .pay-bar {
@@ -1621,7 +1640,7 @@ section {
   .form-note {
     grid-column: 1 / -1;
     grid-row: 4;
-    margin-top: -10px;
+    margin-top: -0.625rem;
   }
 
   /* A message runs the full width above the pay bar, and what follows moves down a row. */
@@ -1670,7 +1689,7 @@ section {
   .remind-opt {
     grid-column: 1;
     grid-row: 2;
-    min-height: 64px;
+    min-height: 4rem;
     margin: 0;
   }
 
@@ -1700,40 +1719,40 @@ section {
 
 @media (max-width: 999px) and (min-width: 700px) {
   .buy-btn {
-    padding: 0 20px 0 22px;
+    padding: 0 1.25rem 0 1.375rem;
   }
 }
 
 /* ---------- Confirmation (reserve flow) ---------- */
 .done {
-  padding: clamp(32px, 4vw, 56px) 0 var(--section);
+  padding: clamp(2rem, 4vw, 3.5rem) 0 var(--section);
 }
 
 .done-card {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
-  gap: clamp(28px, 4vw, 56px);
+  gap: clamp(1.75rem, 4vw, 3.5rem);
   align-items: center;
-  padding: clamp(24px, 3.5vw, 48px);
+  padding: clamp(1.5rem, 3.5vw, 3rem);
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
 }
 
 .done-check {
-  width: 68px;
-  height: 68px;
+  width: 4.25rem;
+  height: 4.25rem;
   display: grid;
   place-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
   border-radius: 50%;
   color: var(--ink);
   background: var(--yolk);
 }
 
 .done-side h2 {
-  margin-bottom: 10px;
-  font-size: clamp(30px, 2vw + 16px, 40px);
+  margin-bottom: 0.625rem;
+  font-size: clamp(1.875rem, 2vw + 1rem, 2.5rem);
   letter-spacing: -0.03em;
 }
 
@@ -1743,50 +1762,50 @@ section {
 }
 
 .done-hint {
-  margin-top: 12px !important;
-  font-size: 14px;
+  margin-top: 0.75rem !important;
+  font-size: 0.875rem;
 }
 
 .receipt {
-  margin: 0 0 18px;
+  margin: 0 0 1.125rem;
   border-top: 1.5px solid var(--ink);
 }
 
 .receipt > div {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 14px 0;
+  gap: 1.25rem;
+  padding: 0.875rem 0;
   border-bottom: 1px solid var(--line);
 }
 
 .receipt dt {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
 .receipt dd {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   text-align: right;
 }
 
 .receipt-total dd {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 800;
 }
 
 .done-actions {
   display: grid;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 .pay-perk {
   margin: 0;
   color: var(--green);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   text-align: center;
 }
@@ -1794,7 +1813,7 @@ section {
 .done-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 /* ---------- How it works: timeline ---------- */
@@ -1812,8 +1831,8 @@ section {
   position: relative;
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 44px 40px 0 0;
+  gap: 0.625rem;
+  padding: 2.75rem 2.5rem 0 0;
 }
 
 /* Yolk dot on a rail */
@@ -1823,8 +1842,8 @@ section {
   left: 0;
   top: 0;
   z-index: 1;
-  width: 22px;
-  height: 22px;
+  width: 1.375rem;
+  height: 1.375rem;
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: var(--yolk);
@@ -1833,22 +1852,22 @@ section {
 .timeline li:not(:last-child)::after {
   content: "";
   position: absolute;
-  left: 22px;
+  left: 1.375rem;
   right: 0;
-  top: 10px;
+  top: 0.625rem;
   height: 2px;
   background: rgba(20, 18, 14, 0.18);
 }
 
 .tl-when {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
 .timeline h3 {
   margin: 0;
-  font-size: clamp(22px, 1vw + 14px, 28px);
+  font-size: clamp(1.375rem, 1vw + 0.875rem, 1.75rem);
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
@@ -1868,14 +1887,14 @@ section {
 .save-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 .save-card {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding: clamp(24px, 2.4vw, 34px);
+  gap: 0.75rem;
+  padding: clamp(1.5rem, 2.4vw, 2.125rem);
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
@@ -1884,9 +1903,9 @@ section {
 .save-big {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin: 0 0 10px;
-  font-size: clamp(44px, 3vw + 16px, 56px);
+  gap: 0.625rem;
+  margin: 0 0 0.625rem;
+  font-size: clamp(2.75rem, 3vw + 1rem, 3.5rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.045em;
@@ -1894,7 +1913,7 @@ section {
 
 .save-big > span:last-child {
   color: var(--muted);
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -1907,7 +1926,7 @@ section {
 
 .save-card h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 1.375rem;
   letter-spacing: -0.015em;
 }
 
@@ -1922,7 +1941,7 @@ section {
 }
 
 .save-card .text-link {
-  margin-top: 6px;
+  margin-top: 0.375rem;
 }
 
 /* ---------- Delivery areas ---------- */
@@ -1932,10 +1951,10 @@ section {
 
 .areas-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 29.375rem);
   align-items: center;
-  gap: clamp(32px, 4vw, 64px);
-  padding: clamp(28px, 4.4vw, 64px);
+  gap: clamp(2rem, 4vw, 4rem);
+  padding: clamp(1.75rem, 4.4vw, 4rem);
   border-radius: var(--r-xl);
   background: var(--paper);
   box-shadow: var(--shadow-card);
@@ -1944,14 +1963,14 @@ section {
 .areas-copy {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 22px;
+  gap: 1.375rem;
   min-width: 0;
 }
 
 .areas-copy h2 {
   max-width: 14ch;
   margin: 0;
-  font-size: clamp(32px, 2.8vw + 8px, 52px);
+  font-size: clamp(2rem, 2.8vw + 0.5rem, 3.25rem);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
@@ -1960,36 +1979,36 @@ section {
   max-width: 42ch;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(16px, 0.3vw + 14.5px, 18px);
+  font-size: clamp(1rem, 0.3vw + 0.90625rem, 1.125rem);
 }
 
 .suburb-check {
   display: flex;
   align-items: center;
-  gap: 8px;
-  max-width: 520px;
-  min-height: 64px;
-  padding: 6px 6px 6px 22px;
+  gap: 0.5rem;
+  max-width: 32.5rem;
+  min-height: 4rem;
+  padding: 0.375rem 0.375rem 0.375rem 1.375rem;
   border: 1.5px solid var(--line);
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   background: var(--cream);
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .suburb-check:focus-within {
   border-color: var(--ink);
-  box-shadow: 0 0 0 4px rgba(20, 18, 14, 0.08);
+  box-shadow: 0 0 0 0.25rem rgba(20, 18, 14, 0.08);
 }
 
 .suburb-check input {
   flex: 1;
   width: 0;
   min-width: 0;
-  height: 48px;
+  height: 3rem;
   border: 0;
   outline: none;
   background: transparent;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
   text-overflow: ellipsis;
 }
@@ -2002,11 +2021,11 @@ section {
 .suburb-check input[type="search"]::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
-  margin: 0 0 0 8px;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0 0 0 0.5rem;
   border-radius: 50%;
-  background: var(--line) center / 10px 10px no-repeat
+  background: var(--line) center / 0.625rem 0.625rem no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M1.5 1.5l7 7M8.5 1.5l-7 7' stroke='%2314120e' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
   cursor: pointer;
 }
@@ -2018,7 +2037,7 @@ section {
 }
 
 .suburb-check .btn {
-  min-height: 50px;
+  min-height: 3.125rem;
 }
 
 .chips,
@@ -2026,7 +2045,7 @@ section {
 .local-siblings {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .chips li,
@@ -2034,12 +2053,12 @@ section {
 .local-siblings li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.875rem;
   border: 1.5px solid var(--line);
-  border-radius: 999px;
+  border-radius: 62.4375rem;
   background: var(--paper);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -2055,9 +2074,9 @@ section {
 .local-siblings a {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 999px;
+  gap: 0.375rem;
+  padding: 0.4375rem 0.875rem;
+  border-radius: 62.4375rem;
   text-decoration: none;
 }
 
@@ -2080,7 +2099,7 @@ section {
 
 .areas-list small {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
@@ -2107,11 +2126,11 @@ section {
 .map-label {
   position: absolute;
   transform: translate(-50%, -50%);
-  padding: 3px 9px;
-  border-radius: 999px;
+  padding: 0.1875rem 0.5625rem;
+  border-radius: 62.4375rem;
   background: var(--paper);
-  box-shadow: 0 2px 8px rgba(20, 18, 14, 0.14);
-  font-size: 12px;
+  box-shadow: 0 2px 0.5rem rgba(20, 18, 14, 0.14);
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.3;
   white-space: nowrap;
@@ -2122,23 +2141,23 @@ section {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px 20px;
-  margin-top: 14px;
+  gap: 0.375rem 1.25rem;
+  margin-top: 0.875rem;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 
 .map-key {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .map-key::before {
   content: "";
-  width: 10px;
-  height: 10px;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 50%;
   background: var(--ink);
 }
@@ -2154,21 +2173,21 @@ section {
 
 .faq-layout {
   display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: clamp(32px, 6vw, 96px);
+  grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
+  gap: clamp(2rem, 6vw, 6rem);
   align-items: start;
 }
 
 .faq-intro {
   display: grid;
-  gap: 18px;
+  gap: 1.125rem;
   position: sticky;
-  top: calc(var(--topbar-h) + 24px);
+  top: calc(var(--topbar-h) + 1.5rem);
 }
 
 .faq-intro h2 {
   margin: 0;
-  font-size: clamp(34px, 3.2vw + 8px, 56px);
+  font-size: clamp(2.125rem, 3.2vw + 0.5rem, 3.5rem);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
@@ -2176,14 +2195,14 @@ section {
 .faq-intro p {
   margin: 0;
   color: var(--muted);
-  font-size: clamp(16px, 0.3vw + 14.5px, 18px);
+  font-size: clamp(1rem, 0.3vw + 0.90625rem, 1.125rem);
 }
 
 .contact-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 6px;
+  gap: 0.625rem;
+  margin-top: 0.375rem;
 }
 
 .faq-grid {
@@ -2201,8 +2220,8 @@ section {
 .faq summary {
   position: relative;
   display: block;
-  padding: 24px 56px 24px 0;
-  font-size: clamp(17px, 0.3vw + 15.5px, 19px);
+  padding: 1.5rem 3.5rem 1.5rem 0;
+  font-size: clamp(1.0625rem, 0.3vw + 0.96875rem, 1.1875rem);
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: -0.01em;
@@ -2219,11 +2238,11 @@ section {
   position: absolute;
   right: 0;
   top: 50%;
-  width: 34px;
-  height: 34px;
+  width: 2.125rem;
+  height: 2.125rem;
   border-radius: 50%;
   transform: translateY(-50%);
-  background: var(--sand) center / 14px 14px no-repeat
+  background: var(--sand) center / 0.875rem 0.875rem no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%2314120e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
   transition: transform 220ms var(--ease), background-color 180ms ease;
 }
@@ -2240,9 +2259,9 @@ section {
 
 .faq details p {
   max-width: 62ch;
-  margin: -8px 0 24px;
+  margin: -0.5rem 0 1.5rem;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.6;
 }
 
@@ -2264,16 +2283,16 @@ section {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 28px 40px;
-  padding: clamp(32px, 5vw, 72px);
+  gap: 1.75rem 2.5rem;
+  padding: clamp(2rem, 5vw, 4.5rem);
   border-radius: var(--r-xl);
   background: var(--yolk);
 }
 
 .cta-panel h2 {
   max-width: 16ch;
-  margin: 0 0 12px;
-  font-size: clamp(36px, 3.6vw + 8px, 60px);
+  margin: 0 0 0.75rem;
+  font-size: clamp(2.25rem, 3.6vw + 0.5rem, 3.75rem);
   line-height: 1;
   letter-spacing: -0.045em;
 }
@@ -2298,7 +2317,7 @@ section {
 
 .cta-panel p {
   margin: 0;
-  font-size: clamp(16px, 0.4vw + 14px, 19px);
+  font-size: clamp(1rem, 0.4vw + 0.875rem, 1.1875rem);
   font-weight: 600;
   text-wrap: balance;
 }
@@ -2313,7 +2332,7 @@ section {
 
 /* ---------- Footer ---------- */
 .foot {
-  padding: clamp(56px, 6vw, 80px) 0 40px;
+  padding: clamp(3.5rem, 6vw, 5rem) 0 2.5rem;
   color: var(--white);
   background: var(--ink);
 }
@@ -2321,16 +2340,16 @@ section {
 .foot-grid {
   display: grid;
   grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr));
-  gap: 40px;
-  padding-bottom: 48px;
+  gap: 2.5rem;
+  padding-bottom: 3rem;
 }
 
 .foot-brand {
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
 }
 
 .foot-brand .brand-logo {
-  height: 40px;
+  height: 2.5rem;
 }
 
 .foot-tag {
@@ -2342,20 +2361,20 @@ section {
 
 .foot-col {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
   align-content: start;
 }
 
 .foot-h {
   margin: 0 0 2px;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
 .foot-col a {
   width: fit-content;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -2364,7 +2383,7 @@ section {
 .foot-col a:hover,
 .foot-col a[aria-current="page"] {
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: 0.25rem;
 }
 
 .foot-bottom {
@@ -2372,25 +2391,25 @@ section {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px 24px;
-  padding-top: 24px;
+  gap: 0.75rem 1.5rem;
+  padding-top: 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .foot-bottom p {
   margin: 0;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .foot-legal {
   display: flex;
-  gap: 24px;
+  gap: 1.5rem;
 }
 
 .foot-legal a {
   color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
 }
 
@@ -2401,19 +2420,19 @@ section {
 /* ---------- Sticky phone bar ---------- */
 .mobile-cta {
   position: fixed;
-  left: max(12px, env(safe-area-inset-left));
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(0.75rem, env(safe-area-inset-left));
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
   z-index: 100;
   display: none;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 10px 10px 10px 20px;
-  border-radius: 999px;
+  gap: 0.875rem;
+  padding: 0.625rem 0.625rem 0.625rem 1.25rem;
+  border-radius: 62.4375rem;
   color: var(--white);
   background: var(--ink);
-  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.28);
+  box-shadow: 0 0.875rem 2.125rem rgba(20, 18, 14, 0.28);
   transform: translateY(160%);
   transition: transform 320ms var(--ease);
 }
@@ -2428,13 +2447,13 @@ section {
 }
 
 .mobile-cta-text strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
 .mobile-cta-text span {
   color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .mobile-cta .btn {
@@ -2448,13 +2467,13 @@ section {
 }
 
 .band-first {
-  padding-top: clamp(16px, 2vw, 32px);
+  padding-top: clamp(1rem, 2vw, 2rem);
 }
 
 .local-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 /* Suburb pages pair a short blurb with a card of suburb chips. In equal halves the chips card
@@ -2476,9 +2495,9 @@ section {
 .panel {
   display: grid;
   align-content: start;
-  gap: 16px;
+  gap: 1rem;
   min-width: 0;
-  padding: clamp(24px, 3vw, 40px);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
@@ -2486,23 +2505,36 @@ section {
 
 .panel h2 {
   margin: 0;
-  font-size: clamp(28px, 1.6vw + 12px, 36px);
+  font-size: clamp(1.75rem, 1.6vw + 0.75rem, 2.25rem);
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
 
-/* A card that spans the page keeps its lines to a readable length; in the paired cards the
-   card is narrower than this, so nothing changes there. */
-.panel > p {
-  max-width: 58ch;
+.panel > p,
+.panel-body > p {
   margin: 0;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.6;
 }
 
+/* A card that spans the page puts its heading on the left and its words on the right, the way
+   the questions sections do, so no line of text runs the whole width of the screen. */
+.panel-body {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 901px) {
+  .panel-split {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 1rem clamp(2rem, 4vw, 4rem);
+  }
+}
+
 .panel .areas-list {
-  margin-top: 4px;
+  margin-top: 0.25rem;
 }
 
 .panel:has(> .hero-cta) {
@@ -2511,9 +2543,9 @@ section {
 }
 
 .local-nearby-label {
-  margin: 8px 0 12px;
+  margin: 0.5rem 0 0.75rem;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -2521,13 +2553,13 @@ section {
 .price-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
+  gap: 1.25rem;
 }
 
 .price-cards li {
   display: grid;
-  gap: 4px;
-  padding: clamp(24px, 2.4vw, 32px);
+  gap: 0.25rem;
+  padding: clamp(1.5rem, 2.4vw, 2rem);
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
@@ -2535,26 +2567,26 @@ section {
 
 .price-cards h3 {
   margin: 0;
-  font-size: 24px;
+  font-size: 1.5rem;
   letter-spacing: -0.015em;
 }
 
 .price-cards .pc-meta {
   margin: 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .price-cards .pc-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 18px;
+  gap: 1rem;
+  margin-top: 1.125rem;
 }
 
 .price-cards .pc-price {
-  font-size: clamp(40px, 2vw + 20px, 48px);
+  font-size: clamp(2.5rem, 2vw + 1.25rem, 3rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.045em;
@@ -2568,12 +2600,12 @@ section {
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
-  font-size: clamp(15px, 0.4vw + 13px, 18px);
+  font-size: clamp(0.9375rem, 0.4vw + 0.8125rem, 1.125rem);
 }
 
 .price-table th,
 .price-table td {
-  padding: clamp(14px, 1.6vw, 22px) clamp(14px, 2.4vw, 32px);
+  padding: clamp(0.875rem, 1.6vw, 1.375rem) clamp(0.875rem, 2.4vw, 2rem);
   border-bottom: 1px solid var(--line);
   text-align: left;
 }
@@ -2586,7 +2618,7 @@ section {
 .price-table thead th {
   color: var(--muted);
   background: var(--sand);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
@@ -2613,11 +2645,11 @@ section {
 
 .price-table tbody tr.best td:last-child::after {
   content: "Best value";
-  margin-left: 10px;
-  padding: 3px 10px;
-  border-radius: 999px;
+  margin-left: 0.625rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 62.4375rem;
   background: var(--yolk);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   vertical-align: 2px;
 }
@@ -2636,12 +2668,12 @@ section {
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
-  font-size: clamp(15px, 0.3vw + 13px, 17px);
+  font-size: clamp(0.9375rem, 0.3vw + 0.8125rem, 1.0625rem);
 }
 
 .cmp-table th,
 .cmp-table td {
-  padding: clamp(14px, 1.4vw, 20px) clamp(14px, 2vw, 28px);
+  padding: clamp(0.875rem, 1.4vw, 1.25rem) clamp(0.875rem, 2vw, 1.75rem);
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -2655,7 +2687,7 @@ section {
 .cmp-table thead th {
   color: var(--muted);
   background: var(--sand);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2694,7 +2726,7 @@ section {
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
   text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+  text-underline-offset: 0.1875rem;
 }
 
 .cmp-table .cmp-pack a:hover {
@@ -2703,9 +2735,9 @@ section {
 
 .cmp-table .cmp-meta {
   display: block;
-  margin-top: 3px;
+  margin-top: 0.1875rem;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
@@ -2733,19 +2765,19 @@ section {
 .cmp-table tr.cmp-us th::after {
   content: "";
   display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-left: 8px;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  margin-left: 0.5rem;
   border-radius: 50%;
   background: var(--yolk-deep);
 }
 
 .cmp-table tr.cmp-group th {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
   color: var(--muted);
   background: var(--cream);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
@@ -2758,37 +2790,37 @@ section {
 .cmp-lead,
 .cmp-note {
   max-width: 68ch;
-  margin: 0 0 18px;
+  margin: 0 0 1.125rem;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
 .cmp-checked {
-  margin-bottom: 6px;
-  font-size: 14px;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
 .cmp-lead {
   color: var(--ink-soft);
-  font-size: clamp(17px, 0.3vw + 15px, 19px);
+  font-size: clamp(1.0625rem, 0.3vw + 0.9375rem, 1.1875rem);
 }
 
 .cmp-table + .cmp-note,
 .price-table + .cmp-note {
-  margin: 18px 0 0;
+  margin: 1.125rem 0 0;
 }
 
 .cmp-sources {
   display: grid;
-  gap: 6px;
+  gap: 0.375rem;
   margin: 0;
-  padding: 16px 0 0;
+  padding: 1rem 0 0;
   border-top: 1px solid var(--line);
   list-style: none;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .cmp-sources strong {
@@ -2802,7 +2834,7 @@ section {
 .local-suburbs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .local-suburbs .all a {
@@ -2815,13 +2847,13 @@ section {
 }
 
 .local-row + .wrap {
-  margin-top: 32px;
+  margin-top: 2rem;
 }
 
 .local-suburbs a {
   display: grid;
   gap: 2px;
-  padding: 20px 22px;
+  padding: 1.25rem 1.375rem;
   border: 1.5px solid transparent;
   border-radius: var(--r-md);
   background: var(--paper);
@@ -2835,27 +2867,27 @@ section {
 }
 
 .local-suburbs strong {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
 }
 
 .local-suburbs span {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .map-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 470px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 29.375rem);
   align-items: center;
-  gap: clamp(32px, 4vw, 64px);
+  gap: clamp(2rem, 4vw, 4rem);
 }
 
 /* Delivery areas finder (/egg-delivery-areas) */
 .areas-finder .panel {
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
   align-items: center;
-  gap: 8px clamp(32px, 4vw, 64px);
+  gap: 0.5rem clamp(2rem, 4vw, 4rem);
 }
 
 .areas-finder .panel h2,
@@ -2867,7 +2899,7 @@ section {
   grid-column: 2;
   grid-row: 1 / span 2;
   max-width: none;
-  padding-right: 22px;
+  padding-right: 1.375rem;
 }
 
 .areas-finder .area-status,
@@ -2876,9 +2908,9 @@ section {
 }
 
 .area-status {
-  margin: 12px 0 0;
+  margin: 0.75rem 0 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
@@ -2891,12 +2923,12 @@ section {
 }
 
 .area-results {
-  margin-top: 8px;
+  margin-top: 0.5rem;
 }
 
 /* All suburbs, A to Z: one closed row under the map on /egg-delivery-areas */
 .az-all {
-  margin-top: 20px;
+  margin-top: 1.25rem;
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-card);
@@ -2905,8 +2937,8 @@ section {
 .az-all summary {
   position: relative;
   display: block;
-  padding: 24px 80px 24px clamp(24px, 3vw, 40px);
-  font-size: clamp(17px, 0.3vw + 15.5px, 19px);
+  padding: 1.5rem 5rem 1.5rem clamp(1.5rem, 3vw, 2.5rem);
+  font-size: clamp(1.0625rem, 0.3vw + 0.96875rem, 1.1875rem);
   font-weight: 700;
   line-height: 1.35;
   letter-spacing: -0.01em;
@@ -2921,13 +2953,13 @@ section {
 .az-all summary::after {
   content: "";
   position: absolute;
-  right: clamp(24px, 3vw, 40px);
+  right: clamp(1.5rem, 3vw, 2.5rem);
   top: 50%;
-  width: 34px;
-  height: 34px;
+  width: 2.125rem;
+  height: 2.125rem;
   border-radius: 50%;
   transform: translateY(-50%);
-  background: var(--sand) center / 14px 14px no-repeat
+  background: var(--sand) center / 0.875rem 0.875rem no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M7 1.5v11M1.5 7h11' stroke='%2314120e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
   transition: transform 220ms var(--ease), background-color 180ms ease;
 }
@@ -2943,18 +2975,18 @@ section {
 }
 
 .az-list {
-  padding: 4px clamp(24px, 3vw, 40px) clamp(24px, 3vw, 36px);
-  columns: 4 200px;
-  column-gap: 32px;
+  padding: 0.25rem clamp(1.5rem, 3vw, 2.5rem) clamp(1.5rem, 3vw, 2.25rem);
+  columns: 4 12.5rem;
+  column-gap: 2rem;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.7;
 }
 
 .az-group h3 {
-  margin: 12px 0 2px;
+  margin: 0.75rem 0 2px;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   break-after: avoid;
 }
@@ -2970,7 +3002,7 @@ section {
 }
 
 .az-group small {
-  font-size: 12px;
+  font-size: 0.75rem;
   opacity: 0.8;
 }
 
@@ -2980,12 +3012,12 @@ section {
 }
 
 .notfound {
-  padding: clamp(48px, 8vw, 120px) 0 var(--section);
+  padding: clamp(3rem, 8vw, 7.5rem) 0 var(--section);
 }
 
 .notfound h1 {
-  margin: 0 0 12px;
-  font-size: clamp(44px, 5vw, 72px);
+  margin: 0 0 0.75rem;
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
   line-height: 1;
   letter-spacing: -0.045em;
 }
@@ -2993,11 +3025,11 @@ section {
 .notfound h1 + p {
   margin: 0;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .notfound .hero-cta {
-  margin: 28px 0 48px;
+  margin: 1.75rem 0 3rem;
 }
 
 /* A short page (data deletion, page not found) still ends with the footer on the bottom edge
@@ -3017,40 +3049,40 @@ body:has(> main > .notfound) > main {
    Same header and footer as the shop. The title sits on the left and the words on the
    right, the way the Questions section is laid out. */
 .legal {
-  padding: clamp(40px, 6vw, 88px) 0 var(--section);
+  padding: clamp(2.5rem, 6vw, 5.5rem) 0 var(--section);
 }
 
 .legal .wrap {
   display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: clamp(32px, 6vw, 96px);
+  grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
+  gap: clamp(2rem, 6vw, 6rem);
   align-items: start;
 }
 
 .legal-head {
   position: sticky;
-  top: calc(var(--topbar-h) + 24px);
+  top: calc(var(--topbar-h) + 1.5rem);
 }
 
 .legal-head h1 {
   margin: 0;
-  font-size: clamp(40px, 3.2vw + 12px, 64px);
+  font-size: clamp(2.5rem, 3.2vw + 0.75rem, 4rem);
   font-weight: 800;
   line-height: 1.02;
   letter-spacing: -0.045em;
 }
 
 .legal-head p {
-  margin: 16px 0 0;
+  margin: 1rem 0 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
 .legal-body {
   max-width: 64ch;
   color: var(--ink-soft);
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.65;
 }
 
@@ -3059,29 +3091,29 @@ body:has(> main > .notfound) > main {
 }
 
 .legal-body h2 {
-  margin: 44px 0 12px;
-  padding-top: 28px;
+  margin: 2.75rem 0 0.75rem;
+  padding-top: 1.75rem;
   border-top: 1px solid var(--line);
   color: var(--ink);
-  font-size: clamp(20px, 0.4vw + 18px, 24px);
+  font-size: clamp(1.25rem, 0.4vw + 1.125rem, 1.5rem);
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 .legal-body p {
-  margin: 0 0 16px;
+  margin: 0 0 1rem;
 }
 
 .legal-body ul {
-  margin: 0 0 16px;
+  margin: 0 0 1rem;
   padding-left: 1.15em;
   list-style: disc;
 }
 
 .legal-body li {
-  margin-bottom: 8px;
-  padding-left: 4px;
+  margin-bottom: 0.5rem;
+  padding-left: 0.25rem;
 }
 
 .legal-body li::marker {
@@ -3099,7 +3131,7 @@ body:has(> main > .notfound) > main {
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
   text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+  text-underline-offset: 0.1875rem;
 }
 
 .legal-body a:hover {
@@ -3113,19 +3145,19 @@ body:has(> main > .notfound) > main {
   z-index: 900;
   display: grid;
   place-items: end center;
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding: 1rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
   background: rgba(20, 18, 14, 0.45);
   animation: share-fade 200ms ease;
 }
 
 .share-card {
   position: relative;
-  width: min(460px, 100%);
-  padding: 30px 26px 26px;
-  border-radius: 28px;
+  width: min(28.75rem, 100%);
+  padding: 1.875rem 1.625rem 1.625rem;
+  border-radius: 1.75rem;
   background: var(--paper);
-  box-shadow: 0 24px 60px rgba(20, 18, 14, 0.28);
+  box-shadow: 0 1.5rem 3.75rem rgba(20, 18, 14, 0.28);
   animation: share-up 260ms var(--ease);
 }
 
@@ -3135,30 +3167,30 @@ body:has(> main > .notfound) > main {
 
 /* The heading starts under the close button, so it can use the card's full width. */
 .share-card h2 {
-  margin: 10px 0 0;
-  font-size: 26px;
+  margin: 0.625rem 0 0;
+  font-size: 1.625rem;
   line-height: 1.15;
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
 
 .share-card p {
-  margin: 10px 0 0;
+  margin: 0.625rem 0 0;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.5;
 }
 
 .share-card .share-kicker {
   margin: 0;
   color: var(--green);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 
 /* What is coming, in ink: the first thing someone who has just paid looks for. */
 .share-card .share-what {
-  margin-top: 10px;
+  margin-top: 0.625rem;
   color: var(--ink);
   font-weight: 600;
   text-wrap: balance;
@@ -3166,19 +3198,19 @@ body:has(> main > .notfound) > main {
 
 /* The ask to pass the link on is a second thought, set apart by a hairline. */
 .share-ask {
-  margin-top: 20px;
-  padding-top: 8px;
+  margin-top: 1.25rem;
+  padding-top: 0.5rem;
   border-top: 1.5px solid var(--line);
 }
 
 .share-card .share-link {
-  margin-top: 18px;
-  padding: 14px 16px;
+  margin-top: 1.125rem;
+  padding: 0.875rem 1rem;
   border: 1.5px solid var(--line);
   border-radius: var(--r-sm);
   color: var(--ink);
   background: var(--cream);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   overflow-wrap: anywhere;
   user-select: all;
@@ -3186,8 +3218,8 @@ body:has(> main > .notfound) > main {
 
 .share-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 0.625rem;
+  margin-top: 0.875rem;
 }
 
 .share-actions .btn {
@@ -3196,14 +3228,14 @@ body:has(> main > .notfound) > main {
 
 .share-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 44px;
-  height: 44px;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--sand) center / 16px 16px no-repeat
+  background: var(--sand) center / 1rem 1rem no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2314120e' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3.5 3.5l9 9M12.5 3.5l-9 9'/%3E%3C/svg%3E");
   cursor: pointer;
   transition: background-color 150ms ease;
@@ -3219,8 +3251,8 @@ body:has(> main > .notfound) > main {
 }
 
 @keyframes shake {
-  25% { transform: translateX(-5px); }
-  55% { transform: translateX(4px); }
+  25% { transform: translateX(-0.3125rem); }
+  55% { transform: translateX(0.25rem); }
   80% { transform: translateX(-2px); }
 }
 
@@ -3237,7 +3269,7 @@ body:has(> main > .notfound) > main {
 }
 
 @keyframes share-up {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(1rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3271,11 +3303,11 @@ body:has(> main > .notfound) > main {
 
 @media (max-width: 900px) {
   :root {
-    --topbar-h: 64px;
+    --topbar-h: 4rem;
   }
 
   .brand .brand-logo {
-    height: 32px;
+    height: 2rem;
   }
 
   .topnav {
@@ -3287,16 +3319,16 @@ body:has(> main > .notfound) > main {
   }
 
   .topbar-actions {
-    gap: 8px;
+    gap: 0.5rem;
   }
 
   .announce {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .hero {
     min-height: 0;
-    padding: 20px 0 56px;
+    padding: 1.25rem 0 3.5rem;
   }
 
   .hero-grid {
@@ -3322,15 +3354,15 @@ body:has(> main > .notfound) > main {
 
   .hero-showcase {
     width: 100%;
-    margin-top: 32px;
+    margin-top: 2rem;
   }
 
   .hero .hero-cta {
-    margin-top: 32px;
+    margin-top: 2rem;
   }
 
   .hero-facts {
-    margin-top: 32px;
+    margin-top: 2rem;
   }
 
   .hero-cta .btn {
@@ -3343,18 +3375,18 @@ body:has(> main > .notfound) > main {
 
   .timeline {
     grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
+    gap: 2rem;
   }
 
   .timeline li {
-    padding: 0 0 0 44px;
+    padding: 0 0 0 2.75rem;
   }
 
   .timeline li:not(:last-child)::after {
-    left: 10px;
+    left: 0.625rem;
     right: auto;
-    top: 22px;
-    bottom: -32px;
+    top: 1.375rem;
+    bottom: -2rem;
     width: 2px;
     height: auto;
   }
@@ -3363,7 +3395,7 @@ body:has(> main > .notfound) > main {
   .price-cards,
   .local-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: 0.75rem;
   }
 
   .local-suburbs {
@@ -3376,7 +3408,7 @@ body:has(> main > .notfound) > main {
   }
 
   .coverage-map {
-    max-width: 470px;
+    max-width: 29.375rem;
     justify-self: center;
   }
 
@@ -3394,13 +3426,13 @@ body:has(> main > .notfound) > main {
 
   .legal-head {
     position: static;
-    padding-bottom: 28px;
+    padding-bottom: 1.75rem;
     border-bottom: 1px solid var(--line);
   }
 
   .areas-finder .panel {
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    gap: 1rem;
   }
 
   .areas-finder .suburb-check {
@@ -3410,7 +3442,7 @@ body:has(> main > .notfound) > main {
 
   .foot-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 32px 24px;
+    gap: 2rem 1.5rem;
   }
 
   .foot-brand-col,
@@ -3442,28 +3474,28 @@ body:has(> main > .notfound) > main {
   }
 
   .areas-panel {
-    padding: 28px 18px 20px;
-    border-radius: 28px;
+    padding: 1.75rem 1.125rem 1.25rem;
+    border-radius: 1.75rem;
   }
 
   .suburb-check {
-    min-height: 58px;
-    padding-left: 18px;
+    min-height: 3.625rem;
+    padding-left: 1.125rem;
   }
 
   .suburb-check .btn {
-    min-height: 46px;
-    padding: 0 20px;
+    min-height: 2.875rem;
+    padding: 0 1.25rem;
   }
 
   .map-label {
-    padding: 2px 7px;
-    font-size: 10px;
+    padding: 2px 0.4375rem;
+    font-size: 0.625rem;
   }
 
   .hero-facts {
     display: grid;
-    gap: 14px;
+    gap: 0.875rem;
   }
 
   .panel .areas-list {
@@ -3481,37 +3513,37 @@ body:has(> main > .notfound) > main {
   }
 
   .panel .areas-list li {
-    font-size: 13.5px;
+    font-size: 0.84375rem;
     letter-spacing: -0.01em;
   }
 
   .panel .areas-list li:not(:has(> a)),
   .panel .areas-list li > a {
-    padding: 11px 12px;
+    padding: 0.6875rem 0.75rem;
   }
 
   .panel .areas-list .chip-strong,
   .panel .areas-list .chip-strong > a {
     grid-column: 1 / -1;
     align-items: center;
-    border-radius: 999px;
+    border-radius: 62.4375rem;
   }
 
   .az-all summary {
-    padding: 20px 64px 20px 20px;
+    padding: 1.25rem 4rem 1.25rem 1.25rem;
   }
 
   .az-all summary::after {
-    right: 18px;
+    right: 1.125rem;
   }
 
   .az-list {
-    padding: 0 20px 22px;
+    padding: 0 1.25rem 1.375rem;
   }
 
   .cta-panel {
-    padding: 36px 24px 28px;
-    border-radius: 28px;
+    padding: 2.25rem 1.5rem 1.75rem;
+    border-radius: 1.75rem;
   }
 
   .cta-panel .btn,
@@ -3521,7 +3553,7 @@ body:has(> main > .notfound) > main {
   }
 
   .faq summary {
-    padding-right: 48px;
+    padding-right: 3rem;
   }
 
   .done-row {
@@ -3547,21 +3579,21 @@ body:has(> main > .notfound) > main {
   }
 
   .price-table.all-cols {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .price-table.all-cols th,
   .price-table.all-cols td {
-    padding: 13px 6px;
+    padding: 0.8125rem 0.375rem;
     white-space: nowrap;
   }
 
   .price-table.all-cols th:first-child {
-    padding-left: 16px;
+    padding-left: 1rem;
   }
 
   .price-table.all-cols thead th {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   /* Each shop becomes a card: name and price on top, the pack under it, then the two rates. */
@@ -3582,8 +3614,8 @@ body:has(> main > .notfound) > main {
   .cmp-table tbody tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 12px;
-    padding: 16px 18px;
+    gap: 0.25rem 0.75rem;
+    padding: 1rem 1.125rem;
     border-bottom: 1px solid var(--line);
   }
 
@@ -3599,12 +3631,12 @@ body:has(> main > .notfound) > main {
 
   .cmp-table tbody th {
     grid-area: 1 / 1;
-    font-size: 17px;
+    font-size: 1.0625rem;
   }
 
   .cmp-table .cmp-price {
     grid-area: 1 / 2;
-    font-size: 18px;
+    font-size: 1.125rem;
     text-align: right;
   }
 
@@ -3615,9 +3647,9 @@ body:has(> main > .notfound) > main {
 
   .cmp-table .cmp-num {
     grid-row: 3;
-    padding-top: 4px;
+    padding-top: 0.25rem;
     color: var(--ink-soft);
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .cmp-table .cmp-num + .cmp-num {
@@ -3630,13 +3662,13 @@ body:has(> main > .notfound) > main {
 
   .cmp-table tbody tr.cmp-group {
     display: block;
-    padding: 10px 18px;
+    padding: 0.625rem 1.125rem;
     background: var(--cream);
   }
 
   .cmp-table tbody tr.cmp-group th {
     display: block;
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .cmp-unit {
@@ -3651,20 +3683,20 @@ body:has(> main > .notfound) > main {
 
   /* The egg sizes table on the narrowest phones. */
   .price-table.all-cols {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 
   .price-table.all-cols th,
   .price-table.all-cols td {
-    padding: 12px 4px;
+    padding: 0.75rem 0.25rem;
   }
 
   .price-table.all-cols th:first-child {
-    padding-left: 12px;
+    padding-left: 0.75rem;
   }
 
   .price-table.all-cols thead th {
-    font-size: 12px;
+    font-size: 0.75rem;
     white-space: normal;
   }
 }
@@ -3673,37 +3705,37 @@ body:has(> main > .notfound) > main {
    button, and the delivery date stays on one line in the bar. */
 @media (max-width: 350px) {
   .topbar-inner {
-    gap: 12px;
+    gap: 0.75rem;
   }
 
   .brand .brand-logo {
-    height: 28px;
+    height: 1.75rem;
   }
 
   .topbar-actions .btn-small {
-    padding: 0 14px;
+    padding: 0 0.875rem;
   }
 
   .menu summary {
-    width: 40px;
-    height: 40px;
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
   .announce {
-    padding-inline: 12px;
-    font-size: 12.5px;
+    padding-inline: 0.75rem;
+    font-size: 0.78125rem;
   }
 
   .suburb-check {
-    gap: 4px;
-    padding-left: 14px;
+    gap: 0.25rem;
+    padding-left: 0.875rem;
   }
 
   .suburb-check .btn {
-    padding: 0 14px;
+    padding: 0 0.875rem;
   }
 
   .suburb-check input::placeholder {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 }

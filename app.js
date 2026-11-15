@@ -140,7 +140,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 
 /* ---------- Hero / order tray image auto-rotate ---------- */
 const rotatorTimers = [];
-const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), 560px";
+const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px";
 const ASSET_CACHE_VER = "112";
 
 function clearImageRotators() {
@@ -252,7 +252,7 @@ function chalkHeroUrls(p) {
 const ORDER_PICTURE_VER = "1";
 const ORDER_PICTURE_ALT = "A fried egg on a slice of toast, seen from above among rows of golden toast";
 // Full width in the poster on phones, half of it beside the words from tablets up.
-const ORDER_PICTURE_SIZES = "(max-width: 699px) calc(100vw - 40px), 560px";
+const ORDER_PICTURE_SIZES = "(max-width: 699px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px";
 
 function orderBrandPicture(active, idAttr) {
   const v = ORDER_PICTURE_VER;

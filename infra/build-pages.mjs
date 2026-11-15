@@ -32,7 +32,7 @@ const SITE = "https://getyolko.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 // Bump when the files change so browsers fetch fresh copies.
-const CSS_V = "160";
+const CSS_V = "161";
 const FONTS_V = "77";
 const IMG_V = "112";
 const MAP_V = "1";
@@ -381,7 +381,7 @@ function jsonLd(graph, indent = "  ") {
 
 /* ---------- Shared markup ---------- */
 
-const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), 560px";
+const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px";
 const heroSrcset = (ext) =>
   [640, 928, 1536].map((w) => `assets/chalk-tray/${PRICE.tray1}-${w}.${ext}?v=${IMG_V} ${w}w`).join(", ");
 const perEgg = (price, eggs) => Math.round((price / eggs) * 100);
@@ -499,7 +499,8 @@ function navLinks(path, indent) {
 
 // Phones and tablets hide the row of links (under 901px), so the same links sit behind a round
 // button beside Order now. It is a <details>, so it opens before any script has loaded; the
-// script only closes it again: on a tap outside, on Escape, after a link, on a wide screen.
+// script only closes it again: on a tap outside (the dimmed page is the <details> itself, so a
+// click whose target is the <details> counts as outside), on Escape, after a link, on a wide screen.
 function menu(path) {
   return `        <details class="menu">
           <summary aria-label="Menu"><span class="menu-icon" aria-hidden="true"></span></summary>
@@ -507,7 +508,7 @@ function menu(path) {
 ${navLinks(path, "            ")}
           </nav>
         </details>
-        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&!m.contains(e.target))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>`;
+        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&(e.target===m||!m.contains(e.target)))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>`;
 }
 
 function header(path) {
@@ -682,13 +683,15 @@ ${items.join("\n")}
     </section>`;
 }
 
+// "Thursday night" stays on one line: the lede wraps into even lines, and it must not end one
+// on "Thursday".
 function ctaBand(title, text, secondary) {
   return `    <section class="cta-band">
       <div class="wrap">
         <div class="cta-panel">
           <div>
             <h2>${title.replace("Saturday", '<span class="brush">Saturday</span>')}</h2>
-            <p>${text}</p>
+            <p>${text.replace("Thursday night", "Thursday&nbsp;night")}</p>
           </div>
           <div class="hero-cta">
             <a class="btn btn-ink btn-lg" href="/#order">Order now</a>${secondary ? `
@@ -1104,12 +1107,14 @@ ${sizes.map(([name, dozen, tray, each]) => `            <tr><th scope="row">${na
 
     <section class="band" aria-labelledby="sources-title">
       <div class="wrap">
-        <div class="panel">
+        <div class="panel panel-split">
           <h2 id="sources-title">Where these prices come from</h2>
-          <p>We read each shop's own website every 6 hours. From Coles and Aldi we list the lowest-priced pack of each size and kind. From IGA and Umall we check one tray of 30.</p>
-          <p>These are the prices each shop shows on its website. A store near you can charge a little more or less, and a price can change between checks. If a shop cannot be read for a day, its prices come off this page until it can.</p>
-          <p>Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a> and we will fix it.</p>
-          ${slot("prices-sources", blank["prices-sources"])}
+          <div class="panel-body">
+            <p>We read each shop's own website every 6 hours. From Coles and Aldi we list the lowest-priced pack of each size and kind. From IGA and Umall we check one tray of 30.</p>
+            <p>These are the prices each shop shows on its website. A store near you can charge a little more or less, and a price can change between checks. If a shop cannot be read for a day, its prices come off this page until it can.</p>
+            <p>Shop and brand names belong to their owners, and YOLKO is not connected to any of them. Seen a price that looks wrong? Email <a href="mailto:${EMAIL}">${EMAIL}</a> and we will fix it.</p>
+            ${slot("prices-sources", blank["prices-sources"])}
+          </div>
         </div>
       </div>
     </section>
