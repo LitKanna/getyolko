@@ -203,6 +203,16 @@ section {
   vertical-align: 1px;
 }
 
+/* A friend's link (/r/CODE): the bar says who sent the free delivery, so the first screen
+   shows the link worked. The date follows where there is room for both. */
+.announce.has-gift .announce-more {
+  display: none;
+}
+
+.announce.has-gift [data-next-run] b {
+  font-weight: inherit;
+}
+
 /* ---------- Header ---------- */
 .topbar {
   position: sticky;
@@ -268,6 +278,98 @@ section {
   display: flex;
   align-items: center;
   gap: 20px;
+}
+
+/* The menu button is for phones and tablets, where the row of links is hidden (see the
+   900px rules). On wide screens the links are in the header, so it is not there at all. */
+.menu {
+  display: none;
+}
+
+.menu summary {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--sand);
+  list-style: none;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+
+.menu summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Two lines that cross into an X while the menu is open, like the plus on a question. */
+.menu-icon {
+  position: relative;
+  width: 18px;
+  height: 10px;
+}
+
+.menu-icon::before,
+.menu-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition: transform 220ms var(--ease), background-color 180ms ease;
+}
+
+.menu-icon::before {
+  top: 0;
+}
+
+.menu-icon::after {
+  bottom: 0;
+}
+
+.menu[open] summary {
+  background: var(--ink);
+}
+
+.menu[open] .menu-icon::before {
+  transform: translateY(4px) rotate(45deg);
+  background: var(--white);
+}
+
+.menu[open] .menu-icon::after {
+  transform: translateY(-4px) rotate(-45deg);
+  background: var(--white);
+}
+
+/* The links drop down from the header, on the same cream, one to a row. */
+.menu-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  padding: 0 var(--gutter) 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--cream);
+  box-shadow: 0 28px 32px -28px rgba(20, 18, 14, 0.22);
+}
+
+.menu-panel a {
+  display: block;
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.menu-panel a[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 
 /* ---------- Buttons ---------- */
@@ -1172,6 +1274,15 @@ section {
   animation: shake 350ms ease;
 }
 
+/* Messages get a row of their own, right above the pay bar: the friend's free delivery,
+   or what stopped the order. app.js shows the row only while one of them is showing. */
+.order-msgs {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: -14px;
+}
+
 .ref-note {
   margin: 0;
   padding: 14px 18px;
@@ -1508,6 +1619,20 @@ section {
     grid-row: 4;
     margin-top: -10px;
   }
+
+  /* A message runs the full width above the pay bar, and what follows moves down a row. */
+  .order-msgs {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .order-details.has-msg .pay-bar {
+    grid-row: 4;
+  }
+
+  .order-details.has-msg .form-note {
+    grid-row: 5;
+  }
 }
 
 /* Wide screens: the photo runs to the poster's edge. With more to choose from
@@ -1553,6 +1678,19 @@ section {
   .form-note {
     grid-column: 2;
     grid-row: 3;
+  }
+
+  .order-msgs {
+    grid-row: 2;
+  }
+
+  .order-details.has-msg .remind-opt,
+  .order-details.has-msg .pay-bar {
+    grid-row: 3;
+  }
+
+  .order-details.has-msg .form-note {
+    grid-row: 4;
   }
 }
 
@@ -2305,6 +2443,22 @@ section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+}
+
+/* Suburb pages pair a short blurb with a card of suburb chips. In equal halves the chips card
+   came out up to 240px taller and left the blurb's card half empty, so the chips get more of
+   the row: the blurb wraps onto more lines, the chips onto fewer rows, and the two cards end
+   within a line or two of each other on every suburb page. */
+@media (min-width: 901px) {
+  .local-near {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 5fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .local-near {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
 }
 
 .panel {
@@ -3093,6 +3247,14 @@ body:has(> main > .notfound) > main {
     display: none;
   }
 
+  .menu {
+    display: block;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
   .announce {
     font-size: 13px;
   }
@@ -3236,6 +3398,10 @@ body:has(> main > .notfound) > main {
 }
 
 @media (max-width: 640px) {
+  .announce.has-gift [data-next-run] {
+    display: none;
+  }
+
   .announce-more {
     display: none;
   }
@@ -3465,5 +3631,31 @@ body:has(> main > .notfound) > main {
   .price-table.all-cols thead th {
     font-size: 12px;
     white-space: normal;
+  }
+}
+
+/* Narrowest phones (320px): the header makes room for the logo, Order now and the menu
+   button, and the delivery date stays on one line in the bar. */
+@media (max-width: 350px) {
+  .topbar-inner {
+    gap: 12px;
+  }
+
+  .brand .brand-logo {
+    height: 28px;
+  }
+
+  .topbar-actions .btn-small {
+    padding: 0 14px;
+  }
+
+  .menu summary {
+    width: 40px;
+    height: 40px;
+  }
+
+  .announce {
+    padding-inline: 12px;
+    font-size: 12.5px;
   }
 }

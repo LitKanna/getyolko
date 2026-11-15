@@ -1310,6 +1310,20 @@ form.addEventListener("input", () => {
   formMsg.hidden = true;
 });
 
+// The messages (this one and the friend's free delivery note) share a row right above the
+// pay bar. The row is only there while one of them is showing, so nothing leaves a gap.
+const orderMsgs = document.getElementById("order-msgs");
+function syncOrderMsgs() {
+  const off = ![...orderMsgs.children].some((el) => !el.hidden);
+  if (orderMsgs.hidden !== off) orderMsgs.hidden = off;
+  const details = orderMsgs.closest(".order-details");
+  if (details) details.classList.toggle("has-msg", !off);
+}
+if (orderMsgs) {
+  new MutationObserver(syncOrderMsgs).observe(orderMsgs, { attributes: true, attributeFilter: ["hidden"], subtree: true });
+  syncOrderMsgs();
+}
+
 // Validate the form and collect the booking; returns null after flagging errors
 function collectBooking() {
   const data = new FormData(form);
@@ -1813,14 +1827,28 @@ function savedReferral() {
   return null;
 }
 
+// The gift is said twice: in the black bar, so the first screen shows the link worked, and
+// beside Buy now. The shop still shows its usual $5 everywhere, because only the server can
+// tell a first order (it never checks a phone number before checkout): the $5 comes off there.
 function showReferral(r) {
   referral = r;
+  const who = r.name || "A friend";
   const note = document.getElementById("ref-note");
-  if (!note) return;
-  note.textContent = r.house
-    ? "Free delivery on your first order. It comes off at checkout."
-    : `${r.name ? `${r.name} sent you` : "A friend sent you"} free delivery. It comes off your first order at checkout.`;
-  note.hidden = false;
+  if (note) {
+    note.textContent = `${r.house ? "Your first delivery is free" : `${who} sent you free delivery on your first order`}. The $${DELIVERY_FEE} comes off at checkout.`;
+    note.hidden = false;
+  }
+  const bar = document.querySelector(".announce");
+  const next = bar && bar.querySelector("[data-next-run]");
+  if (!next) return;
+  let gift = bar.querySelector(".announce-gift");
+  if (!gift) {
+    gift = document.createElement("b");
+    gift.className = "announce-gift";
+    next.before(gift, " ");
+  }
+  gift.textContent = r.house ? "Your first delivery is free." : `${who} sent you a free first delivery.`;
+  bar.classList.add("has-gift");
 }
 
 function clearReferral() {
@@ -1832,6 +1860,10 @@ function clearReferral() {
   }
   const note = document.getElementById("ref-note");
   if (note) note.hidden = true;
+  const bar = document.querySelector(".announce");
+  const gift = bar && bar.querySelector(".announce-gift");
+  if (gift) gift.parentNode.removeChild(gift);
+  if (bar) bar.classList.remove("has-gift");
 }
 
 (function initReferral() {

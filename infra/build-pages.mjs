@@ -488,23 +488,40 @@ const NAV = [
 
 const NO_FAQ = new Set(["/404", "/privacy", "/terms", "/data-deletion"]);
 
-function header(path) {
-  const links = NAV.map(([label, href]) => {
+function navLinks(path, indent) {
+  return NAV.map(([label, href]) => {
     // The 404 page and the three plain pages have no FAQ of their own.
     if (href === "#faq" && NO_FAQ.has(path)) href = "/#faq";
     const current = href === path ? ' aria-current="page"' : "";
-    return `        <a href="${href}"${current}>${label}</a>`;
+    return `${indent}<a href="${href}"${current}>${label}</a>`;
   }).join("\n");
+}
+
+// Phones and tablets hide the row of links (under 901px), so the same links sit behind a round
+// button beside Order now. It is a <details>, so it opens before any script has loaded; the
+// script only closes it again: on a tap outside, on Escape, after a link, on a wide screen.
+function menu(path) {
+  return `        <details class="menu">
+          <summary aria-label="Menu"><span class="menu-icon" aria-hidden="true"></span></summary>
+          <nav class="menu-panel" aria-label="Menu">
+${navLinks(path, "            ")}
+          </nav>
+        </details>
+        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&!m.contains(e.target))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>`;
+}
+
+function header(path) {
   return `${ANNOUNCE}
 
   <header class="topbar">
     <div class="wrap topbar-inner">
 ${BRAND_HEADER("/")}
       <nav class="topnav" aria-label="Main navigation">
-${links}
+${navLinks(path, "        ")}
       </nav>
       <div class="topbar-actions">
         <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+${menu(path)}
       </div>
     </div>
   </header>`;
@@ -838,7 +855,7 @@ ${heroSection({
   })}
 
     <section class="band band-first">
-      <div class="wrap local-row">
+      <div class="wrap local-row local-near">
         <div class="panel">
           <h2>Delivering in ${s.name}</h2>
           <p>${s.local}</p>
@@ -1287,6 +1304,7 @@ function updateHome() {
   html = fillMarker(html, "next-run", NEXT_RUN_SCRIPT);
   html = fillMarker(html, "icons", iconLinks((p) => p).map((l) => `  ${l}`).join("\n"));
   html = fillMarker(html, "brand", BRAND_HEADER("#top"));
+  html = fillMarker(html, "menu", menu("/"));
   html = fillMarker(html, "brand-foot", BRAND_FOOTER("#top", "Back to top"));
   writeFileSync(file, html);
 }

@@ -228,6 +228,16 @@
       </nav>
       <div class="topbar-actions">
         <a class="btn btn-solid btn-small" href="/#order">Order now</a>
+        <details class="menu">
+          <summary aria-label="Menu"><span class="menu-icon" aria-hidden="true"></span></summary>
+          <nav class="menu-panel" aria-label="Menu">
+            <a href="/egg-delivery-sydney">Delivery</a>
+            <a href="/egg-delivery-areas">Suburbs</a>
+            <a href="/bulk-eggs-sydney">Bulk eggs</a>
+            <a href="#faq">Questions</a>
+          </nav>
+        </details>
+        <script>(function(){var m=document.currentScript.previousElementSibling;if(!m||m.tagName!=="DETAILS")return;var shut=function(){m.open=false};document.addEventListener("click",function(e){if(m.open&&!m.contains(e.target))shut()});document.addEventListener("keydown",function(e){if(e.key==="Escape"&&m.open){shut();m.querySelector("summary").focus()}});m.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a"))shut()});if(window.matchMedia){var q=matchMedia("(min-width: 901px)");var f=function(){if(q.matches)shut()};if(q.addEventListener)q.addEventListener("change",f);else if(q.addListener)q.addListener(f)}})();</script>
       </div>
     </div>
   </header>
