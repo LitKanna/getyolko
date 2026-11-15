@@ -929,6 +929,10 @@ body:has(#savebar) .toasts { bottom:84px; }
 .cc.off { opacity:.55; }
 .sb-acts { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .sb-acts .btn { flex:1 1 auto; }
+.sbc .stepper label { min-width:60px; padding:0 6px; }
+.sbc .stepper input { width:44px; text-align:center; }
+.sbc .stepper button:disabled { opacity:.35; pointer-events:none; }
+.modal .sbc .sbc-sum { min-height:20px; margin:16px 2px 0; color:var(--muted); font-size:15px; line-height:20px; }
 .load .ln.soon { color:var(--muted); }
 .insight.due { color:var(--ink2); }
 
@@ -4416,13 +4420,14 @@ function sbOpen(t) {
     else if (s.canSkip) acts.push(b("skip", "Skip Saturday " + s.nextLabel));
     acts.push(b("pause", "Pause"));
   } else if (s.status === "paused" && s.pauseWhy !== "card") acts.push(b("resume", "Resume"));
-  if (s.status !== "cancelled") acts.push(b("cancel", "Cancel order", "danger"));
+  if (s.status !== "cancelled") { acts.push(b("change", "Change")); acts.push(b("cancel", "Cancel order", "danger")); }
   openModal({ title: s.name || "Subscriber", cls: "gr-sheet", html: '<div class="zstack">' + cells.join("") + "</div>" + (acts.length ? '<div class="sb-acts">' + acts.join("") + "</div>" : ""), actions: [{ label: "Done", kind: "primary", value: true }] });
 }
 /** One change to one repeat order. Returns "" when it worked, else what to tell the owner. */
-async function sbSend(id, action, forIso) {
+async function sbSend(id, action, forIso, more) {
   const body = { id: id, action: action };
   if (forIso) body.for = forIso;
+  if (more) { body.bundle = more.bundle; body.quantity = more.quantity; body.every = more.every; }
   const r = await api("/api/admin/subscriptions", { method: "POST", body: body });
   if (!r.ok) return r.data.error || "Not saved. Try again";
   SUBS = r.data;
@@ -4430,10 +4435,66 @@ async function sbSend(id, action, forIso) {
   if (S.view === "subscribers") renderSubs();
   return "";
 }
+const SB_SIZE = { tray1: "1 tray", tray2: "2 trays", box: "Full box" };
+/** Size, how many and how often for one repeat order, for when a customer asks the shop to change it. */
+async function sbChange(s) {
+  const first = sbFirst(s);
+  const sizes = (SUBS.sizes || []).slice();
+  // A size the shop no longer sells stays on offer for the order that already has it.
+  if (!sizes.some(function (z) { return z.key === s.bundle; })) sizes.push({ key: s.bundle, price: s.quantity ? s.total / s.quantity : 0, trays: s.quantity ? s.trays / s.quantity : 1 });
+  const max = SUBS.qtyMax || 20;
+  const was = { bundle: s.bundle, quantity: s.quantity, every: s.every };
+  const radio = function (name, value, label, on) { return '<label><input type="radio" name="' + name + '" value="' + value + '"' + (on ? " checked" : "") + "><span>" + esc(label) + "</span></label>"; };
+  const html = '<div class="pw-form sbc">' +
+    '<div class="field"><span>Size</span><div class="seg wide" role="radiogroup" aria-label="Size">' + sizes.map(function (z) { return radio("sbc-size", z.key, SB_SIZE[z.key] || z.key, z.key === s.bundle); }).join("") + "</div></div>" +
+    '<div class="field"><span>How many</span><div class="stepper"><button type="button" data-sbc="-1" aria-label="One less">' + ic("minus", 16) + "</button>" +
+    '<label><input id="sbc-qty" type="number" inputmode="numeric" min="1" max="' + max + '" step="1" value="' + s.quantity + '" aria-label="How many"></label>' +
+    '<button type="button" data-sbc="1" aria-label="One more">' + ic("plus", 16) + "</button></div></div>" +
+    '<div class="field"><span>How often</span><div class="seg wide" role="radiogroup" aria-label="How often">' + radio("sbc-every", 1, "Weekly", s.every !== 2) + radio("sbc-every", 2, "Fortnightly", s.every === 2) + "</div></div>" +
+    '<p class="sbc-sum" id="sbc-sum" aria-live="polite"></p></div>';
+  const read = function (w) {
+    const size = w.querySelector('input[name="sbc-size"]:checked');
+    const every = w.querySelector('input[name="sbc-every"]:checked');
+    return { bundle: size ? size.value : s.bundle, quantity: Math.floor(Number(w.querySelector("#sbc-qty").value)), every: every && every.value === "2" ? 2 : 1 };
+  };
+  const same = function (v) { return v.bundle === was.bundle && v.quantity === was.quantity && v.every === was.every; };
+  const done = openModal({
+    title: "Change " + first + "’s order",
+    cls: "pw-sheet",
+    html: html,
+    actions: [{ label: "Cancel", kind: "ghost", value: null }, { label: "Save", kind: "primary", value: true }],
+    validate: function (w) { const q = read(w).quantity; return q >= 1 && q <= max ? "" : "How many: 1 to " + max; },
+    collect: read,
+    submit: function (v) { return same(v) ? "" : sbSend(s.id, "change", "", v); },
+  });
+  const m = $("modal");
+  const sum = function () {
+    const v = read(m);
+    const z = sizes.filter(function (x) { return x.key === v.bundle; })[0];
+    const ok = z && v.quantity >= 1 && v.quantity <= max;
+    $("sbc-sum").textContent = ok ? plural(z.trays * v.quantity, "tray") + ", " + money(z.price * v.quantity) + (v.every === 2 ? " every second Saturday" : " every Saturday") + ". Starts with their next delivery." : "";
+    m.querySelector('[data-sbc="-1"]').disabled = !(v.quantity > 1);
+    m.querySelector('[data-sbc="1"]').disabled = v.quantity >= max;
+  };
+  m.addEventListener("click", function (e) {
+    const b = e.target.closest("[data-sbc]");
+    if (!b) return;
+    const input = $("sbc-qty");
+    input.value = Math.min(max, Math.max(1, (Math.floor(Number(input.value)) || 1) + Number(b.getAttribute("data-sbc"))));
+    sum();
+  });
+  m.addEventListener("input", sum);
+  m.addEventListener("change", sum);
+  sum();
+  const v = await done;
+  if (!v || same(v)) return;
+  toast("Changed " + first + "’s order", { label: "Undo", run: async function () { const e = await sbSend(s.id, "change", "", was); toast(e || first + "’s order is back as it was"); } });
+}
 async function sbAct(t) {
   const s = sbFind(t.getAttribute("data-id"));
   const action = t.getAttribute("data-do");
   if (!s || t.classList.contains("busy")) return;
+  if (action === "change") return sbChange(s);
   const first = sbFirst(s);
   if (action === "cancel") {
     // Cancelling lets go of the saved card, so it cannot be undone: ask first, Keep it by default.

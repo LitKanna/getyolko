@@ -365,9 +365,12 @@ links), `sub:run:<id>:<saturday>` (the order id a charge uses, so a retry never 
 order), `sub:off` (pause for everyone), `sub:lastrun`, `sub:alert:<saturday>`.
 
 The customer's page is `/subscription?t=<token>` (`subPage`, the shop's cream look, noindex):
-skip, undo, pause, start again, change size or rhythm, new card, cancel. A GET only ever asks;
-the change happens on a POST and answers with a 303, so mail scanners cannot skip or cancel for
-anyone. Cancelling detaches the saved card. A new address or a quantity above one is by reply.
+skip, undo, pause, start again, change (size, how many, how often), new card, cancel. A GET only
+ever asks; the change happens on a POST and answers with a 303, so mail scanners cannot skip or
+cancel for anyone. Cancelling detaches the saved card. The Change screen offers one to five of a
+size and takes up to ten (`SUB_QTY_MAX`, the shop page's own limit); a change starts with the next
+delivery and charges nothing. A new address or a bigger order is by reply, and the shop then makes
+the change in the admin (up to `SUB_QTY_SHOP_MAX`, 20).
 
 The order section: under Your details, one three-way switch (`#often-picker`: Once, Weekly,
 Fortnightly), each option with its delivery cost under it. Kanna's plan said one "Make it weekly"
@@ -384,11 +387,13 @@ opted in.
 
 Admin > Subscribers (`#subscribers`, `renderSubs`): three tiles (Active, the coming Saturday,
 Worth a week), then one card a person in the Customers style, the ones needing attention first.
-Manage opens a sheet with Skip (or Undo the skip), Pause or Resume, and Cancel order (the only
-action that asks first, because the card is let go). Pause all stops every charge. The nav badge
+Manage opens a sheet with Skip (or Undo the skip), Pause or Resume, Change (`sbChange`: size, how
+many, how often, with what it comes to; the toast offers Undo) and Cancel order (the only action
+that asks first, because the card is let go). Pause all stops every charge. The nav badge
 counts failed cards. The delivery run shows repeat orders that are not charged yet as one line
 under "In the car"; once charged they are ordinary stops. Routes: `GET /api/admin/subscriptions`,
-`POST /api/admin/subscriptions` (`{ on }` or `{ id, action, for? }`), and
+`POST /api/admin/subscriptions` (`{ on }` or `{ id, action, for? }`; `action: "change"` also
+takes `bundle`, `quantity` and `every`, and a field left out stays as it was), and
 `POST /api/admin/subscriptions/check`, which asks Stripe (without charging anything: it opens a
 card-saving checkout and expires it, then sends an empty charge request that must be refused for
 its missing amount) whether the key may do both. Run it once after a deploy that touches payments.

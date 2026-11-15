@@ -2543,6 +2543,10 @@ const SUB_CHARGE_END_HOUR = 12;
 const SUB_BATCH = 4;
 // Two failed charges in a row pause the order until the card is updated.
 const SUB_MAX_FAILURES = 2;
+// How many of a size a customer can set on their own page (the shop page stops at 10 too).
+// The shop can book more from the admin, up to what subItem() allows.
+const SUB_QTY_MAX = 10;
+const SUB_QTY_SHOP_MAX = 20;
 const SUB_PAGE = "https://getyolko.com/subscription";
 const REPEAT_WORD = { 1: "Weekly", 2: "Fortnightly" };
 const REPEAT_EVERY = { 1: "Every Saturday", 2: "Every second Saturday" };
@@ -2617,7 +2621,7 @@ function subNext(sub, clock) {
 /** What a repeat order holds, at the shop's price today. Delivery is always free. */
 function subItem(sub, settings) {
   const bundle = isSubBundle(sub?.bundle) ? sub.bundle : "tray1";
-  const quantity = Math.min(20, Math.max(1, Math.floor(Number(sub?.quantity)) || 1));
+  const quantity = Math.min(SUB_QTY_SHOP_MAX, Math.max(1, Math.floor(Number(sub?.quantity)) || 1));
   const unit = Number(settings?.prices?.[bundle]) || 0;
   return { bundle, quantity, unit, subtotal: unit * quantity, total: unit * quantity, trays: BUNDLES[bundle].packs * quantity, label: emailItem(quantity, bundleLabel(bundle)) };
 }
@@ -3105,7 +3109,7 @@ async function runSubscriptions(env, now = new Date()) {
  * One change to a repeat order, from the customer's page or the admin: skip, unskip, pause,
  * resume, cancel or change. Returns { ok, code, sub }; `code` names what happened (or why not).
  */
-async function subAct(env, sub, action, { now = new Date(), by = "customer", bundle, every, target = "" } = {}) {
+async function subAct(env, sub, action, { now = new Date(), by = "customer", bundle, every, quantity, target = "" } = {}) {
   if (sub.status === "cancelled") return { ok: false, code: "cancelled", sub };
   const clock = subClock(now);
   const next = subNext(sub, clock);
@@ -3138,8 +3142,11 @@ async function subAct(env, sub, action, { now = new Date(), by = "customer", bun
   } else if (action === "change") {
     const b = isSubBundle(bundle) ? bundle : sub.bundle;
     const e = Number(every) === 2 ? 2 : Number(every) === 1 ? 1 : sub.every;
+    // A number that is missing or out of range leaves how many as it was.
+    const n = Number(quantity);
+    const q = Number.isInteger(n) && n >= 1 && n <= (by === "shop" ? SUB_QTY_SHOP_MAX : SUB_QTY_MAX) ? n : subItem(sub).quantity;
     // The next delivery stays where it is. A new rhythm starts from it.
-    out = { ...sub, bundle: b, every: e, nextRun: next };
+    out = { ...sub, bundle: b, quantity: q, every: e, nextRun: next };
     code = "changed";
   } else {
     return { ok: false, code: "unknown", sub };
@@ -3271,6 +3278,9 @@ async function subsAdmin(env, now = new Date()) {
     ok: true,
     on: !off,
     subs: list,
+    // What each size costs today, so the admin can show what a change comes to.
+    sizes: ["tray1", "tray2", "box"].filter((k) => isSubBundle(k) && Number(settings?.prices?.[k]) > 0).map((k) => ({ key: k, price: Number(settings.prices[k]), trays: BUNDLES[k].packs })),
+    qtyMax: SUB_QTY_SHOP_MAX,
     week: {
       sat,
       label: isoLabel(sat),
@@ -3401,12 +3411,17 @@ function subManagePage(sub, settings, { now = new Date(), ok = "", ask = "", tar
       .filter(([key]) => Number(settings.prices?.[key]) > 0 || key === sub.bundle)
       .map(([key, name]) => `<label><input type="radio" name="bundle" value="${key}"${key === st.item.bundle ? " checked" : ""}>${name}</label>`)
       .join("");
+    // One to five, and whatever they have now if it is more.
+    const many = [...new Set([1, 2, 3, 4, 5, st.item.quantity])]
+      .sort((a, b) => a - b)
+      .map((n) => `<label><input type="radio" name="quantity" value="${n}"${n === st.item.quantity ? " checked" : ""}>${n}</label>`)
+      .join("");
     const often = [[1, "Weekly"], [2, "Fortnightly"]]
       .map(([n, name]) => `<label><input type="radio" name="every" value="${n}"${n === (sub.every === 2 ? 2 : 1) ? " checked" : ""}>${name}</label>`)
       .join("");
     return subPage(
       "Change your order",
-      `${kicker}<h1>Change your order</h1><form method="post" action="${link}&amp;do=change"><fieldset><legend>Size</legend><div class="pick">${sizes}</div></fieldset><fieldset><legend>How often</legend><div class="pick">${often}</div></fieldset><div class="acts"><button class="btn" type="submit">Save</button></div></form><p class="quiet">A new address or more than one of a size? Reply to any of our emails.</p>${back()}`
+      `${kicker}<h1>Change your order</h1><form method="post" action="${link}&amp;do=change"><fieldset><legend>Size</legend><div class="pick">${sizes}</div></fieldset><fieldset><legend>How many</legend><div class="pick">${many}</div></fieldset><fieldset><legend>How often</legend><div class="pick">${often}</div></fieldset><div class="acts"><button class="btn" type="submit">Save</button></div></form><p class="quiet">A new address or a bigger order? Reply to any of our emails.</p>${back()}`
     );
   }
 
@@ -3468,7 +3483,7 @@ async function handleSubscriptionPage(request, env, url) {
     let input = {};
     if (action === "change") {
       const data = await request.formData().catch(() => null);
-      input = { bundle: String(data?.get("bundle") || ""), every: Number(data?.get("every")) };
+      input = { bundle: String(data?.get("bundle") || ""), every: Number(data?.get("every")), quantity: Number(data?.get("quantity")) };
     }
     const res = await subAct(env, sub, action, { ...input, target: String(url.searchParams.get("for") || "") });
     return go(res.ok ? (res.code === "cancelled" ? "" : res.code) : res.code === "card" ? "failed" : res.code);
@@ -4981,7 +4996,7 @@ async function handleApi(request, env, url, ctx) {
     return json(await subsAdmin(env), 200, { "Cache-Control": "no-store" });
   }
 
-  // Admin: skip, unskip, pause, resume or cancel one repeat order, or pause them all ({ on })
+  // Admin: skip, unskip, pause, resume, change or cancel one repeat order, or pause them all ({ on })
   if (url.pathname === "/api/admin/subscriptions" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
     const body = await request.json().catch(() => null);
@@ -4991,10 +5006,11 @@ async function handleApi(request, env, url, ctx) {
       return json(await subsAdmin(env));
     }
     const action = String(body?.action || "");
-    if (!["skip", "unskip", "pause", "resume", "cancel"].includes(action)) return json({ error: "bad request" }, 400);
+    if (!["skip", "unskip", "pause", "resume", "cancel", "change"].includes(action)) return json({ error: "bad request" }, 400);
     const sub = await getSub(env, String(body?.id || ""));
     if (!sub) return json({ error: "Not found" }, 404);
-    const res = await subAct(env, sub, action, { by: "shop", target: String(body?.for || "") });
+    // Only "change" reads the size, how many and how often; a field left out stays as it was.
+    const res = await subAct(env, sub, action, { by: "shop", target: String(body?.for || ""), bundle: String(body?.bundle || ""), quantity: Number(body?.quantity), every: Number(body?.every) });
     if (!res.ok) {
       const why = { locked: "Orders for that Saturday have closed", card: "Their card needs updating first", cancelled: "Already cancelled" }[res.code] || "That didn't work";
       return json({ ok: false, code: res.code, error: why }, 409);
@@ -6296,7 +6312,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "121",
+          "X-Yolko-Admin": "122",
         },
       });
     }
@@ -6362,7 +6378,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "254",
+      "X-Yolko-Build": "255",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
