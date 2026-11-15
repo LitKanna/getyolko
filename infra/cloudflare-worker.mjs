@@ -461,6 +461,11 @@ const STRIPE_LOOK = {
   "branding_settings[icon][url]": "https://getyolko.com/assets/brand/icon-512.png",
 };
 const STRIPE_LOOK_NOTE = "stripe:look:refused";
+// Every Stripe call goes through this, so `npx wrangler dev` and the tests can point the Worker
+// at a pretend Stripe (STRIPE_API_URL). Unset in production: the real API.
+function stripeUrl(env, path) {
+  return `${String(env?.STRIPE_API_URL || "https://api.stripe.com").replace(/\/+$/, "")}/v1/${path}`;
+}
 // The Stripe account's own branding, which its receipt page uses. Stripe paints the page in the
 // brand colour, so it must be cream: on ink the ink logo vanished (Kanna rejected that on sight,
 // 12 Nov 2026). The accent is the yolk. Keep these the same as the dashboard, or this puts them back.
@@ -473,7 +478,7 @@ const STRIPE_ACCOUNT_PICTURES = {
 /** Create a Checkout Session. The look is optional: if Stripe refuses it, the payment still goes ahead without it. */
 async function postCheckoutSession(env, params) {
   const send = () =>
-    fetch("https://api.stripe.com/v1/checkout/sessions", {
+    fetch(stripeUrl(env, "checkout/sessions"), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.STRIPE_KEY}`,
@@ -526,7 +531,7 @@ async function ensureStripeAccountLook(env) {
     const id = await stripeBrandFile(env, purpose, path).catch(() => null);
     if (id) body.set(`settings[branding][${field}]`, id);
   }
-  const resp = await fetch("https://api.stripe.com/v1/account", {
+  const resp = await fetch(stripeUrl(env, "account"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.STRIPE_KEY}`,
@@ -560,7 +565,7 @@ async function ensureStripeBranding(env) {
     "business_profile[url]": "https://getyolko.com",
     "settings[payments][statement_descriptor]": STRIPE_BRAND,
   });
-  const resp = await fetch("https://api.stripe.com/v1/account", {
+  const resp = await fetch(stripeUrl(env, "account"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.STRIPE_KEY}`,
@@ -607,6 +612,15 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   const unitPrice = Number(settings.prices[bundle]);
   const subtotal = unitPrice * quantity;
   const isDelivery = order.fulfillment === "delivery";
+  // Weekly or fortnightly: only for the main tray, and it always ships free.
+  const repeat = repeatOf(order);
+  if (repeat) {
+    order.repeat = repeat;
+    order.deliveryPerk = "subscriber";
+  } else {
+    delete order.repeat;
+    if (order.deliveryPerk === "subscriber") delete order.deliveryPerk;
+  }
   // A referral, same-building or earned free delivery is decided when the order is made.
   const deliveryFee = isDelivery
     ? (order.deliveryPerk ? 0 : Number(order.deliveryFee) > 0 ? Number(order.deliveryFee) : SITE_DELIVERY_FEE)
@@ -620,7 +634,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
   order.price = total;
 
   const fulfillDesc = isDelivery
-    ? `Saturday ${order.pickupDate || ""} delivery · ${order.deliveryAddress || "Sydney area"}${order.deliveryPerk ? " · Free delivery" : ""}`.trim()
+    ? `${repeat ? `${REPEAT_WORD[repeat]}, first delivery ` : ""}Saturday ${order.pickupDate || ""}${repeat ? "" : " delivery"} · ${order.deliveryAddress || "Sydney area"}${order.deliveryPerk ? " · Free delivery" : ""}`.trim()
     : `Pickup ${order.pickupDay}${order.pickupDate ? " " + order.pickupDate : ""} at Paddy's Markets Flemington`;
 
   const params = new URLSearchParams({
@@ -646,6 +660,15 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
     params.set("line_items[1][price_data][product_data][description]", "Flat fee on entire order");
     params.set("line_items[1][price_data][unit_amount]", String(Math.round(deliveryFee * 100)));
     params.set("line_items[1][quantity]", "1");
+  }
+  if (repeat) {
+    // Checkout makes a Stripe customer and keeps the card, so the cron can charge it for each
+    // later Saturday (runSubscriptions). Cards only: a bank debit can still fail days later.
+    params.set("customer_creation", "always");
+    params.set("payment_intent_data[setup_future_usage]", "off_session");
+    params.set("payment_method_types[0]", "card");
+    params.set("metadata[repeat]", String(repeat));
+    params.set("custom_text[submit][message]", repeatPayNote(order, repeat));
   }
 
   // One live session per order: a stale tab must not be able to pay for an
@@ -724,7 +747,7 @@ async function verifyStripeSignature(payload, header, secret, nowSec = Math.floo
 
 async function fetchStripeSession(env, sid) {
   const resp = await fetch(
-    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sid)}?expand[]=payment_intent.latest_charge`,
+    stripeUrl(env, `checkout/sessions/${encodeURIComponent(sid)}?expand[]=payment_intent.latest_charge`),
     { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
   );
   return resp.json();
@@ -782,7 +805,7 @@ function runLater(ctx, promise) {
 }
 
 function expireStripeSession(env, sid) {
-  return fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sid)}/expire`, {
+  return fetch(stripeUrl(env, `checkout/sessions/${encodeURIComponent(sid)}/expire`), {
     method: "POST",
     headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
   });
@@ -814,6 +837,10 @@ async function markOrderPaid(env, order, session) {
     // Paid customers jump the queue: auto-confirm and allocate trays.
     if (order.status === "new" || order.status === "cancelled") order.status = "confirmed";
     await syncStock(env, order, order.status);
+    // The first order of a weekly or fortnightly one: keep the card for the Saturdays after.
+    if (order.repeat && !order.subId) {
+      await startSubscription(env, order, session).catch((err) => console.log("repeat order not started", order.id, String(err?.message || err)));
+    }
     await env.DATA.put(order.id, JSON.stringify(order));
     // The admin rings for an order once it is paid, not when checkout opens: orders-head carries this.
     await env.DATA.put("orders:lastpaid", `${order.id}|${Date.now()}`).catch(() => null);
@@ -976,8 +1003,11 @@ ${why ? `<tr><td align="center" style="padding:16px 12px 0;font-family:${FONT};f
 </td></tr></table></body></html>`;
 }
 
-function buildOrderEmail(order) {
+/** `sub` is the order's repeat order (weekly or fortnightly), when it has one. */
+function buildOrderEmail(order, sub = null) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
+  const repeats = sub && sub.token && sub.status !== "cancelled" ? (sub.every === 2 ? 2 : 1) : 0;
+  const manage = repeats ? `${SUB_PAGE}?t=${sub.token}` : "";
   const item = bundleLabel(order.bundle);
   const qty = Math.max(1, Number(order.quantity) || 1);
   const total = order.stripe?.amountTotal != null ? order.stripe.amountTotal : order.price;
@@ -1002,9 +1032,11 @@ ${emailList([
   ["Delivery", `${htmlEscape(when)}${emailUnder(DELIVERY_HOURS)}`],
   order.deliveryAddress ? ["Address", htmlEscape(where)] : null,
   ["Your order", `${htmlEscape(emailItem(qty, item))}${order.subtotal != null ? emailUnder(emailPriceLine(order.subtotal, order.deliveryFee, !(Number(order.deliveryFee) > 0) && !!order.deliveryPerk)) : ""}`],
+  repeats ? ["Repeats", htmlEscape(REPEAT_EVERY[repeats])] : null,
   ["Total paid", emailBig(`${money(total)} AUD`)],
 ])}
-${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View receipt")}</td></tr>` : ""}`,
+${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View receipt")}</td></tr>` : ""}
+${repeats ? `<tr><td style="padding-top:14px;font-size:14px;line-height:21px;color:${C.muted}">We charge your card each ${repeats === 2 ? "second " : ""}Thursday night, before the next delivery. <a href="${htmlEscape(manage)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Skip, pause or cancel</a> any time.</td></tr>` : ""}`,
   });
 
   const text = [
@@ -1018,6 +1050,8 @@ ${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View r
     "",
     `Delivery: ${when}, ${DELIVERY_HOURS}`,
     where,
+    repeats ? `Repeats: ${REPEAT_EVERY[repeats].toLowerCase()}. We charge your card each ${repeats === 2 ? "second " : ""}Thursday night, before the next delivery.` : null,
+    repeats ? `Skip, pause or cancel any time: ${manage}` : null,
     receipt ? `\nReceipt: ${receipt}` : null,
     "",
     EMAIL_HELP_TEXT,
@@ -1092,7 +1126,8 @@ ${emailList([
  * test: admin sample send, marked [Test] in the subject and never copied to the shop.
  */
 async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
-  return sendCustomerEmail(env, order, buildOrderEmail(order), { test });
+  const sub = order.subId ? await getSub(env, order.subId).catch(() => null) : null;
+  return sendCustomerEmail(env, order, buildOrderEmail(order, sub), { test });
 }
 
 /**
@@ -1218,7 +1253,7 @@ async function retryRefundEmails(env, now) {
 
 async function stripeGet(env, path, timeoutMs = 10000) {
   try {
-    const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+    const resp = await fetch(stripeUrl(env, path), {
       headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -1275,7 +1310,8 @@ async function handleChargeRefunded(env, chargeId) {
   if (!external.length) return { ignored: "no dashboard refunds" };
   const sessions = await stripeGet(env, `checkout/sessions?payment_intent=${encodeURIComponent(piId)}&limit=1`);
   if (sessions.error) return { error: sessions.error.message || "stripe error" };
-  const orderId = sessions.data?.[0]?.metadata?.orderId;
+  // A repeat order charged by the cron has no Checkout Session: its payment carries the order id.
+  const orderId = sessions.data?.[0]?.metadata?.orderId || charge.metadata?.orderId;
   if (!String(orderId || "").startsWith("order:")) return { ignored: "no order" };
   const order = await env.DATA.get(orderId, "json");
   if (!order) return { ignored: "order not found" };
@@ -2387,10 +2423,16 @@ async function runReminders(env, now = new Date()) {
   if (!auth) return { skipped: "mailbox not connected" };
   if (!run) run = { sat: sat.iso, label: sat.label, startedAt: now.toISOString(), pending: await getRemindIndex(env), sent: 0, skipped: 0, failed: 0 };
   const batch = run.pending.splice(0, REMIND_BATCH);
+  // People with a weekly or fortnightly order get its own notice, not this one.
+  const repeating = batch.length ? await repeatOrderPeople(env).catch(() => new Set()) : new Set();
   for (let i = 0; i < batch.length; i++) {
     const h = batch[i];
     const rec = await env.DATA.get(remindSubKey(h), "json");
     if (!rec || rec.unsubscribedAt || rec.lastSentFor === sat.iso) {
+      run.skipped++;
+      continue;
+    }
+    if (repeating.has(String(rec.email || "").toLowerCase()) || (rec.phone && repeating.has(String(rec.phone)))) {
       run.skipped++;
       continue;
     }
@@ -2461,6 +2503,980 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;min-he
     status,
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" },
   });
+}
+
+/* ---------- Repeat orders: the same eggs every week or every second week ----------
+ * Kanna, 15 Nov 2026: "weekly and fortnightly is good". Same prices as any order, no discount;
+ * the pull is free delivery. A shopper picks Weekly or Fortnightly under "How often", pays for
+ * the first Saturday at Stripe Checkout as usual, and Checkout keeps the card
+ * (customer_creation=always, setup_future_usage=off_session). From then on the Worker's own cron
+ * does the rest:
+ *   - Thursday, 10am to 8pm Sydney time (the last day to order): an email says the eggs are
+ *     coming on Saturday and what will be charged, with one button to skip.
+ *   - Friday, from midnight to noon (orders have closed): the saved card is charged and a
+ *     normal paid order is written for that Saturday, so stock, the confirmation email, the
+ *     delivery run and refunds all work as they do for any other order.
+ * This is not a Stripe Billing subscription on purpose. Stripe bills on a fixed UTC clock that
+ * cannot follow "Thursday night, Sydney time" through daylight saving, skipping one week there
+ * is awkward, it adds a fee on every charge and it needs more webhook events. Here the whole
+ * schedule is one date on the record (`nextRun`, the ISO date of the next Saturday), and a skip
+ * just moves it on.
+ *
+ * KV: `sub:<id>` (the record), `sub:index` (ids, newest first), `sub:tok:<token>` (the secret in
+ * a customer's links, pointing at the id), `sub:run:<id>:<saturday>` (the order id a charge
+ * will use, so a retried charge can never make a second order), `sub:off` (the admin's pause for
+ * everyone) and `sub:lastrun` (how the last charge run went).
+ */
+const SUB_INDEX = "sub:index";
+const SUB_OFF = "sub:off";
+const SUB_LAST_RUN = "sub:lastrun";
+const subKey = (id) => `sub:${id}`;
+const subTokKey = (t) => `sub:tok:${t}`;
+const subRunKey = (id, iso) => `sub:run:${id}:${iso}`;
+const SUB_ID_RE = /^[a-f0-9]{16}$/;
+const SUB_TOKEN_RE = /^[a-f0-9]{32}$/;
+const SUB_MAX = 500;
+// Cards are charged after orders close: Friday, from midnight until this hour, Sydney time.
+// A card that fails can still be fixed until then and make that Saturday's run.
+const SUB_CHARGE_END_HOUR = 12;
+// A few each cron tick. Every paid order writes the shared stock, one write a second.
+const SUB_BATCH = 4;
+// Two failed charges in a row pause the order until the card is updated.
+const SUB_MAX_FAILURES = 2;
+const SUB_PAGE = "https://getyolko.com/subscription";
+const REPEAT_WORD = { 1: "Weekly", 2: "Fortnightly" };
+const REPEAT_EVERY = { 1: "Every Saturday", 2: "Every second Saturday" };
+
+/** Only the main tray repeats: it is the one thing the shop always has. */
+const isSubBundle = (key) => isBundle(key) && BUNDLES[key].variety === MAIN;
+const subWord = (sub) => REPEAT_WORD[sub?.every === 2 ? 2 : 1].toLowerCase();
+const subStep = (sub) => 7 * (sub?.every === 2 ? 2 : 1);
+
+/** 1 (weekly) or 2 (fortnightly) when an order starts or belongs to a repeat order, else 0. */
+function repeatOf(order) {
+  const n = Number(order?.repeat);
+  return (n === 1 || n === 2) && order.fulfillment === "delivery" && isSubBundle(order.bundle) ? n : 0;
+}
+
+/** The line beside the Pay button on Stripe's page, so nobody is surprised by the next charge. */
+function repeatPayNote(order, repeat) {
+  const when = order.pickupDate ? `Saturday ${order.pickupDate}` : "this Saturday";
+  return `You pay today for ${when}. After that we charge this card every ${repeat === 2 ? "second " : ""}Thursday night for the next delivery, at the shop's price that week. Skip a delivery, pause or cancel any time from our emails.`;
+}
+
+function isoAddDays(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "2026-11-28" as the site's "28 Nov". */
+function isoLabel(iso) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? "" : `${d.getUTCDate()} ${SHORT_MONTHS[d.getUTCMonth()]}`;
+}
+
+/** An order's "28 Nov" back as an ISO date: the one nearest to today. */
+function isoFromLabel(label, now = new Date()) {
+  const m = /^(\d{1,2}) ([A-Z][a-z]{2})$/.exec(String(label || "").trim());
+  const month = m ? SHORT_MONTHS.indexOf(m[2]) : -1;
+  if (month < 0) return null;
+  const year = sydneyClock(now).year;
+  let best = null;
+  for (const y of [year - 1, year, year + 1]) {
+    const t = Date.UTC(y, month, Number(m[1]));
+    if (best === null || Math.abs(t - now.getTime()) < Math.abs(best - now.getTime())) best = t;
+  }
+  return new Date(best).toISOString().slice(0, 10);
+}
+
+/**
+ * Where the week stands for repeat orders. `open` is the Saturday a new order goes to.
+ * `charging` is tomorrow's Saturday while its cards are being charged (Friday morning), else
+ * null. `live` is the earliest Saturday a repeat order can still be for.
+ */
+function subClock(now = new Date()) {
+  const c = sydneyClock(now);
+  const open = deliverySaturday(now);
+  const charging = c.weekday === "Fri" && c.hour < SUB_CHARGE_END_HOUR ? saturdayFrom(c, 1).iso : null;
+  return { open, charging, live: charging || open.iso };
+}
+
+/**
+ * The next Saturday a repeat order is for. `nextRun` is only an anchor: a run that was missed
+ * (the shop paused everyone, a card failed and was not fixed) rolls on by the order's own step,
+ * so a fortnightly order keeps its weeks.
+ */
+function subNext(sub, clock) {
+  const step = subStep(sub);
+  let next = /^\d{4}-\d\d-\d\d$/.test(sub?.nextRun || "") ? sub.nextRun : clock.open.iso;
+  for (let i = 0; next < clock.live && i < 600; i++) next = isoAddDays(next, step);
+  return next;
+}
+
+/** What a repeat order holds, at the shop's price today. Delivery is always free. */
+function subItem(sub, settings) {
+  const bundle = isSubBundle(sub?.bundle) ? sub.bundle : "tray1";
+  const quantity = Math.min(20, Math.max(1, Math.floor(Number(sub?.quantity)) || 1));
+  const unit = Number(settings?.prices?.[bundle]) || 0;
+  return { bundle, quantity, unit, subtotal: unit * quantity, total: unit * quantity, trays: BUNDLES[bundle].packs * quantity, label: emailItem(quantity, bundleLabel(bundle)) };
+}
+
+/** Everything a page or the admin shows about one repeat order right now. */
+function subState(sub, settings, clock) {
+  const next = subNext(sub, clock);
+  const step = subStep(sub);
+  const active = sub.status === "active";
+  const lastSkip = Array.isArray(sub.skipped) ? sub.skipped[0] : null;
+  return {
+    next,
+    nextLabel: isoLabel(next),
+    // The Thursday its card is charged (late that night, once orders close).
+    chargeLabel: isoLabel(isoAddDays(next, -2)),
+    after: isoLabel(isoAddDays(next, step)),
+    // Orders for `next` are still open, so it can still be skipped.
+    canSkip: active && next >= clock.open.iso,
+    // The Saturday a skip can be taken back for, while its orders are still open.
+    undo: active && lastSkip && lastSkip >= clock.open.iso && next === isoAddDays(lastSkip, step) ? lastSkip : null,
+    // Its card failed for the Saturday that is being charged, and can still be fixed in time.
+    cardDue: sub.failedFor === next && clock.charging === next,
+    item: subItem(sub, settings),
+  };
+}
+
+async function getSubIndex(env) {
+  const list = await env.DATA.get(SUB_INDEX, "json").catch(() => null);
+  return Array.isArray(list) ? list : [];
+}
+
+async function getSub(env, id) {
+  return SUB_ID_RE.test(String(id || "")) ? env.DATA.get(subKey(id), "json") : null;
+}
+
+async function putSub(env, sub) {
+  await env.DATA.put(subKey(sub.id), JSON.stringify(sub));
+}
+
+async function allSubs(env) {
+  const ids = await getSubIndex(env);
+  return (await Promise.all(ids.map((id) => env.DATA.get(subKey(id), "json").catch(() => null)))).filter(Boolean);
+}
+
+async function subByToken(env, token) {
+  if (!SUB_TOKEN_RE.test(String(token || ""))) return null;
+  const sub = await getSub(env, await env.DATA.get(subTokKey(token)));
+  return sub && sub.token === token ? sub : null;
+}
+
+/**
+ * Phones and emails with a repeat order, running or paused: they get no "order again" reminder.
+ * Their own Thursday notice covers the weeks they have eggs coming, and a week they skipped, an
+ * off week on fortnightly, or a pause is their choice, not something to nudge.
+ */
+async function repeatOrderPeople(env) {
+  const who = new Set();
+  for (const s of await allSubs(env)) {
+    if (s.status === "cancelled") continue;
+    if (s.email) who.add(String(s.email).toLowerCase());
+    if (s.phone) who.add(String(s.phone));
+  }
+  return who;
+}
+
+/** POST to Stripe. Never throws: `{ status, data }`, with `data.error` when it did not work. */
+async function stripePost(env, path, params, { idempotencyKey = "", timeoutMs = 20000 } = {}) {
+  try {
+    const resp = await fetch(stripeUrl(env, path), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.STRIPE_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+      },
+      body: params ? params.toString() : "",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const data = await resp.json().catch(() => null);
+    return { status: resp.status, data: data || { error: { message: `HTTP ${resp.status}` } } };
+  } catch (err) {
+    return { status: 0, data: { error: { message: String(err?.message || err) } } };
+  }
+}
+
+/**
+ * The first order of a repeat order has just been paid: keep the card Checkout saved and set
+ * the next Saturday. Sets `order.subId`. One repeat order per first order, however often this runs.
+ */
+async function startSubscription(env, order, session) {
+  const every = repeatOf(order);
+  if (!every) return null;
+  const id = (await sha256Hex(`sub|${order.id}`)).slice(0, 16);
+  const have = await env.DATA.get(subKey(id), "json");
+  if (have) {
+    order.subId = id;
+    return have;
+  }
+  const pi = session?.payment_intent && typeof session.payment_intent === "object" ? session.payment_intent : null;
+  const idOf = (v) => (typeof v === "string" ? v : v?.id || null);
+  const customer = idOf(session?.customer) || idOf(pi?.customer);
+  const paymentMethod = idOf(pi?.payment_method);
+  const card = pi?.latest_charge && typeof pi.latest_charge === "object" ? pi.latest_charge.payment_method_details?.card : null;
+  const now = new Date();
+  const first = isoFromLabel(order.pickupDate, now) || deliverySaturday(now).iso;
+  const sub = {
+    id,
+    token: randomHex(16),
+    status: "active",
+    every,
+    name: order.name || "",
+    phone: order.phone || "",
+    email: String(session?.customer_details?.email || session?.customer_email || order.email || "").trim().toLowerCase(),
+    bundle: order.bundle,
+    quantity: Math.max(1, Math.floor(Number(order.quantity)) || 1),
+    deliveryAddress: order.deliveryAddress || "",
+    deliveryStreet: order.deliveryStreet || "",
+    deliverySuburb: order.deliverySuburb || "",
+    deliveryCity: order.deliveryCity || "",
+    deliveryPostcode: order.deliveryPostcode || "",
+    deliveryKm: order.deliveryKm || null,
+    stripeCustomer: customer,
+    paymentMethod,
+    card: card?.last4 ? { brand: card.brand || "", last4: card.last4 } : null,
+    createdAt: now.toISOString(),
+    firstOrderId: order.id,
+    lastOrderId: order.id,
+    lastRun: first,
+    nextRun: isoAddDays(first, 7 * every),
+    runs: 1,
+    failures: 0,
+  };
+  if (!customer || !paymentMethod) {
+    // Checkout did not hand back a card to keep. Nothing can be charged, so say so in the admin.
+    Object.assign(sub, { status: "paused", pauseWhy: "card", pausedAt: sub.createdAt, lastError: "Stripe did not save a card for this order" });
+  }
+  await env.DATA.put(subTokKey(sub.token), id);
+  await putSub(env, sub);
+  const index = await getSubIndex(env);
+  if (!index.includes(id)) await env.DATA.put(SUB_INDEX, JSON.stringify([id, ...index].slice(0, SUB_MAX)));
+  order.subId = id;
+  return sub;
+}
+
+/** Only these Stripe answers mean the card is the problem. Anything else is ours to retry. */
+function subCardProblem(status, err) {
+  if (!err) return false;
+  if (status === 402 || err.type === "card_error") return true;
+  return err.type === "invalid_request_error" && (err.code === "resource_missing" || err.code === "payment_method_unactivated") && /customer|payment_method/.test(String(err.param || err.message || ""));
+}
+
+/**
+ * Charge one repeat order for the Saturday `iso` and write its paid order. Safe to run twice:
+ * the run key fixes the order id, and Stripe answers a repeated idempotency key with its first
+ * answer. Returns { ok, orderId } or { ok: false, declined | transient | off, error }.
+ */
+async function chargeSubscription(env, sub, iso, settings, now = new Date()) {
+  if (!sub.stripeCustomer || !sub.paymentMethod) return subChargeFailed(env, sub, iso, { message: "No saved card" });
+  const attempt = sub.retry?.iso === iso ? Number(sub.retry.n) || 0 : 0;
+  const runKey = subRunKey(sub.id, iso);
+  let run = await env.DATA.get(runKey, "json");
+  if (!run || run.attempt !== attempt) {
+    const priced = subItem(sub, settings);
+    if (!(priced.unit > 0)) return { ok: false, off: true, error: `${bundleLabel(priced.bundle)} has no price, so it was not charged` };
+    // Fixed here: the order id and what is charged. A retry asks Stripe for exactly the same.
+    run = { orderId: `order:${now.toISOString()}:${randomHex(3)}`, attempt, at: now.toISOString(), item: priced };
+    await env.DATA.put(runKey, JSON.stringify(run), { expirationTtl: 60 * 86400 });
+  }
+  const item = run.item;
+  let order = await env.DATA.get(run.orderId, "json");
+  if (order?.paymentStatus !== "paid") {
+    const label = isoLabel(iso);
+    const params = new URLSearchParams({
+      amount: String(Math.round(item.total * 100)),
+      currency: "aud",
+      customer: sub.stripeCustomer,
+      payment_method: sub.paymentMethod,
+      "payment_method_types[0]": "card",
+      off_session: "true",
+      confirm: "true",
+      description: `YOLKO ${subWord(sub)} order: ${item.label}, Saturday ${label}`,
+      "metadata[orderId]": run.orderId,
+      "metadata[subId]": sub.id,
+      "metadata[run]": iso,
+      "metadata[bundle]": item.bundle,
+      "metadata[quantity]": String(item.quantity),
+      "metadata[subtotal]": String(item.subtotal),
+      "metadata[deliveryFee]": "0",
+      "metadata[deliveryPerk]": "subscriber",
+      "expand[0]": "latest_charge",
+    });
+    const { status, data } = await stripePost(env, "payment_intents", params, { idempotencyKey: `yolko-sub-${sub.id}-${iso}-${attempt}` });
+    if (data?.error || data?.status !== "succeeded") {
+      const err = data?.error || null;
+      if (err && !subCardProblem(status, err)) {
+        return { ok: false, transient: true, error: String(err.message || `HTTP ${status}`).slice(0, 300) };
+      }
+      // Stripe wants the customer there (a bank approval): not possible at midnight. Let it go.
+      if (!err && data?.id) await stripePost(env, `payment_intents/${encodeURIComponent(data.id)}/cancel`);
+      return subChargeFailed(env, sub, iso, {
+        message: err?.message || `The payment stopped at "${data?.status}"`,
+        code: err?.decline_code || err?.code || data?.status || "",
+      });
+    }
+    order = {
+      id: run.orderId,
+      name: sub.name,
+      phone: sub.phone,
+      email: sub.email,
+      bundle: item.bundle,
+      quantity: item.quantity,
+      fulfillment: "delivery",
+      deliveryAddress: sub.deliveryAddress || "",
+      deliveryStreet: sub.deliveryStreet || "",
+      deliverySuburb: sub.deliverySuburb || "",
+      deliveryCity: sub.deliveryCity || "",
+      deliveryPostcode: sub.deliveryPostcode || "",
+      deliveryKm: sub.deliveryKm || null,
+      deliveryFee: 0,
+      pickupDay: "Saturday",
+      pickupDate: label,
+      subtotal: item.subtotal,
+      price: item.total,
+      status: "new",
+      createdAt: now.toISOString(),
+      repeat: sub.every === 2 ? 2 : 1,
+      subId: sub.id,
+    };
+    // Counts toward the building's shared trip like any order (the perk itself stays "subscriber").
+    applyDeliveryPerk(order, await deliveryPerk(env, perkInput(order, {})).catch(() => ({ perk: null })));
+    await env.DATA.put(order.id, JSON.stringify(order));
+    await pushOrderIndex(env, order.id);
+    // markOrderPaid reads a Checkout Session. This is the same facts in the same shape.
+    const session = {
+      id: null,
+      payment_intent: data,
+      payment_status: "paid",
+      amount_total: Number.isFinite(Number(data.amount_received)) ? data.amount_received : data.amount,
+      currency: data.currency,
+      customer_details: { email: sub.email },
+      metadata: data.metadata || {},
+    };
+    ({ order } = await markOrderPaid(env, order, session));
+  }
+  await maybeSendOrderEmail(env, order.id).catch((err) => console.log("repeat order email failed", order.id, String(err?.message || err)));
+  const fresh = (await getSub(env, sub.id)) || sub;
+  const next = {
+    ...fresh,
+    nextRun: isoAddDays(iso, subStep(fresh)),
+    lastRun: iso,
+    lastOrderId: order.id,
+    lastChargedAt: now.toISOString(),
+    runs: (Number(fresh.runs) || 0) + 1,
+    failures: 0,
+  };
+  for (const k of ["failedFor", "lastError", "lastErrorCode", "lastFailedAt", "retry"]) delete next[k];
+  if (next.status === "paused" && next.pauseWhy === "card") {
+    next.status = "active";
+    delete next.pauseWhy;
+    delete next.pausedAt;
+  }
+  await putSub(env, next);
+  return { ok: true, orderId: order.id, sub: next };
+}
+
+/** A card that would not charge: note it, pause after the second in a row, and tell the customer. */
+async function subChargeFailed(env, sub, iso, { message, code = "" }) {
+  const fresh = (await getSub(env, sub.id)) || sub;
+  const at = new Date().toISOString();
+  const failures = (Number(fresh.failures) || 0) + 1;
+  const next = { ...fresh, failures, failedFor: iso, lastError: String(message || "The card was declined").slice(0, 300), lastErrorCode: String(code || "").slice(0, 60), lastFailedAt: at };
+  if (failures >= SUB_MAX_FAILURES) Object.assign(next, { status: "paused", pauseWhy: "card", pausedAt: at });
+  await putSub(env, next);
+  const settings = await getSettings(env);
+  const sent = await sendSubEmail(env, next, buildSubCardEmail(next, settings, iso), "orders").catch((err) => ({ ok: false, error: String(err?.message || err) }));
+  if (!sent.ok) console.log("card email not sent", sub.id, sent.error);
+  return { ok: false, declined: true, error: next.lastError, sub: next };
+}
+
+/**
+ * One email about a repeat order. The Thursday notice goes from the shop's mailbox like the
+ * Thursday reminder; a card problem goes through the order sender (the shop gets its copy).
+ * Whichever is tried first, the other is the fallback, so a notice is never lost to one of them.
+ */
+async function sendSubEmail(env, sub, mail, first = "mailbox") {
+  const to = String(sub.email || "").trim();
+  if (!to || to.length > 254 || !EMAIL_RE.test(to)) return { ok: false, error: "no email address" };
+  const mailbox = async () => {
+    const auth = await zohoAuth(env);
+    if (!auth) return { ok: false, error: "mailbox not connected" };
+    try {
+      const acct = await zohoMailAccount(env, auth);
+      await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+        fromAddress: acct.address || SHOP_EMAIL,
+        toAddress: to,
+        subject: mail.subject,
+        content: mail.html,
+        mailFormat: "html",
+      });
+      return { ok: true, via: "mailbox" };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err).slice(0, 300) };
+    }
+  };
+  const orders = async () => {
+    const r = await sendCustomerEmail(env, { name: sub.name, email: to }, mail);
+    return r.ok ? { ok: true, via: "orders" } : { ok: false, error: r.error || r.reason || "not sent" };
+  };
+  let last = { ok: false, error: "not sent" };
+  for (const send of first === "orders" ? [orders, mailbox] : [mailbox, orders]) {
+    last = await send().catch((err) => ({ ok: false, error: String(err?.message || err).slice(0, 300) }));
+    if (last.ok) return last;
+  }
+  return last;
+}
+
+const subCardText = (sub) => (sub.card?.last4 ? `${sub.card.brand ? sub.card.brand.charAt(0).toUpperCase() + sub.card.brand.slice(1) + " " : "Card "}ending ${sub.card.last4}` : "Your saved card");
+
+/** Thursday's notice: the eggs are coming, what is charged tonight, and one button to skip. */
+function buildSubNoticeEmail(sub, settings, sat) {
+  const first = String(sub.name || "").split(/\s+/)[0] || "there";
+  const item = subItem(sub, settings);
+  const manage = `${SUB_PAGE}?t=${sub.token}`;
+  const skip = sub.every === 2 ? "Skip this delivery" : "Skip this week";
+  const subject = `Your eggs come this Saturday, ${sat.label}`;
+  const C = EMAIL_C;
+  const html = emailFrame({
+    subject,
+    preheader: `Your ${subWord(sub)} order: ${item.label}. We charge ${money(item.total)} tonight. Skip by midnight if you don't need eggs.`,
+    label: `Saturday ${sat.label}`,
+    title: "Your eggs come this Saturday",
+    mark: "Saturday",
+    help: "Need to change something?",
+    rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}, your ${subWord(sub)} order is set.</td></tr>
+${emailList([
+  ["Delivery", `Saturday ${htmlEscape(sat.label)}${emailUnder(DELIVERY_HOURS)}`],
+  sub.deliveryAddress ? ["Address", htmlEscape(sub.deliveryAddress)] : null,
+  ["Your order", `${htmlEscape(item.label)}${emailUnder(emailPriceLine(item.subtotal, 0, true))}`],
+  ["Total", `${emailBig(money(item.total))}${emailUnder(`Charged tonight to ${subCardText(sub).replace(/^Your saved card$/, "your saved card")}`)}`],
+])}
+<tr><td style="padding-top:16px">${emailWideButton(`${manage}&do=skip&for=${sat.iso}`, skip)}</td></tr>
+<tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">Want your eggs? There is nothing to do. To skip, tap the button by midnight tonight.</td></tr>`,
+    why: `Sent before each delivery of your ${subWord(sub)} order.<br><a href="${htmlEscape(manage)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Pause, cancel or change it</a>`,
+  });
+  const text = [
+    `Hi ${first}, your ${subWord(sub)} order is set for Saturday ${sat.label}, ${DELIVERY_HOURS}.`,
+    "",
+    item.label,
+    `Total: ${money(item.total)}, delivery free. Charged tonight to ${subCardText(sub).replace(/ /g, " ").replace(/^Your saved card$/, "your saved card")}.`,
+    sub.deliveryAddress || null,
+    "",
+    `Want your eggs? There is nothing to do. ${skip} by midnight tonight: ${manage}&do=skip&for=${sat.iso}`,
+    `Pause, cancel or change your order: ${manage}`,
+    "",
+    EMAIL_HELP_TEXT,
+  ].filter((l) => l !== null).join("\n");
+  return { subject, html, text };
+}
+
+/** The card would not charge: what was not booked, and one button to fix it. */
+function buildSubCardEmail(sub, settings, iso) {
+  const first = String(sub.name || "").split(/\s+/)[0] || "there";
+  const item = subItem(sub, settings);
+  const label = isoLabel(iso);
+  const manage = `${SUB_PAGE}?t=${sub.token}`;
+  const paused = sub.status === "paused";
+  const subject = `Your card didn't go through for Saturday ${label}`;
+  const after = paused
+    ? `That is twice in a row, so your ${subWord(sub)} order is paused. Update your card and it starts again.`
+    : `Update it by 12pm Friday and your eggs still come this Saturday. If not, we skip this one and try again ${sub.every === 2 ? "in two weeks" : "next week"}.`;
+  const C = EMAIL_C;
+  const html = emailFrame({
+    subject,
+    preheader: `We couldn't charge ${money(item.total)} for your ${subWord(sub)} order, so Saturday ${label} is not booked yet.`,
+    label: `Saturday ${label}`,
+    title: "Your card didn’t go through",
+    mark: "card",
+    help: "Need a hand?",
+    rows: `<tr><td style="font-size:16px;line-height:24px;color:${C.ink2}">Hi ${htmlEscape(first)}, we couldn't charge your card, so your eggs for Saturday ${htmlEscape(label)} are not booked yet.</td></tr>
+${emailList([
+  ["Your order", htmlEscape(item.label)],
+  ["Card", htmlEscape(subCardText(sub))],
+  ["Total", emailBig(money(item.total))],
+])}
+<tr><td style="padding-top:16px">${emailWideButton(`${manage}&do=card`, "Update card")}</td></tr>
+<tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">${htmlEscape(after)}</td></tr>`,
+    why: `About your ${subWord(sub)} order.<br><a href="${htmlEscape(manage)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Pause, cancel or change it</a>`,
+  });
+  const text = [
+    `Hi ${first}, we couldn't charge your card, so your eggs for Saturday ${label} are not booked yet.`,
+    "",
+    item.label,
+    `Total: ${money(item.total)}`,
+    `Card: ${subCardText(sub).replace(/ /g, " ")}`,
+    "",
+    `Update your card: ${manage}&do=card`,
+    after,
+    "",
+    EMAIL_HELP_TEXT,
+  ].join("\n");
+  return { subject, html, text };
+}
+
+/** Tell the shop, once for a Saturday, that Stripe would not take the repeat order charges. */
+async function subAlertShop(env, iso, error) {
+  const key = `sub:alert:${iso}`;
+  if (await env.DATA.get(key)) return;
+  await env.DATA.put(key, "1", { expirationTtl: 14 * 86400 });
+  const auth = await zohoAuth(env);
+  if (!auth) return;
+  const acct = await zohoMailAccount(env, auth);
+  await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+    fromAddress: acct.address || SHOP_EMAIL,
+    toAddress: SHOP_EMAIL,
+    subject: `Repeat orders for Saturday ${isoLabel(iso)} are not charged yet`,
+    content: mailHtml(`Stripe would not take the charge for one or more weekly or fortnightly orders for Saturday ${isoLabel(iso)}.\n\nStripe said: ${error}\n\nThe shop keeps trying until 12pm Friday. Admin, Subscribers shows who is waiting.`),
+    mailFormat: "html",
+  });
+}
+
+/** Thursday: tell each customer whose eggs come this Saturday, a few each tick. */
+async function runSubNotices(env, subs, clock, sat, now) {
+  const tried = (s) => (s.noticeTry?.iso === sat.iso ? Number(s.noticeTry.n) || 0 : 0);
+  const due = subs.filter((s) => s.status === "active" && s.noticeFor !== sat.iso && tried(s) < 3 && subNext(s, clock) === sat.iso);
+  if (!due.length) return { notices: 0 };
+  const settings = await getSettings(env);
+  const out = { notices: 0, failed: 0 };
+  for (const sub of due.slice(0, SUB_BATCH)) {
+    const res = await sendSubEmail(env, sub, buildSubNoticeEmail(sub, settings, sat));
+    // A skip or a pause may have landed while the email went out: write onto the latest copy.
+    const { noticeTry: _t, ...fresh } = (await getSub(env, sub.id)) || sub;
+    if (res.ok) {
+      out.notices++;
+      await putSub(env, { ...fresh, noticeFor: sat.iso, noticeAt: now.toISOString() });
+    } else {
+      out.failed++;
+      await putSub(env, { ...fresh, noticeTry: { iso: sat.iso, n: tried(sub) + 1, error: res.error || "" } });
+    }
+  }
+  return out;
+}
+
+/** Friday morning: charge the cards for tomorrow's run, a few each tick. */
+async function runSubCharges(env, subs, clock, now) {
+  const iso = clock.charging;
+  const isDue = (s) => s && s.status === "active" && s.failedFor !== iso && subNext(s, clock) === iso;
+  const due = subs.filter(isDue);
+  if (!due.length) return { charged: 0 };
+  if (!env.STRIPE_KEY) return { skipped: "payments not configured" };
+  const settings = await getSettings(env);
+  const prev = await env.DATA.get(SUB_LAST_RUN, "json").catch(() => null);
+  const out = prev?.sat === iso ? prev : { sat: iso, charged: 0, declined: 0 };
+  out.at = now.toISOString();
+  out.waiting = Math.max(0, due.length - SUB_BATCH);
+  delete out.error;
+  for (const [i, sub] of due.slice(0, SUB_BATCH).entries()) {
+    if (i) await new Promise((r) => setTimeout(r, 1100));
+    const fresh = await getSub(env, sub.id);
+    if (!isDue(fresh)) continue;
+    const res = await chargeSubscription(env, fresh, iso, settings, now).catch((err) => ({ ok: false, transient: true, error: String(err?.message || err).slice(0, 300) }));
+    if (res.ok) out.charged++;
+    else if (res.declined) out.declined++;
+    else {
+      out.waiting++;
+      out.error = res.error;
+    }
+  }
+  await env.DATA.put(SUB_LAST_RUN, JSON.stringify(out)).catch(() => null);
+  if (out.error) await subAlertShop(env, iso, out.error).catch((err) => console.log("repeat order alert failed", String(err?.message || err)));
+  return out;
+}
+
+/** Cron: Thursday's notices and Friday's charges. Outside those hours it reads nothing. */
+async function runSubscriptions(env, now = new Date()) {
+  const clock = subClock(now);
+  const notice = clock.charging ? null : reminderWindow(now);
+  if (!clock.charging && !notice) return { skipped: "window" };
+  if (!(await getSubIndex(env)).length) return { skipped: "none" };
+  if (await env.DATA.get(SUB_OFF)) return { skipped: "paused" };
+  const subs = await allSubs(env);
+  return clock.charging ? runSubCharges(env, subs, clock, now) : runSubNotices(env, subs, clock, notice, now);
+}
+
+/**
+ * One change to a repeat order, from the customer's page or the admin: skip, unskip, pause,
+ * resume, cancel or change. Returns { ok, code, sub }; `code` names what happened (or why not).
+ */
+async function subAct(env, sub, action, { now = new Date(), by = "customer", bundle, every, target = "" } = {}) {
+  if (sub.status === "cancelled") return { ok: false, code: "cancelled", sub };
+  const clock = subClock(now);
+  const next = subNext(sub, clock);
+  const at = now.toISOString();
+  let out = null;
+  let code = action;
+  if (action === "skip") {
+    // `target` is the Saturday the button was drawn for: a page left open must not skip a later one.
+    if (sub.status !== "active" || next < clock.open.iso || (target && target !== next)) return { ok: false, code: "locked", sub };
+    out = { ...sub, nextRun: isoAddDays(next, subStep(sub)), skipped: [next, ...(Array.isArray(sub.skipped) ? sub.skipped : [])].slice(0, 8) };
+    code = "skipped";
+  } else if (action === "unskip") {
+    const last = Array.isArray(sub.skipped) ? sub.skipped[0] : null;
+    if (sub.status !== "active" || !last || last < clock.open.iso || next !== isoAddDays(last, subStep(sub)) || (target && target !== last)) return { ok: false, code: "locked", sub };
+    out = { ...sub, nextRun: last, skipped: sub.skipped.slice(1) };
+    code = "unskipped";
+  } else if (action === "pause") {
+    if (sub.status !== "active") return { ok: true, code: "paused", sub };
+    out = { ...sub, status: "paused", pauseWhy: by, pausedAt: at };
+    code = "paused";
+  } else if (action === "resume") {
+    if (sub.status === "active") return { ok: true, code: "resumed", sub };
+    if (!sub.stripeCustomer || !sub.paymentMethod || sub.pauseWhy === "card") return { ok: false, code: "card", sub };
+    out = { ...sub, status: "active", nextRun: clock.open.iso, failures: 0 };
+    for (const k of ["pauseWhy", "pausedAt", "failedFor", "lastError", "lastErrorCode"]) delete out[k];
+    code = "resumed";
+  } else if (action === "cancel") {
+    out = { ...sub, status: "cancelled", cancelledAt: at, cancelledBy: by };
+    code = "cancelled";
+  } else if (action === "change") {
+    const b = isSubBundle(bundle) ? bundle : sub.bundle;
+    const e = Number(every) === 2 ? 2 : Number(every) === 1 ? 1 : sub.every;
+    // The next delivery stays where it is. A new rhythm starts from it.
+    out = { ...sub, bundle: b, every: e, nextRun: next };
+    code = "changed";
+  } else {
+    return { ok: false, code: "unknown", sub };
+  }
+  await putSub(env, out);
+  if (code === "cancelled" && sub.paymentMethod && env.STRIPE_KEY) {
+    // Nothing more will be charged, so the card is no longer kept.
+    await stripePost(env, `payment_methods/${encodeURIComponent(sub.paymentMethod)}/detach`);
+  }
+  return { ok: true, code, sub: out };
+}
+
+/** Stripe's own page to enter a new card for a repeat order. Returns its address, or null. */
+async function subCardCheckout(env, sub) {
+  if (!env.STRIPE_KEY || !sub.stripeCustomer) return null;
+  const params = new URLSearchParams({
+    mode: "setup",
+    customer: sub.stripeCustomer,
+    "payment_method_types[0]": "card",
+    "metadata[subId]": sub.id,
+    success_url: `${SUB_PAGE}?t=${sub.token}&card={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${SUB_PAGE}?t=${sub.token}`,
+    ...STRIPE_LOOK,
+  });
+  const session = await postCheckoutSession(env, params);
+  return session?.url || null;
+}
+
+/**
+ * Back from Stripe with a new card: keep it, drop the old one, start a paused order again and,
+ * if this Saturday's charge failed and there is still time, charge it now.
+ */
+async function subCardReturn(env, sub, sessionId, now = new Date()) {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(String(sessionId || ""))) return "failed";
+  if (sub.cardSession === sessionId) return "card";
+  const session = await stripeGet(env, `checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=setup_intent.payment_method`);
+  const pm = session?.setup_intent?.payment_method;
+  const pmId = typeof pm === "string" ? pm : pm?.id;
+  if (session?.error || session.metadata?.subId !== sub.id || session.status !== "complete" || !pmId) return "failed";
+  const clock = subClock(now);
+  const old = sub.paymentMethod;
+  const out = { ...sub, paymentMethod: pmId, cardSession: sessionId, cardUpdatedAt: now.toISOString(), failures: 0 };
+  if (pm?.card?.last4) out.card = { brand: pm.card.brand || "", last4: pm.card.last4 };
+  for (const k of ["lastError", "lastErrorCode"]) delete out[k];
+  // This Saturday's charge failed and its window is still open: try again with the new card.
+  const retry = sub.status !== "cancelled" && clock.charging && sub.failedFor === clock.charging;
+  if (retry) {
+    out.retry = { iso: clock.charging, n: (sub.retry?.iso === clock.charging ? Number(sub.retry.n) || 0 : 0) + 1 };
+    out.nextRun = clock.charging;
+  }
+  delete out.failedFor;
+  if (sub.status === "paused" && sub.pauseWhy === "card") {
+    out.status = "active";
+    if (!retry) out.nextRun = clock.open.iso;
+    delete out.pauseWhy;
+    delete out.pausedAt;
+  }
+  await putSub(env, out);
+  if (old && old !== pmId) await stripePost(env, `payment_methods/${encodeURIComponent(old)}/detach`);
+  if (retry && out.status === "active") {
+    const res = await chargeSubscription(env, out, clock.charging, await getSettings(env), now).catch((err) => ({ ok: false, error: String(err?.message || err) }));
+    if (res.ok) await subRunFixed(env, clock.charging);
+    return res.ok ? "charged" : "cardfail";
+  }
+  return "card";
+}
+
+/** A failed card was fixed in time: the run's tally moves it from failed to charged. */
+async function subRunFixed(env, iso) {
+  const run = await env.DATA.get(SUB_LAST_RUN, "json").catch(() => null);
+  if (run?.sat !== iso) return;
+  run.charged = (Number(run.charged) || 0) + 1;
+  run.declined = Math.max(0, (Number(run.declined) || 0) - 1);
+  await env.DATA.put(SUB_LAST_RUN, JSON.stringify(run)).catch(() => null);
+}
+
+/** What the admin lists for one repeat order. Never the customer's link token. */
+function subAdminView(sub, settings, clock) {
+  const st = subState(sub, settings, clock);
+  return {
+    id: sub.id,
+    name: sub.name || "",
+    phone: sub.phone || "",
+    email: sub.email || "",
+    suburb: sub.deliverySuburb || "",
+    address: sub.deliveryAddress || "",
+    bundle: st.item.bundle,
+    quantity: st.item.quantity,
+    item: st.item.label.replace(/ /g, " "),
+    trays: st.item.trays,
+    total: st.item.total,
+    every: sub.every === 2 ? 2 : 1,
+    status: sub.status,
+    pauseWhy: sub.pauseWhy || null,
+    next: sub.status === "active" ? st.next : null,
+    nextLabel: sub.status === "active" ? st.nextLabel : "",
+    canSkip: st.canSkip,
+    undo: st.undo,
+    cardFailed: sub.failedFor === st.next || sub.pauseWhy === "card",
+    lastError: sub.lastError || null,
+    card: sub.card || null,
+    since: sub.createdAt || null,
+    runs: Number(sub.runs) || 0,
+    // The last Saturday its card was charged for.
+    paidFor: sub.lastRun || null,
+    lastOrderId: sub.lastOrderId || null,
+    skipped: Array.isArray(sub.skipped) ? sub.skipped.slice(0, 3) : [],
+    cancelledAt: sub.cancelledAt || null,
+  };
+}
+
+/** Admin > Subscribers: every repeat order, and what the next charge run will take. */
+async function subsAdmin(env, now = new Date()) {
+  const [subs, settings, off, lastRun] = await Promise.all([
+    allSubs(env),
+    getSettings(env),
+    env.DATA.get(SUB_OFF).catch(() => null),
+    env.DATA.get(SUB_LAST_RUN, "json").catch(() => null),
+  ]);
+  const clock = subClock(now);
+  const list = subs.map((s) => subAdminView(s, settings, clock));
+  // The run being charged now, or the one orders are still open for.
+  const sat = clock.live;
+  const due = list.filter((s) => s.status === "active" && s.next === sat && !s.cardFailed);
+  // Already charged for that Saturday (they are real orders in the run now), and cards that failed.
+  const done = list.filter((s, i) => subs[i].lastRun === sat);
+  const failed = list.filter((s) => s.status === "active" && s.next === sat && s.cardFailed);
+  return {
+    ok: true,
+    on: !off,
+    subs: list,
+    week: {
+      sat,
+      label: isoLabel(sat),
+      charge: isoLabel(isoAddDays(sat, -2)),
+      charging: !!clock.charging,
+      due: due.length,
+      trays: due.reduce((n, s) => n + s.trays, 0),
+      total: due.reduce((n, s) => n + s.total, 0),
+      charged: done.length,
+      chargedTrays: done.reduce((n, s) => n + s.trays, 0),
+      chargedTotal: done.reduce((n, s) => n + s.total, 0),
+      failed: failed.length,
+    },
+    lastRun: lastRun || null,
+  };
+}
+
+/** A page in the shop's own look for a customer's repeat order. `body` is HTML. */
+function subPage(title, body, status = 200) {
+  const html = `<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="theme-color" content="#faf7f0"><title>${htmlEscape(title)} · YOLKO</title>
+${iconLinks().join("")}
+<style>@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400 800;font-display:swap;src:url(/assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2) format("woff2")}
+*{box-sizing:border-box}
+body{margin:0;background:#faf7f0;color:#14120e;font:16px/1.5 "Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+main{max-width:480px;margin:0 auto;padding:32px 16px 48px}
+.logo{display:inline-block;color:#14120e}
+.logo svg{display:block;height:36px;width:auto;overflow:visible}
+.card{margin-top:20px;background:#fff;border-radius:24px;padding:28px 24px 24px;box-shadow:0 1px 2px rgba(20,18,14,.04),0 8px 24px rgba(20,18,14,.05)}
+.kicker{margin:0 0 6px;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b675e}
+h1{margin:0;font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.03em;text-wrap:balance}
+.lead{margin:10px 0 0;color:#3d3b36}
+.note{margin:16px 0 0;padding:12px 16px;border-radius:14px;background:#f3eee2;color:#14120e;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.note form{margin:0}
+.note button{border:0;background:none;padding:0;font:inherit;font-weight:700;color:#14120e;text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:24px}
+.facts{margin:20px 0 0;padding:0}
+.facts div{display:grid;grid-template-columns:auto 1fr;gap:16px;padding:13px 0;border-top:1px solid #e6e0d2}
+.facts div:last-child{border-bottom:1px solid #e6e0d2}
+.facts dt{color:#6b675e;font-size:15px;line-height:22px;white-space:nowrap}
+.facts dd{margin:0;text-align:right;font-size:15px;line-height:22px;font-weight:700}
+.facts dd span{display:block;font-weight:400;color:#3d3b36}
+.facts dd a{font-weight:600}
+.acts{margin-top:20px;display:grid;gap:10px}
+.acts form{margin:0;display:grid}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:54px;padding:0 22px;border:0;border-radius:999px;background:#ffd32a;color:#14120e;font:inherit;font-size:16px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:hover{background:#f5c800}
+.btn.ghost{background:#f3eee2}
+.btn.ghost:hover{background:#ebe5d6}
+.btn.ink{background:#14120e;color:#fff}
+.btn.ink:hover{background:#2a2722}
+.btn:focus-visible,a:focus-visible,.note button:focus-visible,.pick label:has(input:focus-visible){outline:2.5px solid #14120e;outline-offset:2px}
+a{color:#14120e;text-underline-offset:3px}
+.quiet{margin:18px 0 0;text-align:center;font-size:14px;line-height:20px;color:#6b675e}
+.quiet a{color:#3d3b36;font-weight:600}
+.help{margin:20px 4px 0;text-align:center;font-size:14px;line-height:21px;color:#6b675e}
+fieldset{margin:20px 0 0;padding:0;border:0;min-width:0}
+legend{padding:0;margin:0 0 8px;font-size:15px;font-weight:700}
+.pick{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;padding:5px;border-radius:999px;background:#f3eee2}
+.pick label{position:relative;display:grid;place-items:center;min-height:46px;padding:0 6px;border-radius:999px;font-size:15px;font-weight:700;text-align:center;cursor:pointer}
+.pick input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.pick label:has(input:checked){background:#14120e;color:#fff}
+</style></head><body><main><a class="logo" href="/" aria-label="YOLKO home">${logoAlone()}</a><div class="card">${body}</div><p class="help">Need a hand? Email <a href="mailto:${SHOP_EMAIL}">${SHOP_EMAIL}</a>${EMAIL_WA ? ` or message us on <a href="${EMAIL_WA}">WhatsApp</a>` : ""}.</p></main></body></html>`;
+  return new Response(html, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer" },
+  });
+}
+
+// What the page says once something has been done (?ok=...). `undo` adds the take-it-back button.
+const SUB_NOTES = {
+  skipped: "Skipped. Nothing is charged for it.",
+  unskipped: "It's back on.",
+  paused: "Paused.",
+  resumed: "Welcome back.",
+  changed: "Saved.",
+  card: "Card updated.",
+  charged: "Card updated, and this Saturday is booked.",
+  cardfail: "That card didn't go through either. Try another one.",
+  locked: "Orders for that Saturday have closed, so it can't be changed now.",
+  failed: "That didn't work. Try again, or reply to any of our emails.",
+};
+
+/** The customer's page for a repeat order: what is coming, and skip, pause, cancel, change. */
+function subManagePage(sub, settings, { now = new Date(), ok = "", ask = "", target = "" } = {}) {
+  const clock = subClock(now);
+  const st = subState(sub, settings, clock);
+  // An email's Skip button is for one Saturday. Once that one has closed, say so; never offer the next.
+  if (ask === "skip" && (!st.canSkip || (target && target !== st.next))) {
+    ask = "";
+    ok = "locked";
+  }
+  const word = subWord(sub);
+  const Word = REPEAT_WORD[sub.every === 2 ? 2 : 1];
+  const link = `/subscription?t=${sub.token}`;
+  const form = (action, label, cls = "") => `<form method="post" action="${link}&amp;do=${action}${action === "skip" ? `&amp;for=${st.next}` : ""}"><button class="btn${cls ? " " + cls : ""}" type="submit">${htmlEscape(label)}</button></form>`;
+  const kicker = `<p class="kicker">${htmlEscape(Word)} order</p>`;
+  const back = (label = "Back to your order") => `<p class="quiet"><a href="${link}">${htmlEscape(label)}</a></p>`;
+  const sat = `Saturday ${st.nextLabel}`;
+
+  if (sub.status === "cancelled") {
+    return subPage(
+      "Order cancelled",
+      `${kicker}<h1>Your ${word} order is cancelled</h1><p class="lead">Nothing more will be charged. You can order again any time.</p><div class="acts"><a class="btn" href="/#order">Order eggs</a></div>`
+    );
+  }
+
+  // One question at a time: a link from an email only asks, a button on the page acts.
+  if (ask === "skip") {
+    return subPage(
+      `Skip ${sat}?`,
+      `${kicker}<h1>Skip ${htmlEscape(sat)}?</h1><p class="lead">Nothing is charged for it. Your next delivery would be Saturday ${htmlEscape(st.after)}.</p><div class="acts">${form("skip", sub.every === 2 ? "Skip this delivery" : "Skip this week")}</div>${back("Keep it")}`
+    );
+  }
+  if (ask === "cancel") {
+    return subPage(
+      "Cancel your order?",
+      `${kicker}<h1>Cancel your ${word} order?</h1><p class="lead">No more deliveries and no more charges. If you only need a break, pause it instead.</p><div class="acts">${form("cancel", "Cancel order", "ink")}${sub.status === "active" ? form("pause", "Pause instead", "ghost") : ""}</div>${back("Keep my order")}`
+    );
+  }
+  if (ask === "card") {
+    return subPage(
+      "Update your card",
+      `${kicker}<h1>Update your card</h1><p class="lead">Stripe asks for the new card on its own secure page. ${st.cardDue ? `We then charge ${htmlEscape(money(st.item.total))} for ${htmlEscape(sat)}.` : "Nothing is charged today."}</p><div class="acts">${form("card", "Continue to Stripe")}</div>${back()}`
+    );
+  }
+  if (ask === "change") {
+    const sizes = [["tray1", "1 tray"], ["tray2", "2 trays"], ["box", "Full box"]]
+      .filter(([key]) => Number(settings.prices?.[key]) > 0 || key === sub.bundle)
+      .map(([key, name]) => `<label><input type="radio" name="bundle" value="${key}"${key === st.item.bundle ? " checked" : ""}>${name}</label>`)
+      .join("");
+    const often = [[1, "Weekly"], [2, "Fortnightly"]]
+      .map(([n, name]) => `<label><input type="radio" name="every" value="${n}"${n === (sub.every === 2 ? 2 : 1) ? " checked" : ""}>${name}</label>`)
+      .join("");
+    return subPage(
+      "Change your order",
+      `${kicker}<h1>Change your order</h1><form method="post" action="${link}&amp;do=change"><fieldset><legend>Size</legend><div class="pick">${sizes}</div></fieldset><fieldset><legend>How often</legend><div class="pick">${often}</div></fieldset><div class="acts"><button class="btn" type="submit">Save</button></div></form><p class="quiet">A new address or more than one of a size? Reply to any of our emails.</p>${back()}`
+    );
+  }
+
+  const card = sub.card?.last4 ? htmlEscape(subCardText(sub)) : "No card saved";
+  const facts = (rows) => `<dl class="facts">${rows.filter(Boolean).map(([name, value]) => `<div><dt>${name}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+  const undo = st.undo ? `<form method="post" action="${link}&amp;do=unskip&amp;for=${st.undo}"><button type="submit">Undo</button></form>` : "";
+  // What was just done, or a skip that can still be taken back.
+  const note = SUB_NOTES[ok]
+    ? `<div class="note" role="status"><span>${htmlEscape(SUB_NOTES[ok])}</span>${ok === "skipped" ? undo : ""}</div>`
+    : undo
+      ? `<div class="note"><span>Saturday ${htmlEscape(isoLabel(st.undo))} is skipped.</span>${undo}</div>`
+      : "";
+  const order = ["Your order", `${htmlEscape(st.item.label)}<span>${htmlEscape(REPEAT_EVERY[sub.every === 2 ? 2 : 1])}</span>`];
+  const where = sub.deliveryAddress ? ["Deliver to", `${htmlEscape(sub.deliveryAddress)}<span>${DELIVERY_HOURS}</span>`] : null;
+  const cardRow = ["Card", `${card}<span><a href="${link}&amp;do=card">Update</a></span>`];
+  const cancel = `<p class="quiet"><a href="${link}&amp;do=cancel">Cancel this order</a></p>`;
+
+  if (sub.status === "paused") {
+    const byCard = sub.pauseWhy === "card";
+    return subPage(
+      "Order paused",
+      `${kicker}<h1>Your ${word} order is paused</h1><p class="lead">${byCard ? "Your card didn't go through. Update it and your eggs start again." : "No deliveries and no charges until you start it again."}</p>${note}${facts([order, where, cardRow])}<div class="acts">${byCard ? `<a class="btn" href="${link}&amp;do=card">Update card</a>` : form("resume", `Start again from Saturday ${clock.open.label}`)}</div>${cancel}`
+    );
+  }
+
+  const total = ["Total", `${htmlEscape(money(st.item.total))}<span>Free delivery. Charged Thursday night, ${htmlEscape(st.chargeLabel)}.</span>`];
+  if (st.cardDue) {
+    return subPage(
+      "Your card didn't go through",
+      `${kicker}<h1>Your card didn’t go through</h1><p class="lead">Update it by 12pm Friday and your eggs still come on ${htmlEscape(sat)}.</p>${note}${facts([order, where, ["Total", htmlEscape(money(st.item.total))], cardRow])}<div class="acts"><a class="btn" href="${link}&amp;do=card">Update card</a><div class="pair">${form("pause", "Pause", "ghost")}<a class="btn ghost" href="${link}&amp;do=change">Change</a></div></div>${cancel}`
+    );
+  }
+  const locked = !st.canSkip;
+  return subPage(
+    `Your ${word} order`,
+    `${kicker}<h1>Next eggs ${htmlEscape(sat)}</h1>${locked ? `<p class="lead">Orders for this Saturday have closed, so it can't be skipped now.</p>` : ""}${note}${facts([order, where, total, cardRow])}<div class="acts">${locked ? "" : form("skip", `Skip ${sat}`)}<div class="pair">${form("pause", "Pause", "ghost")}<a class="btn ghost" href="${link}&amp;do=change">Change</a></div></div>${cancel}`
+  );
+}
+
+/** getyolko.com/subscription?t=<token>: a link only ever asks (GET), a button acts (POST). */
+async function handleSubscriptionPage(request, env, url) {
+  const gone = () => subPage("This link has expired", `<h1>This link has expired</h1><p class="lead">Open the newest email about your order, or reply to it and we will sort it out.</p><div class="acts"><a class="btn" href="/">Back to YOLKO</a></div>`, 404);
+  if (request.method !== "GET" && request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  if (!(await allowRate(env, `sub:${clientIp(request) || "unknown"}`, 90, 3600))) {
+    return subPage("One moment", `<h1>One moment</h1><p class="lead">Too many tries from here. Wait a little and open the link again.</p>`, 429);
+  }
+  const sub = await subByToken(env, url.searchParams.get("t"));
+  if (!sub) return gone();
+  const link = `${url.origin}/subscription?t=${sub.token}`;
+  const go = (ok) => Response.redirect(`${link}${ok ? `&ok=${ok}` : ""}`, 303);
+  const action = String(url.searchParams.get("do") || "");
+
+  if (request.method === "POST") {
+    if (action === "card") {
+      const stripe = sub.status === "cancelled" ? null : await subCardCheckout(env, sub);
+      return stripe ? Response.redirect(stripe, 303) : go("failed");
+    }
+    if (!["skip", "unskip", "pause", "resume", "cancel", "change"].includes(action)) return go("");
+    let input = {};
+    if (action === "change") {
+      const data = await request.formData().catch(() => null);
+      input = { bundle: String(data?.get("bundle") || ""), every: Number(data?.get("every")) };
+    }
+    const res = await subAct(env, sub, action, { ...input, target: String(url.searchParams.get("for") || "") });
+    return go(res.ok ? (res.code === "cancelled" ? "" : res.code) : res.code === "card" ? "failed" : res.code);
+  }
+
+  const cardSession = url.searchParams.get("card");
+  if (cardSession) return go(await subCardReturn(env, sub, cardSession));
+  return subManagePage(sub, await getSettings(env), { ok: String(url.searchParams.get("ok") || ""), ask: action, target: String(url.searchParams.get("for") || "") });
 }
 
 /* ---------- Referrals and same-building orders ----------
@@ -2612,8 +3628,11 @@ function applyDeliveryPerk(order, p) {
     order.refBy = p.refBy;
     if (p.house) order.refHouse = true;
   }
-  if (p.perk) {
-    order.deliveryPerk = p.perk;
+  // A weekly or fortnightly order ships free whatever else applies. It uses up no earned
+  // credit, and a friend's link still earns the friend theirs (refFrom is kept above).
+  const perk = repeatOf(order) ? "subscriber" : p.perk;
+  if (perk) {
+    order.deliveryPerk = perk;
     order.deliveryFee = 0;
     order.price = Number(order.subtotal) || 0;
   }
@@ -2819,7 +3838,7 @@ async function reconcileOrders(env) {
   if (env.STRIPE_KEY) {
     const since = Math.floor(Date.now() / 1000) - 26 * 3600;
     const list = await fetch(
-      `https://api.stripe.com/v1/checkout/sessions?status=complete&limit=100&created[gte]=${since}&expand[]=data.payment_intent.latest_charge`,
+      stripeUrl(env, `checkout/sessions?status=complete&limit=100&created[gte]=${since}&expand[]=data.payment_intent.latest_charge`),
       { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
     ).then((r) => r.json()).catch(() => null);
     for (const session of list?.data || []) {
@@ -3785,6 +4804,10 @@ async function handleApi(request, env, url, ctx) {
     // "Email me a reminder each Thursday" at checkout; signed up once the order is paid.
     if (body?.remind === true) order.remindOptIn = true;
     else delete order.remindOptIn;
+    // "How often" on the order form: 1 is weekly, 2 is fortnightly. Started once this order is paid.
+    const repeat = Number(body?.repeat);
+    if (repeat === 1 || repeat === 2) order.repeat = repeat;
+    else delete order.repeat;
     applyDeliveryPerk(order, await deliveryPerk(env, perkInput(order, body)));
 
     let result = await createCheckoutForOrder(env, order, settings, ctx);
@@ -3794,6 +4817,7 @@ async function handleApi(request, env, url, ctx) {
       const {
         sessionId: _s, paymentStatus: _p, stripe: _st, stockTaken: _t, updatedAt: _u,
         confirmationEmail: _c, metaPurchaseSent: _m, metaPurchaseSentAt: _ma, metaPurchaseEventId: _me,
+        subId: _sub,
         ...details
       } = order;
       order = {
@@ -3908,7 +4932,7 @@ async function handleApi(request, env, url, ctx) {
     if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
     const order = await env.DATA.get(id, "json");
     if (!order) return json({ error: "Order not found" }, 404);
-    const { subject, html, text } = buildOrderEmail(order);
+    const { subject, html, text } = buildOrderEmail(order, order.subId ? await getSub(env, order.subId).catch(() => null) : null);
     return json({
       ok: true,
       subject,
@@ -3949,6 +4973,63 @@ async function handleApi(request, env, url, ctx) {
       ? await sendCustomerEmail(env, sample, buildRefundEmail(sample, { id: "re_test", amount: sample.price, currency: "AUD" }), { test: true })
       : await sendOrderConfirmationEmail(env, sample, { test: true });
     return json(result, result.ok ? 200 : 502);
+  }
+
+  // Admin > Subscribers: every weekly and fortnightly order, and what the next charge run takes
+  if (url.pathname === "/api/admin/subscriptions" && request.method === "GET") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    return json(await subsAdmin(env), 200, { "Cache-Control": "no-store" });
+  }
+
+  // Admin: skip, unskip, pause, resume or cancel one repeat order, or pause them all ({ on })
+  if (url.pathname === "/api/admin/subscriptions" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => null);
+    if (typeof body?.on === "boolean") {
+      if (body.on) await env.DATA.delete(SUB_OFF);
+      else await env.DATA.put(SUB_OFF, new Date().toISOString());
+      return json(await subsAdmin(env));
+    }
+    const action = String(body?.action || "");
+    if (!["skip", "unskip", "pause", "resume", "cancel"].includes(action)) return json({ error: "bad request" }, 400);
+    const sub = await getSub(env, String(body?.id || ""));
+    if (!sub) return json({ error: "Not found" }, 404);
+    const res = await subAct(env, sub, action, { by: "shop", target: String(body?.for || "") });
+    if (!res.ok) {
+      const why = { locked: "Orders for that Saturday have closed", card: "Their card needs updating first", cancelled: "Already cancelled" }[res.code] || "That didn't work";
+      return json({ ok: false, code: res.code, error: why }, 409);
+    }
+    return json({ ...(await subsAdmin(env)), did: res.code });
+  }
+
+  // Admin: can this shop's Stripe key save a card and charge it later? Makes one Checkout
+  // Session and expires it at once; no order, no charge. Run once after a deploy.
+  if (url.pathname === "/api/admin/subscriptions/check" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    if (!env.STRIPE_KEY) return json({ ok: false, error: "payments not configured" }, 503);
+    const made = await stripePost(env, "checkout/sessions", new URLSearchParams({
+      mode: "payment",
+      "line_items[0][price_data][currency]": "aud",
+      "line_items[0][price_data][product_data][name]": "Repeat order check (not an order)",
+      "line_items[0][price_data][unit_amount]": "1300",
+      "line_items[0][quantity]": "1",
+      customer_creation: "always",
+      "payment_intent_data[setup_future_usage]": "off_session",
+      "payment_method_types[0]": "card",
+      "custom_text[submit][message]": repeatPayNote({ pickupDate: deliverySaturday().label }, 1),
+      success_url: "https://getyolko.com/",
+      cancel_url: "https://getyolko.com/",
+    }));
+    if (made.data?.id) await expireStripeSession(env, made.data.id).catch(() => null);
+    // An empty charge request must be turned away for its missing amount, not for permission.
+    const probe = await stripePost(env, "payment_intents", new URLSearchParams({ currency: "aud" }));
+    const probeErr = probe.data?.error || {};
+    const canCharge = probe.status === 400 && /amount/i.test(`${probeErr.param || ""} ${probeErr.message || ""}`);
+    return json({
+      ok: !!made.data?.id && canCharge,
+      saveCard: made.data?.id ? "ok" : String(made.data?.error?.message || `HTTP ${made.status}`).slice(0, 300),
+      chargeLater: canCharge ? "ok" : String(probeErr.message || `HTTP ${probe.status}`).slice(0, 300),
+    });
   }
 
   // Admin: Thursday reminders, who is signed up and how the last run went
@@ -4516,7 +5597,11 @@ async function handleApi(request, env, url, ctx) {
         const code = await ensureRefCode(env, order.phone, order.name).catch(() => null);
         if (code) share = { code, link: shareLink(code) };
         // What the paid screen says back: which Saturday, and what is coming.
+        const repeat = repeatOf(order);
         booked = {
+          // 1 weekly, 2 fortnightly: the sheet says the eggs keep coming and when the next ones are.
+          repeat: repeat || undefined,
+          next: repeat ? isoLabel(isoAddDays(isoFromLabel(order.pickupDate) || deliverySaturday().iso, 7 * repeat)) : undefined,
           when: `Saturday${order.pickupDate ? " " + order.pickupDate : ""}`,
           item: isBundle(order.bundle)
             ? emailItem(Math.max(1, Number(order.quantity) || 1), bundleLabel(order.bundle)).replace(/ /g, " ")
@@ -4571,7 +5656,7 @@ async function handleApi(request, env, url, ctx) {
     if (!env.STRIPE_KEY) return json({ error: "payments not configured" }, 503);
 
     if (request.method === "GET") {
-      const resp = await fetch("https://api.stripe.com/v1/account", {
+      const resp = await fetch(stripeUrl(env, "account"), {
         headers: { Authorization: `Bearer ${env.STRIPE_KEY}` },
       });
       const account = await resp.json();
@@ -4603,8 +5688,7 @@ async function handleApi(request, env, url, ctx) {
     if (!id.startsWith("order:")) return json({ error: "bad order" }, 400);
     let order = await env.DATA.get(id, "json");
     if (!order) return json({ error: "not found" }, 404);
-    if (!order.sessionId) return json({ error: "no stripe session" }, 404);
-
+    // A repeat order charged by the cron has no Checkout Session; its details were kept when it was charged.
     if (order.stripe?.receiptUrl && order.stripe?.amountTotal != null && order.paymentStatus === "paid") {
       return json({
         ok: true,
@@ -4614,9 +5698,10 @@ async function handleApi(request, env, url, ctx) {
         cached: true,
       });
     }
+    if (!order.sessionId) return json({ error: "no stripe session" }, 404);
 
     const resp = await fetch(
-      `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(order.sessionId)}?expand[]=payment_intent.latest_charge`,
+      stripeUrl(env, `checkout/sessions/${encodeURIComponent(order.sessionId)}?expand[]=payment_intent.latest_charge`),
       { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
     );
     const session = await resp.json();
@@ -4665,7 +5750,7 @@ async function handleApi(request, env, url, ctx) {
     // Resolve PaymentIntent / charge from Checkout session if needed
     if (!paymentIntentId && order.sessionId) {
       const sessResp = await fetch(
-        `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(order.sessionId)}?expand[]=payment_intent.latest_charge`,
+        stripeUrl(env, `checkout/sessions/${encodeURIComponent(order.sessionId)}?expand[]=payment_intent.latest_charge`),
         { headers: { Authorization: `Bearer ${env.STRIPE_KEY}` } }
       );
       const session = await sessResp.json();
@@ -4692,7 +5777,7 @@ async function handleApi(request, env, url, ctx) {
     if (paymentIntentId) refundParams.set("payment_intent", paymentIntentId);
     else refundParams.set("charge", chargeId);
 
-    const refundResp = await fetch("https://api.stripe.com/v1/refunds", {
+    const refundResp = await fetch(stripeUrl(env, "refunds"), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${env.STRIPE_KEY}`,
@@ -5121,10 +6206,15 @@ async function handleApi(request, env, url, ctx) {
 }
 
 export default {
-  // Every cron tick: Meta stock sync, competitor prices (checked once every 6 hours), egg news,
+  // Every cron tick: repeat orders, Meta stock sync, competitor prices (checked once every 6 hours), egg news,
   // the monthly Farm Transparency re-check for Admin > Growers, the missed-payment safety net
   // and, on Thursdays, reorder reminders.
   async scheduled(_event, env, ctx) {
+    // Repeat orders go first and finish before anything else starts: on Thursday their notices,
+    // on Friday morning their charges. Any other moment this returns at once.
+    await runSubscriptions(env).catch((err) => {
+      console.log("repeat orders failed", String(err?.message || err));
+    });
     const settings = await getSettings(env);
     ctx.waitUntil(syncMetaAdsForStock(env, settings.traysAvailable));
     ctx.waitUntil(
@@ -5206,7 +6296,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "120",
+          "X-Yolko-Admin": "121",
         },
       });
     }
@@ -5217,6 +6307,11 @@ export default {
 
     if (url.pathname.startsWith("/api/")) {
       return handleApi(request, env, url, ctx);
+    }
+
+    // A customer's weekly or fortnightly order: skip, pause, cancel, change, new card.
+    if (url.pathname === "/subscription" || url.pathname === "/subscription/") {
+      return handleSubscriptionPage(request, env, url);
     }
 
     // One canonical URL per page for search engines: /index.html -> /,

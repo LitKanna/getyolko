@@ -173,7 +173,7 @@ a { color:inherit; text-decoration:none; }
 /* Nothing in the sidebar squashes; a short screen scrolls it instead. */
 .side > * { flex-shrink:0; }
 /* A short laptop screen drops the week card (Orders shows the same numbers) so everything fits. */
-@media (max-height:820px) { .side .week { display:none; } .side .seg.appear { margin-top:auto; } }
+@media (max-height:880px) { .side .week { display:none; } .side .seg.appear { margin-top:auto; } }
 .brand { display:flex; align-items:center; gap:8px; padding:0 14px 16px; }
 .brand .lg { display:block; flex:none; width:auto; height:26px; fill:currentColor; color:var(--ink); overflow:visible; }
 .brand small { font-size:15px; line-height:20px; font-weight:400; color:var(--muted); }
@@ -183,6 +183,8 @@ a { color:inherit; text-decoration:none; }
   color:var(--ink2); font-size:17px; line-height:22px; letter-spacing:-.012em; transition:background .15s, color .22s .08s;
 }
 .nav a .i { width:22px; height:22px; color:inherit; }
+/* Eleven sections on a 734px laptop screen: slightly shorter rows, so the list fits without scrolling. */
+@media (max-height:760px) and (pointer:fine) { .nav a { min-height:42px; } }
 .nav a span:not(.badge):not(.unsaved-dot) { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nav a:hover { background:var(--hover); }
 .nav a:active { background:var(--press); }
@@ -923,6 +925,11 @@ body:has(#savebar) .toasts { bottom:84px; }
 .cc-foot { display:flex; align-items:center; gap:8px; margin-top:auto; padding-top:12px; box-shadow:inset 0 .5px 0 var(--line); }
 .insight { flex:1; min-width:0; font-size:13px; line-height:18px; font-weight:500; color:var(--muted); }
 .insight.warn { color:var(--ink); font-weight:600; }
+/* Subscribers: the Customers card again, with a Manage button on its bottom edge. */
+.cc.off { opacity:.55; }
+.sb-acts { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.sb-acts .btn { flex:1 1 auto; }
+.load .ln.soon { color:var(--muted); }
 .insight.due { color:var(--ink2); }
 
 /* ---------- competitors ---------- */
@@ -1015,8 +1022,8 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
 .gr-sheet .zcell a { color:var(--ink); font-weight:600; text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
 .gr-src { display:flex; flex-direction:column; gap:2px; margin:2px 0 0; padding:0; list-style:none; color:var(--muted); font-size:15px; line-height:20px; }
 @media (max-width:899px) {
-  .kpis.three.gr-k { grid-template-columns:1fr 1fr; }
-  .kpis.three.gr-k .kpi:last-child { grid-column:1 / -1; }
+  .kpis.three.gr-k, .kpis.three.sb-k { grid-template-columns:1fr 1fr; }
+  .kpis.three.gr-k .kpi:last-child, .kpis.three.sb-k .kpi:last-child { grid-column:1 / -1; }
   .gr-tools { grid-template-columns:1fr 1fr; }
   .gr-tools .gr-q { grid-column:1 / -1; }
 }
@@ -1480,6 +1487,14 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
       <div id="c-body"></div>
     </section>
 
+    <section class="view" data-view="subscribers" id="v-subscribers" hidden>
+      <div class="vhead">
+        <div class="min0"><h1>Subscribers</h1><p class="sub" id="sb-sub"></p></div>
+        <div class="vact" id="sb-act"></div>
+      </div>
+      <div id="sb-body"></div>
+    </section>
+
     <section class="view grow" data-view="competitors" id="v-competitors" hidden>
       <div class="vhead">
         <div class="min0"><h1>Competitors</h1><p class="sub" id="pw-sub"></p></div>
@@ -1602,6 +1617,9 @@ const ICONS = {
   bird: '<path d="M3.5 16.5c3.2 0 5.4-1.6 6.6-4.6 1.1-2.8 2.9-4.4 5.6-4.4 1.4 0 2.4.5 3 1.4l1.8.6-1.8 1c-.2 5-3.9 8.5-9.2 8.5-2.5 0-4.6-.9-6-2.5z"/><path d="M10 19.5 8.5 21M13 19.5l-1 1.5"/><circle cx="16" cy="9.6" r=".9" fill="currentColor" stroke="none"/>',
   barn: '<path d="M3.5 10.5 12 4l8.5 6.5V20h-17z"/><path d="M9 20v-5.5h6V20"/><path d="M9 14.5l6 5.5M15 14.5 9 20"/>',
   download: '<path d="M12 4v11"/><path d="m7 10.5 5 5 5-5"/><path d="M5 19.5h14"/>',
+  pause: '<path d="M9 5.5v13M15 5.5v13"/>',
+  play: '<path d="M8 5.5v13l10.5-6.5L8 5.5z"/>',
+  repeat: '<path d="m16.5 3 3.5 3.5-3.5 3.5"/><path d="M4 11.5v-1a4 4 0 0 1 4-4h12"/><path d="M7.5 21 4 17.5l3.5-3.5"/><path d="M20 12.5v1a4 4 0 0 1-4 4H4"/>',
 };
 function ic(name, size) {
   const s = size || 18;
@@ -2417,7 +2435,7 @@ function statusFooter(o) {
   return b("new", "Reopen order", "ghost", "undo");
 }
 // Why an order's delivery was free (see the referral rules in the Worker).
-const FREE_DELIVERY_WHY = { friend: "Free, friend's link", offer: "Free, first order", building: "Free, same building", credit: "Free, earned" };
+const FREE_DELIVERY_WHY = { friend: "Free, friend's link", offer: "Free, first order", building: "Free, same building", credit: "Free, earned", subscriber: "Free, subscriber" };
 function detailHtml(o) {
   const sig = orderSignals(o);
   const isDelivery = o.fulfillment === "delivery";
@@ -2791,9 +2809,10 @@ function renderRun() {
   if (!S.ordersLoaded) { body.innerHTML = '<div class="card"><span class="sk" style="width:40%;height:16px"></span><span class="sk" style="height:180px;margin-top:16px"></span></div>'; return; }
   const g = runGroup();
   $("r-act").innerHTML = '<button class="ib" type="button" data-action="refresh" aria-label="Refresh" title="Refresh">' + ic("refresh") + "</button>";
+  const coming = sbComing(g);
   if (!g) {
-    $("r-sub").textContent = "Nothing booked yet";
-    body.innerHTML = '<div class="card"><div class="empty-state">' + ic("truck", 28) + "<b>No deliveries coming up</b><p>Paid Saturday orders show up here as a route, nearest first.</p></div></div>";
+    $("r-sub").textContent = coming ? coming : "Nothing booked yet";
+    body.innerHTML = '<div class="card"><div class="empty-state">' + ic("truck", 28) + "<b>No deliveries coming up</b><p>" + (coming ? esc(coming) + ". They join the route once paid." : "Paid Saturday orders show up here as a route, nearest first.") + "</p></div></div>";
     return;
   }
   const stops = runStops(g);
@@ -2808,7 +2827,8 @@ function renderRun() {
   const route = mapsRoute(left, true);
   const side = '<div class="card run-prog' + (left.length ? "" : " complete") + '"><div class="top"><span class="big num">' + doneN + " of " + stops.length + '</span><span class="minor" style="margin:0">delivered</span></div><div class="bar"><i style="width:' + pct + '%"></i></div>' +
     '<div class="load"><h3>' + (left.length ? "In the car" : "Delivered today") + "</h3>" + loadList(left.length ? left : stops).map(function (l) { return '<div class="ln"><b>' + esc(l[0]) + "</b></div>"; }).join("") +
-      (collect.length ? '<div class="ln due">' + esc("Collect " + money(owed) + " from " + plural(collect.length, "stop")) + "</div>" : "") + "</div>" +
+      (collect.length ? '<div class="ln due">' + esc("Collect " + money(owed) + " from " + plural(collect.length, "stop")) + "</div>" : "") +
+      (coming ? '<div class="ln soon">' + esc(coming) + "</div>" : "") + "</div>" +
     (left.length ? '<div class="run-acts">' + (route ? '<a class="btn dark" href="' + esc(route) + '" target="_blank" rel="noopener">' + ic("route", 16) + "Full route</a>" : "") + '<button type="button" class="btn ghost" data-action="copy-run">' + ic("copy", 16) + "Copy list</button>" +
       '<button type="button" class="btn ghost run-cards" data-action="print-cards">' + ic("qr", 16) + "Print box cards</button></div>" +
       '<p class="minor run-hint">One card per box. A neighbour who scans its QR code gets free delivery.</p>' : "") +
@@ -3016,18 +3036,21 @@ const VIEWS = [
   { id: "stock", label: "Stock & prices", short: "Stock", icon: "stock", hash: "stock" },
   { id: "emails", label: "Emails", icon: "mail", hash: "emails" },
   { id: "customers", label: "Customers", icon: "users", hash: "customers" },
+  { id: "subscribers", label: "Subscribers", icon: "repeat", hash: "subscribers" },
   { id: "competitors", label: "Competitors", icon: "trend", hash: "prices" },
   { id: "news", label: "News", icon: "news", hash: "news" },
   { id: "growers", label: "Growers", icon: "barn", hash: "growers" },
   { id: "visits", label: "Flyer visits", icon: "qr", hash: "visits" },
   { id: "images", label: "Images", icon: "image", hash: "assets" },
 ];
-const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", prices: "competitors", competitors: "competitors", news: "news", growers: "growers", visits: "visits", assets: "images", images: "images", more: "more" };
+const HASH_TO_VIEW = { "": "orders", orders: "orders", run: "run", stock: "stock", emails: "emails", customers: "customers", subscribers: "subscribers", prices: "competitors", competitors: "competitors", news: "news", growers: "growers", visits: "visits", assets: "images", images: "images", more: "more" };
 // The phone tab bar is for moving between sections only; everything else lives on the More page.
 const TAB_IDS = ["orders", "run", "stock", "emails"];
 function navBadge(id) {
   if (id === "orders") { const n = ORDERS.filter(function (o) { return o.status === "new" && !isOpenCheckout(o); }).length; return n ? String(n) : ""; }
   if (id === "emails") { const n = emailAttention(); return n ? String(n) : ""; }
+  // A card that failed is the only thing here that needs the owner.
+  if (id === "subscribers") { const n = SUBS ? (SUBS.subs || []).filter(function (s) { return s.status !== "cancelled" && s.cardFailed; }).length : 0; return n ? String(n) : ""; }
   return "";
 }
 // Each badge remembers its last count, so a new count can pop in.
@@ -4257,6 +4280,192 @@ function renderCustomers() {
   }).join("") + "</div>";
 }
 
+/* ============================== subscribers ============================== */
+// Weekly and fortnightly orders. Just after orders close on Thursday night the Worker charges each
+// saved card and writes a normal paid order for Saturday, so the run, the stock and the emails
+// follow by themselves. This page shows who is on, what the next run takes, and lets the owner
+// skip, pause or cancel for a customer who asks.
+let SUBS = null;
+function sbIso(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  return m ? Number(m[3]) + " " + Object.keys(MONTHS)[Number(m[2]) - 1] : "";
+}
+function sbFind(id) { return SUBS ? (SUBS.subs || []).filter(function (x) { return x.id === id; })[0] : null; }
+function sbFirst(s) { return String(s.name || "").trim().split(/\s+/)[0] || "them"; }
+function sbBrand(s) {
+  const b = String((s.card || {}).brand || "").replace(/_/g, " ");
+  return b ? b.charAt(0).toUpperCase() + b.slice(1) : "";
+}
+function sbCard(s) {
+  const c = s.card || {};
+  return c.last4 ? (sbBrand(s) || "Card") + " ending " + c.last4 : "Saved card";
+}
+/** The one line on a card's bottom edge: what happens next, or what is wrong. */
+function sbInsight(s, w) {
+  // Short enough to stay on one line beside the buttons, four cards across.
+  const today = sydDate(Date.now());
+  if (s.status === "cancelled") return ["Cancelled" + (s.cancelledAt ? " " + sbIso(sydDate(Date.parse(s.cancelledAt))) : ""), "soft"];
+  if (s.status === "paused") return s.pauseWhy === "card" ? ["Card failed twice", "warn"] : [s.pauseWhy === "shop" ? "Paused by you" : "Customer paused", "soft"];
+  if (s.cardFailed) return ["Card failed", "warn"];
+  if (s.undo && s.undo >= today) return ["Skipping " + sbIso(s.undo), "due"];
+  if (s.paidFor && s.paidFor >= today) return ["Paid for " + sbIso(s.paidFor), "good"];
+  if (s.next === w.sat) return [w.charging ? "Charging now" : "Charges Thursday", "good"];
+  return ["Next on " + s.nextLabel, "soft"];
+}
+/** For the delivery run: repeat orders for that Saturday whose cards are not charged yet. */
+function sbComing(g) {
+  if (!SUBS || !SUBS.on || !SUBS.week || !SUBS.week.due) return "";
+  const w = SUBS.week;
+  // Only beside the run it belongs to (or when nothing is booked at all).
+  if (g && !g.orders.some(function (o) { return o.pickupDate === w.label; })) return "";
+  return plural(w.due, "repeat order") + " (" + plural(w.trays, "tray") + ") " + (w.charging ? "charging now" : "charge Thursday night");
+}
+function renderSubSub() {
+  const el = $("sb-sub");
+  if (!el) return;
+  let text = "";
+  if (SUBS) {
+    const w = SUBS.week || {}, lr = SUBS.lastRun;
+    const live = (SUBS.subs || []).some(function (s) { return s.status !== "cancelled"; });
+    if (!SUBS.on) text = live ? "Paused for everyone. No cards are charged" : "";
+    else if (lr && lr.error && lr.sat >= sydDate(Date.now())) text = "Could not charge for Saturday " + sbIso(lr.sat) + ". Trying again";
+    else if (w.charging && w.due) text = "Charging cards now for Saturday " + w.label;
+    else if (lr && lr.sat >= sydDate(Date.now()) && (lr.charged || lr.declined)) text = "Saturday " + sbIso(lr.sat) + ": " + plural(lr.charged || 0, "card") + " charged" + (lr.declined ? ", " + lr.declined + " failed" : "");
+    else if (w.due) text = "Cards are charged Thursday night, " + w.charge + ", for Saturday " + w.label;
+  }
+  el.textContent = text;
+}
+function renderSubs() {
+  const body = $("sb-body");
+  if (!body) return;
+  if (!SUBS) {
+    body.innerHTML = '<div class="kpis three sb-k">' + [1, 2, 3].map(function () { return '<div class="kpi"><span class="sk" style="width:60%;height:12px"></span><span class="sk" style="width:40%;height:24px;margin-top:10px"></span></div>'; }).join("") + '</div><div class="cgrid">' + [1, 2, 3].map(function () { return '<div class="card cc"><span class="sk" style="width:60%;height:14px"></span><span class="sk" style="height:36px;margin-top:16px"></span><span class="sk" style="height:40px;margin-top:12px"></span></div>'; }).join("") + "</div>";
+    return;
+  }
+  renderSubSub();
+  const w = SUBS.week || {};
+  const all = SUBS.subs || [];
+  const active = all.filter(function (s) { return s.status === "active"; });
+  const paused = all.filter(function (s) { return s.status === "paused"; });
+  const live = active.length + paused.length;
+  const allWord = SUBS.on ? "Pause all" : "Resume all";
+  $("sb-act").innerHTML = live ? '<button class="btn ghost sm" type="button" data-action="sub-all" aria-label="' + allWord + '" title="' + allWord + '">' + ic(SUBS.on ? "pause" : "play") + '<span class="lbl">' + allWord + "</span></button>" : "";
+  if (!all.length) {
+    body.innerHTML = '<div class="card"><div class="empty-state">' + ic("repeat", 28) + "<b>No subscribers yet</b><p>They show up here when someone picks Weekly or Fortnightly on the shop.</p></div></div>";
+    return;
+  }
+  // That Saturday's repeat orders: the ones still to charge and the ones charged already.
+  const satOrders = (w.due || 0) + (w.charged || 0);
+  const satTrays = (w.trays || 0) + (w.chargedTrays || 0);
+  const satNote = [];
+  if (satOrders) satNote.push(plural(satOrders, "order"), money((w.total || 0) + (w.chargedTotal || 0)));
+  if (w.failed) satNote.push(plural(w.failed, "card") + " failed");
+  // What these orders bring in over a week: a fortnightly one counts as half.
+  const weekly = active.reduce(function (n, s) { return n + (Number(s.total) || 0) / (s.every === 2 ? 2 : 1); }, 0);
+  const rank = function (s) { return s.status === "cancelled" ? 4 : s.cardFailed ? 0 : s.status === "paused" ? 3 : s.next === w.sat ? 1 : 2; };
+  const list = all.slice().sort(function (a, b) { return rank(a) - rank(b) || String(a.next || "").localeCompare(String(b.next || "")) || String(a.name).localeCompare(String(b.name)); });
+  body.innerHTML =
+    '<div class="kpis three sb-k">' +
+      kpi("Active", String(active.length), paused.length ? paused.length + " paused" : "Weekly and fortnightly", "", "", "repeat") +
+      kpi("Saturday " + (w.label || ""), plural(satTrays, "tray"), satNote.join(", ") || "Nothing due", "", "", "truck") +
+      kpi("Worth a week", money(Math.round(weekly)), "Fortnightly counts as half", "", "", "trend") +
+    "</div>" +
+    '<div class="cgrid cascade">' + list.map(function (s) {
+      const ins = sbInsight(s, w);
+      const off = s.status === "cancelled";
+      const c = s.card || {};
+      return '<div class="card cc' + (off ? " off" : "") + '"><div class="cc-top"><span class="av">' + esc(initials(s.name)) + '</span><div class="nm"><b>' + esc(s.name || "No name") + "</b><span>" + esc([s.every === 2 ? "Fortnightly" : "Weekly", s.suburb].filter(Boolean).join(" · ")) + '</span></div><span class="cc-spend num">' + esc(money(s.total)) + "</span></div>" +
+        '<div class="cc-stats"><div><b class="num">' + s.trays + "</b><span>" + (s.trays === 1 ? "tray" : "trays") + "</span></div><div><b>" + esc(s.status === "active" ? s.nextLabel : "-") + "</b><span>next</span></div><div><b class=\"num\">" + s.runs + "</b><span>delivered</span></div><div><b class=\"num\">" + esc(c.last4 || "-") + "</b><span>" + esc(sbBrand(s) || "card") + "</span></div></div>" +
+        '<div class="cc-foot"><span class="insight ' + ins[1] + '">' + esc(ins[0]) + "</span>" +
+          '<button type="button" class="btn ghost sm" data-action="sub-open" data-id="' + esc(s.id) + '">' + (off ? "Details" : "Manage") + "</button>" +
+          (s.phone ? '<a class="ib" href="' + esc(waLink(s.phone)) + '" target="_blank" rel="noopener" title="WhatsApp ' + esc(fmtPhone(s.phone)) + '" aria-label="WhatsApp">' + ic("chat") + "</a>" : "") +
+        "</div></div>";
+    }).join("") + "</div>";
+}
+async function loadSubs(quiet) {
+  const r = await api("/api/admin/subscriptions");
+  if (!r.ok) {
+    if (!quiet && S.view === "subscribers") {
+      if (!SUBS) $("sb-body").innerHTML = '<div class="card"><div class="empty-state">' + ic("alert", 28) + "<b>Could not load the subscribers</b><p>Check the connection and try again.</p></div></div>";
+      else toast("Could not refresh the subscribers");
+    }
+    return;
+  }
+  SUBS = r.data;
+  renderNav();
+  if (S.view === "subscribers") renderSubs();
+  if (S.view === "run") renderRun();
+  if (S.view === "more") renderMore();
+}
+function sbOpen(t) {
+  const s = sbFind(t.getAttribute("data-id"));
+  if (!s) return;
+  const cells = [
+    grCell("stock", "Order", esc(s.item), money(s.total) + " each time, free delivery"),
+    grCell("repeat", "How often", esc(s.every === 2 ? "Every second Saturday" : "Every Saturday"), s.status === "active" ? "Next on Saturday " + s.nextLabel + (s.undo ? ", after the skip" : "") : s.status === "paused" ? "Paused" : "Cancelled"),
+    grCell("pin", "Deliver to", esc(s.address), ""),
+    grCell("card", "Card", esc(sbCard(s)), s.pauseWhy === "card" ? "Failed twice. It starts again when they add a new card from the email we sent" : s.cardFailed ? "The last charge failed. We emailed them a link to update it" : "Charged Thursday night, before each delivery"),
+  ];
+  if (s.phone) cells.push(grCell("phone", "Mobile", '<a href="tel:' + esc(String(s.phone).replace(/[^\d+]/g, "")) + '">' + esc(fmtPhone(s.phone)) + "</a>", ""));
+  if (s.email) cells.push(grCell("mail", "Email", '<a href="mailto:' + esc(s.email) + '" data-action="gr-mail" data-to="' + esc(s.email) + '">' + esc(s.email) + "</a>", "Writes from orders@getyolko.com"));
+  cells.push(grCell("check", "Since", esc(fmtDay(s.since)), plural(s.runs, "delivery", "deliveries") + " so far"));
+  const b = function (act, label, kind) { return '<button type="button" class="btn ' + (kind || "ghost") + '" data-action="sub-act" data-do="' + act + '" data-id="' + esc(s.id) + '">' + esc(label) + "</button>"; };
+  const acts = [];
+  if (s.status === "active") {
+    if (s.undo) acts.push(b("unskip", "Undo the skip"));
+    else if (s.canSkip) acts.push(b("skip", "Skip Saturday " + s.nextLabel));
+    acts.push(b("pause", "Pause"));
+  } else if (s.status === "paused" && s.pauseWhy !== "card") acts.push(b("resume", "Resume"));
+  if (s.status !== "cancelled") acts.push(b("cancel", "Cancel order", "danger"));
+  openModal({ title: s.name || "Subscriber", cls: "gr-sheet", html: '<div class="zstack">' + cells.join("") + "</div>" + (acts.length ? '<div class="sb-acts">' + acts.join("") + "</div>" : ""), actions: [{ label: "Done", kind: "primary", value: true }] });
+}
+/** One change to one repeat order. Returns "" when it worked, else what to tell the owner. */
+async function sbSend(id, action, forIso) {
+  const body = { id: id, action: action };
+  if (forIso) body.for = forIso;
+  const r = await api("/api/admin/subscriptions", { method: "POST", body: body });
+  if (!r.ok) return r.data.error || "Not saved. Try again";
+  SUBS = r.data;
+  renderNav();
+  if (S.view === "subscribers") renderSubs();
+  return "";
+}
+async function sbAct(t) {
+  const s = sbFind(t.getAttribute("data-id"));
+  const action = t.getAttribute("data-do");
+  if (!s || t.classList.contains("busy")) return;
+  const first = sbFirst(s);
+  if (action === "cancel") {
+    // Cancelling lets go of the saved card, so it cannot be undone: ask first, Keep it by default.
+    const ok = await openModal({
+      title: "Cancel " + first + "’s " + (s.every === 2 ? "fortnightly" : "weekly") + " order?",
+      html: "<p>Their card is not charged again and the saved card is removed. This can’t be undone: they would have to order again on the shop.</p>",
+      actions: [{ label: "Keep it", kind: "ghost", value: null }, { label: "Cancel order", kind: "danger", value: true }],
+    });
+    if (!ok) return;
+  } else t.classList.add("busy");
+  const err = await sbSend(s.id, action, action === "skip" ? s.next : action === "unskip" ? s.undo : "");
+  t.classList.remove("busy");
+  if (err) { toast(err); return; }
+  closeModal(null);
+  const undo = function (act, iso, done) { return { label: "Undo", run: async function () { const e = await sbSend(s.id, act, iso); toast(e || done); } }; };
+  if (action === "skip") toast("Skipped Saturday " + s.nextLabel + " for " + first, undo("unskip", s.next, "Back on for Saturday " + s.nextLabel));
+  else if (action === "unskip") toast("Back on for Saturday " + sbIso(s.undo));
+  else if (action === "pause") toast("Paused " + first + "’s order", undo("resume", "", first + "’s order is back on"));
+  else if (action === "resume") toast(first + "’s order is back on");
+  else toast("Cancelled " + first + "’s order");
+}
+async function sbAll() {
+  if (!SUBS) return;
+  const on = !SUBS.on;
+  const r = await api("/api/admin/subscriptions", { method: "POST", body: { on: on } });
+  if (!r.ok) { toast("Not saved: " + (r.data.error || "try again")); return; }
+  SUBS = r.data;
+  renderNav();
+  if (S.view === "subscribers") renderSubs();
+  toast(on ? "Repeat orders are back on" : "Paused for everyone. No cards are charged", { label: "Undo", run: sbAll });
+}
+
 /* ============================== competitors ============================== */
 // Other shops' egg prices. The Worker reads Coles, Aldi, IGA and Umall every
 // 6 hours; Costco and Woolworths block that, so their prices are typed in here. Every egg is filed
@@ -5281,7 +5490,8 @@ function showView(v) {
   if (v === "stock" && !$("stock-body").innerHTML) renderStock();
   if (v === "emails") { renderEmails(); loadEmails(); }
   if (v === "customers") renderCustomers();
-  if (v === "run") { if (changed) S.runOpen = null; renderRun(); }
+  if (v === "subscribers" && changed) { renderSubs(); loadSubs(); }
+  if (v === "run") { if (changed) { S.runOpen = null; loadSubs(true); } renderRun(); }
   syncWakeLock();
   if (v === "competitors" && changed) loadPriceWatch();
   if (v === "news" && changed) { NW_SEEN = nwSeenGet(); nwSeenSet(Date.now()); NW_LIMIT = 60; if (NW) renderNews(); loadNews(); }
@@ -5380,6 +5590,9 @@ const ACTIONS = {
   "gr-more": grMore,
   "gr-open": grOpen,
   "gr-csv": grCsv,
+  "sub-open": sbOpen,
+  "sub-act": sbAct,
+  "sub-all": sbAll,
   "gr-mail": function (t) { composeMail({ to: t.getAttribute("data-to"), subject: "", draftKey: "g:" + t.getAttribute("data-to") }); },
   "gr-check": grCheckNow,
   "gr-k-confirmed": function () { grSet("confirmed"); },
@@ -5545,6 +5758,7 @@ function boot() {
   renderBell();
   pollHead();
   loadEmails();
+  loadSubs(true);
   if (POLL) clearInterval(POLL);
   let ticks = 0;
   POLL = setInterval(function () {
