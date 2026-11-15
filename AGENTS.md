@@ -55,6 +55,27 @@ phone number), short ledes that wrap into even lines (`text-wrap: balance` on `.
 tables on `/egg-prices-sydney` sharing one set of columns, a reading width on full-width cards
 (`.panel > p`), the search box placeholder showing whole on phones, and wide screens (below).
 
+Round 4 (build 256): Kanna asked to "remove unnecessary things" from the Delivery, Suburbs and
+Bulk eggs pages, so each of them says a thing once. Keep them this lean.
+- `/egg-delivery-sydney`: hero, three steps (`DELIVERY_STEPS`, the homepage's words), the map
+  card with the search and the suburb pages as chips under it (the homepage's card; the grid of
+  suburb cards is gone), prices, the yellow panel. No Questions section.
+- `/egg-delivery-areas`: hero, then one card (`.areas-finder`): the search and its matches on
+  the left, the map on the right, the A to Z fold under it. From 901px the words start a set
+  distance from the top of the card, so the box does not move as matches arrive. No Questions
+  section: the search answers them.
+- `/bulk-eggs-sydney`: hero, the per egg table (three rows), one wholesale card
+  (`.panel-split`: heading left, words and WhatsApp right), five questions, the yellow panel.
+  The wholesale heading and "Do you sell eggs wholesale?" are there for search: keep them.
+- A page without its own Questions section goes in `NO_FAQ`, so its Questions link opens the
+  homepage's. The yellow panel has one button; `ctaBand` takes it as `primary` (the bulk page's
+  opens the form with a box picked).
+- The hero line never repeats the three facts under it (Saturday, $5 flat, card).
+- The line under a Questions heading is "Can't find your answer? Message us." Kanna did not
+  want "a real person will reply". No phone number there: the buttons open WhatsApp and email.
+- The map takes at most half its card (`min(29.375rem, 50%)`), so the search box beside it
+  keeps its width on a small laptop.
+
 Sizes are in rem (round 3, non-obvious). Every length in `styles-modern.css` is written in rem,
 where rem = px / 16 (13px is `0.8125rem`), and `html` sets `font-size: clamp(16px, 1vw, 20px)`.
 Up to 1600px wide 1rem is 16px, so every size is the px number it always was. Past 1600px the

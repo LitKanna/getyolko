@@ -2156,9 +2156,11 @@ section {
   padding: 0 0 var(--section);
 }
 
+/* The map never takes more than half the card: on a small laptop or a tablet on its side the
+   words beside it were left a column too thin for the search box. */
 .areas-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 29.375rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(29.375rem, 50%));
   align-items: center;
   gap: clamp(2rem, 4vw, 4rem);
   padding: clamp(1.75rem, 4.4vw, 4rem);
@@ -3038,84 +3040,29 @@ section {
   margin: 0;
 }
 
-.local-suburbs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.local-suburbs .all a {
-  color: var(--white);
-  background: var(--ink);
-}
-
-.local-suburbs .all span {
-  color: rgba(255, 255, 255, 0.7);
-}
-
 .local-row + .wrap {
   margin-top: 2rem;
 }
 
-.local-suburbs a {
-  display: grid;
-  gap: 2px;
-  padding: 1.25rem 1.375rem;
-  border: 1.5px solid transparent;
-  border-radius: var(--r-md);
-  background: var(--paper);
-  box-shadow: var(--shadow-card);
-  text-decoration: none;
-  transition: border-color 160ms ease;
-}
-
-.local-suburbs a:hover {
-  border-color: var(--ink);
-}
-
-.local-suburbs strong {
-  font-size: 1.125rem;
-  font-weight: 700;
-}
-
-.local-suburbs span {
-  color: var(--muted);
-  font-size: 0.875rem;
-}
-
-.map-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 29.375rem);
-  align-items: center;
-  gap: clamp(2rem, 4vw, 4rem);
-}
-
-/* Delivery areas finder (/egg-delivery-areas) */
-.areas-finder .panel {
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 0.5rem clamp(2rem, 4vw, 4rem);
-}
-
-.areas-finder .panel h2,
-.areas-finder .panel > p {
-  grid-column: 1;
-}
-
+/* Delivery areas finder (/egg-delivery-areas): the search and its matches sit beside the map.
+   The words start at a set distance from the top of the card, level with the middle of the
+   map while the box is empty, so the box never moves as matches arrive under it. */
 .areas-finder .suburb-check {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  max-width: none;
   padding-right: 1.375rem;
 }
 
-.areas-finder .area-status,
-.areas-finder .area-results {
-  grid-column: 1 / -1;
+@media (min-width: 901px) {
+  .areas-finder .areas-panel {
+    align-items: start;
+  }
+
+  .areas-finder .areas-copy {
+    padding-top: 9rem;
+  }
 }
 
 .area-status {
-  margin: 0.75rem 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.9375rem;
   font-weight: 600;
@@ -3127,10 +3074,6 @@ section {
 
 .area-status a {
   color: var(--ink);
-}
-
-.area-results {
-  margin-top: 0.5rem;
 }
 
 /* All suburbs, A to Z: one closed row under the map on /egg-delivery-areas */
@@ -3606,12 +3549,7 @@ body:has(> main > .notfound) > main {
     gap: 0.75rem;
   }
 
-  .local-suburbs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .areas-panel,
-  .map-panel {
+  .areas-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -3636,16 +3574,6 @@ body:has(> main > .notfound) > main {
     position: static;
     padding-bottom: 1.75rem;
     border-bottom: 1px solid var(--line);
-  }
-
-  .areas-finder .panel {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-  }
-
-  .areas-finder .suburb-check {
-    grid-column: 1;
-    grid-row: auto;
   }
 
   .foot-grid {
@@ -3706,13 +3634,13 @@ body:has(> main > .notfound) > main {
     gap: 0.875rem;
   }
 
-  .panel .areas-list {
+  :is(.panel, .areas-copy) .areas-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .panel .areas-list li,
-  .panel .areas-list li > a {
+  :is(.panel, .areas-copy) .areas-list li,
+  :is(.panel, .areas-copy) .areas-list li > a {
     flex-direction: column;
     align-items: flex-start;
     gap: 1px;
@@ -3720,18 +3648,18 @@ body:has(> main > .notfound) > main {
     border-radius: var(--r-sm);
   }
 
-  .panel .areas-list li {
+  :is(.panel, .areas-copy) .areas-list li {
     font-size: 0.84375rem;
     letter-spacing: -0.01em;
   }
 
-  .panel .areas-list li:not(:has(> a)),
-  .panel .areas-list li > a {
+  :is(.panel, .areas-copy) .areas-list li:not(:has(> a)),
+  :is(.panel, .areas-copy) .areas-list li > a {
     padding: 0.6875rem 0.75rem;
   }
 
-  .panel .areas-list .chip-strong,
-  .panel .areas-list .chip-strong > a {
+  :is(.panel, .areas-copy) .areas-list .chip-strong,
+  :is(.panel, .areas-copy) .areas-list .chip-strong > a {
     grid-column: 1 / -1;
     align-items: center;
     border-radius: 62.4375rem;
