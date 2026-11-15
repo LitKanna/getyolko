@@ -944,6 +944,17 @@ function emailWideButton(href, label) {
 }
 
 /**
+ * The weekly offer on an email to someone who buys one order at a time: a ruled-off block in the
+ * style of "Free delivery for a neighbour", with one link that opens the order form with Weekly
+ * picked. `line` is plain text. Never on an email to someone who already has a repeat order.
+ */
+function emailWeeklyOffer(href, line) {
+  const C = EMAIL_C;
+  return `<tr><td style="padding-top:22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid ${C.line};padding-top:18px;font-size:15px;line-height:22px;font-weight:700;color:${C.ink}">Make it weekly</td></tr><tr><td style="padding-top:4px;font-size:14px;line-height:21px;color:${C.ink2}">${htmlEscape(line)}</td></tr><tr><td style="padding-top:8px;font-size:15px;line-height:22px"><a href="${htmlEscape(href)}" style="font-weight:600;color:${C.ink};text-decoration:underline">Order weekly</a></td></tr></table></td></tr>`;
+}
+const WEEKLY_OFFER_LINK = "https://getyolko.com/?repeat=1&utm_source=order&utm_medium=email&utm_campaign=weekly#order";
+
+/**
  * An email's heading with the yolk brush stroke under `mark`, one word of it. The stroke is a
  * background picture, so a mail app that skips those (desktop Outlook) shows the plain heading.
  */
@@ -1004,9 +1015,13 @@ ${why ? `<tr><td align="center" style="padding:16px 12px 0;font-family:${FONT};f
 }
 
 /** `sub` is the order's repeat order (weekly or fortnightly), when it has one. */
-function buildOrderEmail(order, sub = null) {
+function buildOrderEmail(order, sub = null, { offerWeekly = false } = {}) {
   const first = String(order.name || "").split(/\s+/)[0] || "there";
   const repeats = sub && sub.token && sub.status !== "cancelled" ? (sub.every === 2 ? 2 : 1) : 0;
+  // A one-off order of the main tray, delivered: the one email where the weekly offer fits.
+  const weekly = offerWeekly && !repeats && order.fulfillment === "delivery" && isSubBundle(order.bundle) && order.subtotal != null
+    ? `Get this every Saturday for ${money(order.subtotal)}, with free delivery. Skip a week or cancel any time.`
+    : "";
   const manage = repeats ? `${SUB_PAGE}?t=${sub.token}` : "";
   const item = bundleLabel(order.bundle);
   const qty = Math.max(1, Number(order.quantity) || 1);
@@ -1036,7 +1051,8 @@ ${emailList([
   ["Total paid", emailBig(`${money(total)} AUD`)],
 ])}
 ${receipt ? `<tr><td style="padding-top:16px">${emailWideButton(receipt, "View receipt")}</td></tr>` : ""}
-${repeats ? `<tr><td style="padding-top:14px;font-size:14px;line-height:21px;color:${C.muted}">We charge your card each ${repeats === 2 ? "second " : ""}Thursday night, before the next delivery. <a href="${htmlEscape(manage)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Skip, pause or cancel</a> any time.</td></tr>` : ""}`,
+${repeats ? `<tr><td style="padding-top:14px;font-size:14px;line-height:21px;color:${C.muted}">We charge your card each ${repeats === 2 ? "second " : ""}Thursday night, before the next delivery. <a href="${htmlEscape(manage)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Skip, pause or cancel</a> any time.</td></tr>` : ""}
+${weekly ? emailWeeklyOffer(WEEKLY_OFFER_LINK, weekly) : ""}`,
   });
 
   const text = [
@@ -1053,6 +1069,7 @@ ${repeats ? `<tr><td style="padding-top:14px;font-size:14px;line-height:21px;col
     repeats ? `Repeats: ${REPEAT_EVERY[repeats].toLowerCase()}. We charge your card each ${repeats === 2 ? "second " : ""}Thursday night, before the next delivery.` : null,
     repeats ? `Skip, pause or cancel any time: ${manage}` : null,
     receipt ? `\nReceipt: ${receipt}` : null,
+    weekly ? `\nMake it weekly: ${weekly}\n${WEEKLY_OFFER_LINK}` : null,
     "",
     EMAIL_HELP_TEXT,
     `YOLKO · ABN ${SHOP_ABN} · getyolko.com`,
@@ -1127,7 +1144,15 @@ ${emailList([
  */
 async function sendOrderConfirmationEmail(env, order, { test = false } = {}) {
   const sub = order.subId ? await getSub(env, order.subId).catch(() => null) : null;
-  return sendCustomerEmail(env, order, buildOrderEmail(order, sub), { test });
+  // The weekly offer goes to one-off buyers only: not on a repeat order's own email, and not to
+  // someone who already has a repeat order and adds an extra one.
+  let offerWeekly = !sub && !repeatOf(order);
+  if (offerWeekly && !test) {
+    const repeating = await repeatOrderPeople(env).catch(() => new Set());
+    const email = String(order.stripe?.email || order.email || "").trim().toLowerCase();
+    offerWeekly = !(email && repeating.has(email)) && !(order.phone && repeating.has(String(order.phone)));
+  }
+  return sendCustomerEmail(env, order, buildOrderEmail(order, sub, { offerWeekly }), { test });
 }
 
 /**
@@ -2346,6 +2371,8 @@ async function reminderByToken(env, token) {
 function reminderLinks(token) {
   return {
     reorder: `https://getyolko.com/?utm_source=reminder&utm_medium=email&utm_campaign=thursday#reorder=${token}`,
+    // The same filled-in order with Weekly picked on the form's switch (repeat=1, see app.js).
+    weekly: `https://getyolko.com/?repeat=1&utm_source=reminder&utm_medium=email&utm_campaign=weekly#reorder=${token}`,
     stop: `https://getyolko.com/api/reminders/stop?t=${token}`,
   };
 }
@@ -2379,6 +2406,7 @@ ${emailList([
 ${free ? `<tr><td style="padding-top:14px;font-size:15px;line-height:22px;color:${C.ink2}">You've earned a free delivery, so this one is on us. It comes off at checkout.</td></tr>` : ""}
 <tr><td style="padding-top:16px">${emailWideButton(links.reorder, "Order again")}</td></tr>
 <tr><td style="padding-top:12px;font-size:14px;line-height:21px;color:${C.muted}">It opens your order filled in, ready to pay. Not this week? Just ignore this email.</td></tr>
+${isSubBundle(item.bundle) ? emailWeeklyOffer(links.weekly, `Get this every Saturday for ${money(item.subtotal)}, with free delivery. Skip a week or cancel any time.`) : ""}
 ${ref?.link ? `<tr><td style="padding-top:22px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid ${C.line};padding-top:18px;font-size:15px;line-height:22px;font-weight:700;color:${C.ink}">Free delivery for a neighbour</td></tr><tr><td style="padding-top:4px;font-size:14px;line-height:21px;color:${C.ink2}">Send them your link. Their first delivery is free, and so is your next one.</td></tr><tr><td style="padding-top:8px;font-size:15px;line-height:22px"><a href="${htmlEscape(ref.link)}" style="font-weight:600;color:${C.ink};text-decoration:underline">${htmlEscape(ref.link.replace("https://", ""))}</a></td></tr></table></td></tr>` : ""}`,
     why: `Sent each Thursday because you asked.<br><a href="${htmlEscape(links.stop)}" style="color:${C.ink2};font-weight:600;text-decoration:underline">Stop reminders</a>`,
   });
@@ -6377,7 +6405,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "260",
+      "X-Yolko-Build": "261",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

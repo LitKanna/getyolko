@@ -1862,7 +1862,13 @@ function applyReorder(d) {
   refreshDeliveryZoneHint();
   refreshSubmitPrice();
   orderSection.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-  showFormMessage(`Your last order is filled in for Saturday ${nextPickupDate("Saturday")}. Check it, then tap Buy now.`, false);
+  // The reminder email's "Order weekly" link also carries ?repeat=1, so Weekly is already picked.
+  showFormMessage(
+    currentRepeat()
+      ? `Your last order is filled in as a weekly order, starting Saturday ${nextPickupDate("Saturday")}. Check it, then tap Subscribe.`
+      : `Your last order is filled in for Saturday ${nextPickupDate("Saturday")}. Check it, then tap Buy now.`,
+    false
+  );
 }
 
 /* ---------- Back from the pay page without paying ---------- */

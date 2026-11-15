@@ -244,6 +244,7 @@ ok(!kv("sub:index"), "weekly: nothing starts until it is paid");
 
 r = await pay("cs_test_2");
 let sub = subOf();
+ok(orderMail.at(-1).html.includes("Every Saturday") && !orderMail.at(-1).html.includes("Make it weekly"), "weekly: its own order email does not offer the weekly order");
 let first = orders().find((o) => o.sessionId === "cs_test_2");
 ok(r.status === 200 && first.paymentStatus === "paid" && first.status === "confirmed" && first.deliveryPerk === "subscriber" && first.price === 25, "first order: paid, confirmed, free delivery");
 ok(sub && sub.status === "active" && sub.every === 1 && sub.nextRun === "2026-11-28" && sub.lastRun === "2026-11-21", "repeat order started: next Saturday is the 28th");
@@ -464,6 +465,7 @@ at("2027-01-08T00:15");
 await cron();
 ok(charges().length === 6, "cancelled: never charged again");
 ok(mailbox.at(-1).toAddress === "priya@example.com" && mailbox.at(-1).subject.startsWith("Eggs this Saturday, 9 Jan?"), "cancelled: the ordinary Thursday reminder they asked for comes back");
+ok(mailbox.at(-1).content.includes("Make it weekly") && /\?repeat=1&amp;utm_source=reminder[^"]*#reorder=[a-f0-9]{32}"/.test(mailbox.at(-1).content), "and it offers the weekly order, with a link that opens their order with Weekly picked");
 
 /* ---------- 11. Two failures in a row pause it; a new card starts it again ---------- */
 at("2027-01-11T09:00");
@@ -520,6 +522,13 @@ ok(charges().at(-1).params.get("amount") === "30000" && orders()[0].quantity ===
 at("2027-02-19T12:15");
 r = await call("GET", "/api/admin/subscriptions", { headers: admin });
 ok(r.data.week.sat === "2027-02-27" && r.data.week.due === 0, "after Friday noon the admin looks at the following Saturday");
+// The weekly offer on an order email: for a one-off buyer, never for someone with a repeat order.
+r = await buy({ phone: "0498765432", name: "Sam Lee", deliveryStreet: "88 Burwood Road" });
+await pay([...stripe.sessions.values()].at(-1).id, { email: "sam@example.com" });
+ok(orderMail.at(-1).to === "sam@example.com" && orderMail.at(-1).html.includes("Make it weekly") && orderMail.at(-1).html.includes("?repeat=1&amp;utm_source=order") && orderMail.at(-1).text.includes("Make it weekly"), "one-off order: the email offers the weekly order");
+r = await buy({ phone: "0423456789", name: "Mai Tran", deliveryStreet: "8 Rose Avenue", bundle: "tray1" });
+await pay([...stripe.sessions.values()].at(-1).id, { email: "mai@example.com" });
+ok(orderMail.at(-1).to === "mai@example.com" && orderMail.at(-1).subject.includes("confirmed") && !orderMail.at(-1).html.includes("Make it weekly"), "an extra order from someone with a repeat order: no offer");
 r = await call("POST", "/api/admin/subscriptions", { headers: admin, body: { id: mai.id, action: "cancel" } });
 ok(r.data.did === "cancelled" && subOf(0).status === "cancelled" && subOf(0).cancelledBy === "shop", "admin: cancel");
 
