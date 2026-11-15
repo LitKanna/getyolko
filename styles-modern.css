@@ -523,12 +523,15 @@ section {
   letter-spacing: -0.045em;
 }
 
+/* Short ledes (here, under section headings and in the yellow panel) wrap into even lines,
+   so the last line is never a stranded "$5 flat." */
 .hero-sub {
   max-width: 34ch;
   margin: 0;
   color: var(--muted);
   font-size: clamp(17px, 0.5vw + 14px, 21px);
   line-height: 1.5;
+  text-wrap: balance;
 }
 
 .hero-sub b,
@@ -713,6 +716,7 @@ section {
   color: var(--muted);
   font-size: clamp(16px, 0.3vw + 14.5px, 19px);
   line-height: 1.5;
+  text-wrap: balance;
 }
 
 .section-head.split {
@@ -1987,6 +1991,7 @@ section {
   background: transparent;
   font-size: 16px;
   font-weight: 500;
+  text-overflow: ellipsis;
 }
 
 .suburb-check input::placeholder {
@@ -2004,6 +2009,12 @@ section {
   background: var(--line) center / 10px 10px no-repeat
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none'%3E%3Cpath d='M1.5 1.5l7 7M8.5 1.5l-7 7' stroke='%2314120e' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
   cursor: pointer;
+}
+
+/* An empty box has nothing to clear, but the hidden clear button still held its 36px and
+   cut the last letters off "Suburb or postcode" on phones. */
+.suburb-check input:placeholder-shown::-webkit-search-cancel-button {
+  display: none;
 }
 
 .suburb-check .btn {
@@ -2289,6 +2300,7 @@ section {
   margin: 0;
   font-size: clamp(16px, 0.4vw + 14px, 19px);
   font-weight: 600;
+  text-wrap: balance;
 }
 
 .cta-panel .hero-cta {
@@ -2479,7 +2491,10 @@ section {
   letter-spacing: -0.03em;
 }
 
+/* A card that spans the page keeps its lines to a readable length; in the paired cards the
+   card is narrower than this, so nothing changes there. */
 .panel > p {
+  max-width: 58ch;
   margin: 0;
   color: var(--muted);
   font-size: 17px;
@@ -2652,6 +2667,26 @@ section {
 
 .cmp-table .cmp-pack {
   width: 46%;
+}
+
+/* The two shop tables share one set of columns, so Pack, Price, Per egg and Per kilo line up
+   down the page whatever the shop and pack names are. (On phones each row is a card.) */
+@media (min-width: 641px) {
+  .cmp-table {
+    table-layout: fixed;
+  }
+
+  .cmp-table thead th:nth-child(1) {
+    width: 15%;
+  }
+
+  .cmp-table thead th:nth-child(2) {
+    width: 46%;
+  }
+
+  .cmp-table thead th:nth-child(n + 3) {
+    width: 13%;
+  }
 }
 
 .cmp-table .cmp-pack a {
@@ -3657,5 +3692,18 @@ body:has(> main > .notfound) > main {
   .announce {
     padding-inline: 12px;
     font-size: 12.5px;
+  }
+
+  .suburb-check {
+    gap: 4px;
+    padding-left: 14px;
+  }
+
+  .suburb-check .btn {
+    padding: 0 14px;
+  }
+
+  .suburb-check input::placeholder {
+    font-size: 14px;
   }
 }
