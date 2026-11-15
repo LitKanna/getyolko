@@ -46,6 +46,32 @@ row; on phones the hero facts stack and suburb chips inside a card become a two-
 paired cards with a button (`.panel:has(> .hero-cta)`) line their buttons up; short pages
 (`.legal`, `.notfound`) push the footer to the bottom of the screen. Round 2 (build 252) went
 through every state of the order form and checkout: see "Messages in the form" below.
+Round 3 (build 253): the referral landing (below), the paired cards on suburb pages
+(`.local-near` gives the suburb chips the wider column so the two cards end level), a menu on
+phones and tablets (`.menu`, a `<details>` in the header written by `menu()` in
+`infra/build-pages.mjs`: Delivery, Suburbs, Bulk eggs, Questions; the header still carries no
+phone number), short ledes that wrap into even lines (`text-wrap: balance` on `.hero-sub`,
+`.section-head p`, `.cta-panel p`, so "$5 flat." is never left alone on a line), the two shop
+tables on `/egg-prices-sydney` sharing one set of columns, a reading width on full-width cards
+(`.panel > p`), the search box placeholder showing whole on phones, and wide screens (below).
+
+Sizes are in rem (round 3, non-obvious). Every length in `styles-modern.css` is written in rem,
+where rem = px / 16 (13px is `0.8125rem`), and `html` sets `font-size: clamp(16px, 1vw, 20px)`.
+Up to 1600px wide 1rem is 16px, so every size is the px number it always was. Past 1600px the
+root grows with the screen (19.2px at 1920, 20px from 2000), and the whole page grows with it:
+a 1920 monitor shows the page as it looks at 1600 instead of a small column in the middle.
+Write new sizes in rem. Keep media query conditions and hairlines under 3px in px. Never set a
+px `font-size` on `html`, and when a picture's width changes, update its `sizes` hint too
+(`HERO_SIZES` in `app.js` and `infra/build-pages.mjs`, `ORDER_PICTURE_SIZES` in `app.js`).
+
+Referral landing (round 3). A visitor from `/r/<CODE>` or `?ref=FRESH5` is told about the gift
+twice, and nowhere else: the black bar at the top says "Asha sent you a free first delivery."
+(`.announce-gift`, written by `showReferral` in `app.js`; on phones it replaces the date, on wider
+screens it sits before it), and `#ref-note` says it again right above the Buy now bar. `#ref-note`
+and `#form-msg` live in one row, `#order-msgs`, between the reminder tick and the pay bar; the
+script gives `.order-details` the class `has-msg` while either shows so the grid makes room. The
+fee on the page stays $5, because only the server knows at checkout whether the order is a first
+one. A code that no longer exists shows nothing at all.
 
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
