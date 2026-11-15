@@ -648,6 +648,17 @@ form?.addEventListener("change", (e) => {
   radio.dispatchEvent(new Event("change", { bubbles: true }));
 })();
 
+// The bulk page's "Order weekly" button links to /?b=box&repeat=1#order: 1 picks Weekly and
+// 2 picks Fortnightly on the "how often" switch.
+(function preselectRepeat() {
+  const n = new URLSearchParams(location.search).get("repeat");
+  if (n !== "1" && n !== "2") return;
+  const radio = oftenPicker?.querySelector(`input[name="repeat"][value="${n}"]`);
+  if (!radio) return;
+  radio.checked = true;
+  radio.dispatchEvent(new Event("change", { bubbles: true }));
+})();
+
 const fulfillmentSeg = document.getElementById("fulfillment-seg");
 if (fulfillmentSeg) fulfillmentSeg.addEventListener("change", syncFulfillmentUI);
 

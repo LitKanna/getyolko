@@ -522,10 +522,6 @@ section {
   min-width: 0;
 }
 
-.hero .crumbs {
-  margin-bottom: clamp(1rem, 2.4 * var(--vvh), 1.5rem);
-}
-
 .hero .hero-sub {
   margin-top: clamp(1rem, 2.6 * var(--vvh), 1.5rem);
 }
@@ -683,34 +679,6 @@ section {
 
 .showcase-price {
   display: none !important;
-}
-
-/* Breadcrumbs (generated pages) */
-.crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.crumbs a {
-  text-decoration: none;
-}
-
-.crumbs a:hover {
-  color: var(--ink);
-  text-decoration: underline;
-}
-
-.crumbs [aria-current="page"] {
-  color: var(--ink);
-}
-
-.crumbs-sep {
-  color: var(--line-strong);
 }
 
 /* ---------- Section heads ---------- */
@@ -3496,7 +3464,6 @@ body:has(> main > .notfound) > main {
     min-width: 0;
   }
 
-  .crumbs { order: 0; }
   .hero h1 { order: 2; max-width: 12ch; }
   .hero-sub { order: 3; }
   .hero-cta { order: 4; }
