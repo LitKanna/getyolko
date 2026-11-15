@@ -437,6 +437,13 @@ can"). The weekly order is said once on each screen it fits, in few words, and n
 Not touched on purpose: the black bar, the yellow band at the foot of a page, the phone order
 bar and the paid sheet (each already has one job).
 
+In emails: a "Make it weekly" block (`emailWeeklyOffer`, the look of "Free delivery for a
+neighbour") on the order email of a one-off order and on the Thursday reminder. Only people who
+buy one order at a time get it: never a repeat order's own email, and never someone who already
+has a repeat order (`repeatOrderPeople`). The order email's link is `/?repeat=1#order`; the
+reminder's is its own reorder link with `repeat=1`, so the form opens filled in with Weekly
+picked and the line above the button says "tap Subscribe".
+
 People with a repeat order that is not cancelled (active or paused) are left out of the ordinary
 Thursday "order again" reminder (`repeatOrderPeople`); it comes back after a cancel if they had
 opted in.
