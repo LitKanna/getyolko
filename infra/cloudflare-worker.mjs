@@ -1,4 +1,4 @@
-import { checkDeliveryAddress, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
+import { checkDeliveryAddress, quoteDelivery, SUBURBS, SITE_DELIVERY_FEE, MAX_DELIVERY_KM } from "./delivery-zones.mjs";
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped, getLatest as latestShopPrices, lastPriceChange } from "./price-watch.mjs";
 import { fillPricesPage, sitemapWithPriceChange, PRICES_PATH } from "./prices-page.mjs";
 import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
@@ -19,6 +19,14 @@ import {
   callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
   wordsFromWebhook, wordsEmail,
   ringBack,
+  validAgentId,
+  agentConnect,
+  agentBroke,
+  hangUp,
+  agentFacts,
+  nearSuburbs,
+  suburbAnswer,
+  agentNoteEmail,
   ringBackThanks, recordingUrlOk, testRole, testShop, testShopAccept,
 } from "./phone-line.mjs";
 
@@ -2320,6 +2328,57 @@ async function lineVoice(request, env, url, ctx, config, key) {
     return texml(screenAccept(field("Digits")));
   }
 
+  // ----- The voice agent's own questions (asked by the assistant at the phone provider, not by a call) -----
+  // A call from the line's own number is a test: its notes and facts are kept in the test log and nothing is emailed.
+  if (step === "vars") {
+    const p = (fields?.data && fields.data.payload) || {};
+    const clock = sydneyClock();
+    const settings = await getSettings(env).catch(() => ({}));
+    const facts = agentFacts({
+      now: new Date(),
+      saturdayIso: deliverySaturday().iso,
+      todayIso: `${clock.year}-${String(clock.month).padStart(2, "0")}-${String(clock.day).padStart(2, "0")}`,
+      hour: clock.hour,
+      inStock: Number(settings?.traysAvailable) > 0,
+      canForward: validForwardTo(config.forwardTo),
+    });
+    if (number(p.telnyx_end_user_target) === LINE_NUMBER) ctx.waitUntil(lineTestLog(env, "vars", { ...facts }).catch(() => null));
+    return json({ dynamic_variables: facts });
+  }
+  if (step === "suburb") {
+    const asked = String(fields?.suburb || "").slice(0, 80);
+    const postcode = String(fields?.postcode || "").replace(/\D/g, "").slice(0, 4);
+    let quote = asked || postcode ? quoteDelivery({ suburb: asked, postcode }) : null;
+    if (!quote?.ok && asked) quote = quoteDelivery(asked);
+    const answer = suburbAnswer(asked || postcode, quote, quote?.ok ? [] : nearSuburbs(asked, SUBURBS.map((x) => x.name)));
+    if (number(fields?.caller) === LINE_NUMBER) ctx.waitUntil(lineTestLog(env, "suburb", { asked, postcode, ...answer }).catch(() => null));
+    return json(answer);
+  }
+  if (step === "note") {
+    const caller = number(fields?.caller);
+    const note = {
+      from: caller,
+      at: new Date(),
+      name: fields?.caller_name,
+      about: fields?.about,
+      summary: fields?.summary,
+      followUp: fields?.follow_up,
+      passed: fields?.passed_to_shop,
+    };
+    if (caller === LINE_NUMBER) {
+      ctx.waitUntil(lineTestLog(env, "note", { ...fields }).catch(() => null));
+      return json({ ok: true });
+    }
+    const call = id(fields?.call) || `${caller}-${new Date().toISOString().slice(0, 15)}`;
+    const seen = `line:noted:${call}`;
+    if (!(await env.DATA.get(seen).catch(() => null))) {
+      await env.DATA.put(seen, "1", { expirationTtl: 24 * 3600 }).catch(() => null);
+      ctx.waitUntil(lineLog(env, { kind: "call-note", from: caller, text: String(fields?.summary || "").slice(0, 300), todo: String(fields?.follow_up || "").slice(0, 200) }).catch(() => null));
+      ctx.waitUntil(emailLineNote(env, agentNoteEmail(note)).catch((err) => console.log("line agent note failed", String(err?.message || err))));
+    }
+    return json({ ok: true });
+  }
+
   // A ring back: the line has rung someone who called earlier (started through the Telnyx API), and they picked up.
   if (step === "back") {
     const to = number(q.get("f"));
@@ -2335,6 +2394,14 @@ async function lineVoice(request, env, url, ctx, config, key) {
   // Later steps carry the caller's number and the call's id in the address, in case Telnyx leaves them out.
   const from = number(q.get("f")) || number(field("From"));
   const sid = id(q.get("c")) || id(field("CallSid"));
+
+  // The assistant's part of the call is over. If it broke, the caller is not dropped: the line asks who they are and rings the shop.
+  if (step === "agentend") {
+    const reason = field("Reason").slice(0, 40);
+    if (!t) ctx.waitUntil(lineLog(env, { kind: "agent-end", from, reason }).catch(() => null));
+    if (agentBroke(reason) && !t && validForwardTo(config.forwardTo)) return texml(screenAsk(at("said", { f: from, c: sid }), at("words", { f: from, c: sid })));
+    return texml(hangUp());
+  }
 
   // The caller has said who they are (or said nothing): ring the shop.
   if (step === "said") {
@@ -2357,12 +2424,18 @@ async function lineVoice(request, env, url, ctx, config, key) {
 
   // A call just arrived.
   if (from === LINE_NUMBER) {
+    // An agent test: the first call from the line reaches the assistant under test, a later one a pretend shop owner.
+    if (role && test.mode === "agent") {
+      const pick = role === "caller" ? test.agent : test.owner;
+      return texml(validAgentId(pick) ? agentConnect(pick, at("agentend", { f: from, c: sid, t: "1" })) : sorryScreened());
+    }
     if (role === "caller") return texml(screenAsk(at("said", { f: from, c: sid, t: "1" }), at("words", { f: from, who: "screen", t: "1" })));
     if (role === "shop") return texml(testShop(test.mode, at("shop2", { t: "1" }), at("words", { who: "shop", t: "1" })));
     return texml(sorryScreened());
   }
   ctx.waitUntil(lineLog(env, { kind: "call", from }).catch(() => null));
   ctx.waitUntil(noteLineCall(env, { sid, from, forwardTo: config.forwardTo }).catch((err) => console.log("line call note failed", String(err?.message || err))));
+  if (validAgentId(config.agent)) return texml(agentConnect(config.agent, at("agentend", { f: from, c: sid })));
   if (config.screen === true && validForwardTo(config.forwardTo)) return texml(screenAsk(at("said", { f: from, c: sid }), at("words", { f: from, c: sid })));
   return texml(voiceAnswer(config, `${here}?after=1`));
 }
@@ -6537,7 +6610,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "266",
+      "X-Yolko-Build": "267",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
