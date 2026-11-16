@@ -32,6 +32,10 @@ import {
   agentBroke,
   hangUp,
   agentFacts,
+  stockWords,
+  agentMemory,
+  withoutNumber,
+  spokenSuburb,
   nearSuburbs,
   suburbAnswer,
   agentNoteEmail,
@@ -222,6 +226,33 @@ assert.equal(thursday.order_by, "tonight, before midnight");
 assert.equal(thursday.in_stock, "no");
 assert.equal(thursday.forward_ok, "no");
 assert.equal(agentFacts({ now: new Date(), saturdayIso: "2026-11-28", todayIso: "2026-11-20", hour: 10, inStock: true, canForward: false }).forward_ok, "no");
+// A test, and the shop phone ringing its own line, are not held to the hours. Stock is given in words the agent can say.
+assert.equal(agentFacts({ now: new Date(), saturdayIso: "2026-11-21", todayIso: "2026-11-16", hour: 21, trays: 60, canForward: true, anyHour: true }).forward_ok, "yes");
+assert.equal(agentFacts({ now: new Date(), saturdayIso: "2026-11-21", todayIso: "2026-11-16", hour: 21, trays: 60, canForward: false, anyHour: true }).forward_ok, "no");
+const stocked = agentFacts({ now: new Date(), saturdayIso: "2026-11-21", todayIso: "2026-11-16", hour: 10, trays: 60, canForward: true });
+assert.equal(stocked.in_stock, "yes");
+assert.equal(stocked.stock_note, "60 trays, which is 10 boxes");
+assert.equal(agentFacts({ now: new Date(), saturdayIso: "2026-11-21", todayIso: "2026-11-16", hour: 10, trays: 0, canForward: true }).in_stock, "no");
+assert.equal(stockWords(0), "none");
+assert.equal(stockWords(4), "4 trays");
+assert.equal(stockWords(1), "1 tray");
+assert.equal(stockWords(8), "8 trays, which is 1 box and 2 trays");
+assert.equal(stockWords(13), "13 trays, which is 2 boxes and 1 tray");
+
+// What the agent may remember: earlier calls labelled with the same caller. A hidden number has no label and no memory.
+const memory = agentMemory("61412345678");
+assert.equal(memory.conversation.metadata.yolko_caller, "61412345678");
+assert.equal(memory.memory.conversation_query, "metadata->yolko_caller=eq.61412345678&limit=3&order=last_message_at.desc");
+assert.doesNotMatch(agentMemory("+61 412&x=1").memory?.conversation_query || "", /[+ ]|x=1/);
+assert.deepEqual(agentMemory(""), {});
+assert.deepEqual(agentMemory("anon"), {});
+assert.equal(agentMemory("test-abc12").conversation.metadata.yolko_caller, "test-abc12");
+
+// A number is taken out of a note however it was written.
+assert.equal(withoutNumber("Call Sam back on 0412 345 678 today.", "+61412345678"), "Call Sam back on the shop phone today.");
+assert.equal(withoutNumber("Number is +61412345678.", "+61412345678"), "Number is the shop phone.");
+assert.equal(withoutNumber("Number is 0412-345-678 or 0499 111 222.", "+61412345678"), "Number is the shop phone or 0499 111 222.");
+assert.equal(withoutNumber("No number here.", ""), "No number here.");
 
 // Suburbs heard on a phone line: a close name is offered, never guessed.
 assert.deepEqual(nearSuburbs("Berwood", ["Burwood", "Ryde", "Eastwood", "Burwood Heights"]), ["Burwood"]);
@@ -231,6 +262,13 @@ assert.match(suburbAnswer("Burwood", { ok: true, deliver: true, name: "Burwood" 
 assert.equal(suburbAnswer("Penrith", { ok: true, deliver: false, name: "Penrith" }).deliver, "no");
 assert.match(suburbAnswer("Berwood", { ok: false }, ["Burwood"]).say, /Burwood/);
 assert.match(suburbAnswer("Xyz", { ok: false }).say, /spell the suburb or give the postcode/);
+// Another name for a listed suburb is said back the way the caller said it.
+const flemington = { name: "Flemington", aliases: ["homebush west", "sydney markets"] };
+assert.equal(spokenSuburb("homebush West", flemington), "Homebush West");
+assert.equal(spokenSuburb("Flemington", flemington), "");
+assert.equal(spokenSuburb("Burwood", flemington), "");
+assert.equal(spokenSuburb("Homebush West", null), "");
+assert.match(suburbAnswer("Homebush West", { ok: true, deliver: true, name: "Flemington" }, [], "Homebush West").say, /deliver to Homebush West/);
 
 // The agent's note about a call, as it lands in Admin > Emails.
 const agentNote = agentNoteEmail({ from: "+61412345678", at: new Date("2026-11-16T04:26:00Z"), name: "Sam", about: "wants to order", summary: "Asked the price of a box.\nWill order online.", followUp: "", passed: "" });
@@ -240,6 +278,10 @@ assert.match(agentNote.text, /What was said: Asked the price of a box\. Will ord
 assert.match(agentNote.text, /To do: nothing/);
 assert.match(agentNote.text, /Passed to the shop phone: not tried/);
 assert.equal(agentNoteEmail({ from: "", name: "" }).subject, "Call note: a private number");
+const ownNote = agentNoteEmail({ from: "", own: true, name: "Shelby", summary: "Asked for 24 boxes." });
+assert.equal(ownNote.subject, "Call note: Shelby, the shop phone");
+assert.match(ownNote.text, /came from the shop phone itself/);
+assert.doesNotMatch(ownNote.text, /To ring back/);
 
 // A test call: the first call from the line's own number is the caller, a later one the shop; no test, no part.
 const t0 = Date.UTC(2026, 10, 16, 4, 0, 0);

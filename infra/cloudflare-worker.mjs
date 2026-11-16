@@ -24,6 +24,9 @@ import {
   agentBroke,
   hangUp,
   agentFacts,
+  agentMemory,
+  withoutNumber,
+  spokenSuburb,
   nearSuburbs,
   suburbAnswer,
   agentNoteEmail,
@@ -2332,37 +2335,49 @@ async function lineVoice(request, env, url, ctx, config, key) {
   // A call from the line's own number is a test: its notes and facts are kept in the test log and nothing is emailed.
   if (step === "vars") {
     const p = (fields?.data && fields.data.payload) || {};
+    const caller = number(p.telnyx_end_user_target);
+    const trial = caller === LINE_NUMBER;
     const clock = sydneyClock();
     const settings = await getSettings(env).catch(() => ({}));
+    // The shop phone is rung 8am to 8pm. A test, and the shop phone ringing its own line (the owner trying it), are not held to the hours.
     const facts = agentFacts({
       now: new Date(),
       saturdayIso: deliverySaturday().iso,
       todayIso: `${clock.year}-${String(clock.month).padStart(2, "0")}-${String(clock.day).padStart(2, "0")}`,
       hour: clock.hour,
-      inStock: Number(settings?.traysAvailable) > 0,
+      trays: Number(settings?.traysAvailable) || 0,
       canForward: validForwardTo(config.forwardTo),
+      anyHour: trial || (validForwardTo(config.forwardTo) && caller === config.forwardTo),
     });
-    if (number(p.telnyx_end_user_target) === LINE_NUMBER) ctx.waitUntil(lineTestLog(env, "vars", { ...facts }).catch(() => null));
-    return json({ dynamic_variables: facts });
+    // What it may remember: earlier calls from the same number. A test only remembers the tests that share its `memory` word.
+    const trialWord = trial ? id(((await env.DATA.get("line:test", "json").catch(() => null)) || {}).memory).slice(0, 24) : "";
+    const remember = agentMemory(trial ? (trialWord ? `test-${trialWord}` : "") : caller.replace(/\D/g, ""));
+    if (trial) ctx.waitUntil(lineTestLog(env, "vars", { ...facts, memory: remember.memory ? "on" : "off" }).catch(() => null));
+    return json({ dynamic_variables: facts, ...remember });
   }
   if (step === "suburb") {
     const asked = String(fields?.suburb || "").slice(0, 80);
     const postcode = String(fields?.postcode || "").replace(/\D/g, "").slice(0, 4);
     let quote = asked || postcode ? quoteDelivery({ suburb: asked, postcode }) : null;
     if (!quote?.ok && asked) quote = quoteDelivery(asked);
-    const answer = suburbAnswer(asked || postcode, quote, quote?.ok ? [] : nearSuburbs(asked, SUBURBS.map((x) => x.name)));
+    const spoken = quote?.ok ? spokenSuburb(asked, SUBURBS.find((x) => x.name === quote.name)) : "";
+    const answer = suburbAnswer(asked || postcode, quote, quote?.ok ? [] : nearSuburbs(asked, SUBURBS.map((x) => x.name)), spoken);
     if (number(fields?.caller) === LINE_NUMBER) ctx.waitUntil(lineTestLog(env, "suburb", { asked, postcode, ...answer }).catch(() => null));
     return json(answer);
   }
   if (step === "note") {
     const caller = number(fields?.caller);
+    // The shop phone ringing its own line is the owner trying it: its number stays out of the note.
+    const own = validForwardTo(config.forwardTo) && caller === config.forwardTo;
+    const plain = (v) => (own ? withoutNumber(v, caller) : String(v ?? ""));
     const note = {
-      from: caller,
+      from: own ? "" : caller,
+      own,
       at: new Date(),
       name: fields?.caller_name,
       about: fields?.about,
-      summary: fields?.summary,
-      followUp: fields?.follow_up,
+      summary: plain(fields?.summary),
+      followUp: plain(fields?.follow_up),
       passed: fields?.passed_to_shop,
     };
     if (caller === LINE_NUMBER) {
@@ -2373,7 +2388,7 @@ async function lineVoice(request, env, url, ctx, config, key) {
     const seen = `line:noted:${call}`;
     if (!(await env.DATA.get(seen).catch(() => null))) {
       await env.DATA.put(seen, "1", { expirationTtl: 24 * 3600 }).catch(() => null);
-      ctx.waitUntil(lineLog(env, { kind: "call-note", from: caller, text: String(fields?.summary || "").slice(0, 300), todo: String(fields?.follow_up || "").slice(0, 200) }).catch(() => null));
+      ctx.waitUntil(lineLog(env, { kind: "call-note", from: caller, text: note.summary.slice(0, 300), todo: note.followUp.slice(0, 200) }).catch(() => null));
       ctx.waitUntil(emailLineNote(env, agentNoteEmail(note)).catch((err) => console.log("line agent note failed", String(err?.message || err))));
     }
     return json({ ok: true });
@@ -6610,7 +6625,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "267",
+      "X-Yolko-Build": "268",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

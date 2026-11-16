@@ -219,17 +219,54 @@ const longDay = (d) => `${LONG_DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${LONG_MON
  * new order goes to (the Worker's own rule), `todayIso` Sydney's date, `hour` Sydney's hour.
  * The shop phone is only rung between 8am and 8pm.
  */
-export function agentFacts({ now, saturdayIso, todayIso, hour, inStock, canForward }) {
+export function agentFacts({ now, saturdayIso, todayIso, hour, inStock, trays, canForward, anyHour = false }) {
   const saturday = new Date(`${saturdayIso}T00:00:00Z`);
   const thursday = new Date(saturday.getTime() - 2 * 86400000);
   const lastDayToday = thursday.toISOString().slice(0, 10) === todayIso;
+  const stocked = trays == null ? Boolean(inStock) : Math.floor(Number(trays) || 0) > 0;
   return {
     sydney_now: sydneyWhen(now),
     next_delivery: longDay(saturday),
     order_by: lastDayToday ? "tonight, before midnight" : `${longDay(thursday)}, before midnight`,
-    in_stock: inStock ? "yes" : "no",
-    forward_ok: canForward && hour >= 8 && hour < 20 ? "yes" : "no",
+    in_stock: stocked ? "yes" : "no",
+    stock_note: trays == null ? (stocked ? "not counted" : "none") : stockWords(trays),
+    forward_ok: canForward && (anyHour || (hour >= 8 && hour < 20)) ? "yes" : "no",
   };
+}
+
+/** What is left for the coming delivery, in words the assistant can say: "60 trays, which is 10 boxes". */
+export function stockWords(trays) {
+  const n = Math.max(0, Math.floor(Number(trays) || 0));
+  if (!n) return "none";
+  const boxes = Math.floor(n / 6);
+  const rest = n % 6;
+  const t = (k) => `${k} ${k === 1 ? "tray" : "trays"}`;
+  const b = (k) => `${k} ${k === 1 ? "box" : "boxes"}`;
+  if (!boxes) return t(n);
+  return `${t(n)}, which is ${b(boxes)}${rest ? ` and ${t(rest)}` : ""}`;
+}
+
+/**
+ * Which earlier conversations the assistant may remember on this call: its last few with the
+ * same caller, so that someone ringing back is not asked everything again. Each conversation is
+ * labelled with the caller's number as plain digits (`yolko_caller`), and the phone provider is
+ * asked for the ones carrying the same label. A hidden number gets no label and no memory.
+ */
+export function agentMemory(callerKey) {
+  const key = String(callerKey || "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 40);
+  if (key.length < 8) return {};
+  return {
+    memory: { conversation_query: `metadata->yolko_caller=eq.${key}&limit=3&order=last_message_at.desc` },
+    conversation: { metadata: { yolko_caller: key } },
+  };
+}
+
+/** One phone number taken out of free text, however it was spaced or written (+61.., 04..). */
+export function withoutNumber(text, number, instead = "the shop phone") {
+  const digits = String(number || "").replace(/\D/g, "");
+  if (digits.length < 9) return String(text ?? "");
+  const tail = digits.slice(-9).split("").join("[\\s.-]*");
+  return String(text ?? "").replace(new RegExp(`(?:\\+?61|0)?[\\s.-]*${tail}`, "g"), instead);
 }
 
 const plainName = (v) => String(v || "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
@@ -267,11 +304,22 @@ export function nearSuburbs(heard, names) {
  * The answer to "do you deliver to ...?", for the assistant to say. `quote` is what the site's
  * own delivery check says about the suburb; `near` are close names when it knew none.
  */
-export function suburbAnswer(asked, quote, near = []) {
-  if (quote?.ok && quote.deliver) return { deliver: "yes", suburb: quote.name, say: `Yes, we deliver to ${quote.name} on Saturday mornings. Delivery is $5.` };
-  if (quote?.ok) return { deliver: "no", suburb: quote.name, say: `Sorry, ${quote.name} is outside the delivery area for now.` };
+export function suburbAnswer(asked, quote, near = [], spoken = "") {
+  const place = spoken || quote?.name;
+  if (quote?.ok && quote.deliver) return { deliver: "yes", suburb: place, say: `Yes, we deliver to ${place} on Saturday mornings. Delivery is $5.` };
+  if (quote?.ok) return { deliver: "no", suburb: place, say: `Sorry, ${place} is outside the delivery area for now.` };
   if (near.length) return { deliver: "unknown", suburb: "", near, say: `That name was not found. Ask the caller if they mean ${near.join(" or ")}, then check again with the right name.` };
   return { deliver: "unknown", suburb: "", say: `"${String(asked || "").slice(0, 60)}" was not found. Ask the caller to spell the suburb or give the postcode, then check again.` };
+}
+
+/**
+ * The name to say back when the caller used another name for a suburb on the list ("Homebush
+ * West" is kept under Flemington): their own words, tidied. Empty when they said the listed name.
+ */
+export function spokenSuburb(asked, entry) {
+  const said = plainName(asked);
+  if (!said || !entry || !(entry.aliases || []).map(plainName).includes(said)) return "";
+  return said.replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
 const noteLine = (v, max = 600) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -279,8 +327,8 @@ const noteLine = (v, max = 600) => String(v ?? "").replace(/\s+/g, " ").trim().s
 /** The assistant's note about one call, for Admin > Emails. */
 export function agentNoteEmail(note) {
   const number = String(note?.from || "").replace(/[^\d+]/g, "");
-  const known = number.replace(/\D/g, "").length >= 6;
-  const who = known ? prettyAuNumber(number) : "a private number";
+  const known = !note?.own && number.replace(/\D/g, "").length >= 6;
+  const who = note?.own ? "the shop phone" : known ? prettyAuNumber(number) : "a private number";
   const name = noteLine(note?.name, 80);
   const rows = [
     `The voice agent took a call from ${who} at ${sydneyWhen(note?.at)}.`,
@@ -291,7 +339,7 @@ export function agentNoteEmail(note) {
     `To do: ${noteLine(note?.followUp, 400) || "nothing"}`,
     `Passed to the shop phone: ${noteLine(note?.passed, 40) || "not tried"}`,
     "",
-    known ? `To ring back, call ${who}. A reply to this email does not reach them.` : "The caller hid their number, so there is no number to ring back.",
+    note?.own ? "This call came from the shop phone itself." : known ? `To ring back, call ${who}. A reply to this email does not reach them.` : "The caller hid their number, so there is no number to ring back.",
   ];
   return { subject: `Call note: ${name ? `${name}, ` : ""}${who}`, text: rows.join("\n") };
 }

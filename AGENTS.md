@@ -523,6 +523,14 @@ What happens to a call, first match wins:
    8am to 8pm only), for suburb checks (`step=suburb`, the same check as checkout) and files a
    note after each call (`step=note`, an email "Call note: ..." in Admin > Emails, once per call).
    `step=agentend` runs when its part of a call is over: if it broke, the caller falls to step 2.
+   `step=vars` also says how much stock is left in words, and labels the conversation with the
+   caller's number (`yolko_caller`, digits only) so the assistant remembers its last three calls
+   from the same number (Kanna rang back and it had forgotten the first call). When the assistant
+   rings the shop phone it asks the owner privately: the owner can take the call, or give an
+   answer that the assistant passes on to the caller (Kanna, 16 Nov 2026: "the owner said we can
+   take the order ... the assistant should've ... talk back to customer to confirm that order").
+   The shop phone ringing its own line is the owner trying it: the 8am to 8pm rule does not
+   apply and its number is kept out of the note.
 2. `screen: true`: the caller is asked their name and reason (recorded and written down), the
    shop phone rings showing the shop number, the owner hears the caller's number and recording
    and presses 1 to take the call. Otherwise the caller hears a short message.
