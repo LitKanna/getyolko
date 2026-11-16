@@ -507,6 +507,40 @@ its missing amount) whether the key may do both. Run it once after a deploy that
 clock: first order, notice, skip, charge, decline, card update, Stripe outage, pause, change,
 cancel and the admin routes. Never test this against the real Stripe account.
 
+### The shop phone line and its voice agent (Nov 2026)
+The shop's own number is 0480 093 935 (Telnyx). `infra/phone-line.mjs` builds everything the
+line says; the Worker serves it on `/api/line/voice/<key>` (calls) and `/api/line/sms/<key>`
+(texts). The key and the shop phone a call is forwarded to live only in KV `line:config`
+(`{ key, forwardTo, screen, agent }`): never write either in the repo, a log or a message.
+`npm run test:phone-line` checks every builder and fails if the owner's personal mobile
+appears in any page or Worker file.
+
+What happens to a call, first match wins:
+1. `agent` holds an assistant id: the call is connected to the voice agent, a talking assistant
+   kept at Telnyx (Kanna, 16 Nov 2026: answer every call, ring the shop phone only when a person
+   is needed). The assistant asks the Worker for the day's facts (`step=vars`: Sydney time, the
+   Saturday a new order goes to, the order deadline, stock, whether the shop phone may be rung,
+   8am to 8pm only), for suburb checks (`step=suburb`, the same check as checkout) and files a
+   note after each call (`step=note`, an email "Call note: ..." in Admin > Emails, once per call).
+   `step=agentend` runs when its part of a call is over: if it broke, the caller falls to step 2.
+2. `screen: true`: the caller is asked their name and reason (recorded and written down), the
+   shop phone rings showing the shop number, the owner hears the caller's number and recording
+   and presses 1 to take the call. Otherwise the caller hears a short message.
+3. A plain forward to the shop phone.
+
+Also: `step=back` and `step=thanks` are a ring back (a call started through Telnyx's API where a
+recorded voice asks what the person had called about; the words land in Admin > Emails as
+"Rang back ..."). Every call and text is kept in KV `line:log` (last 100) and emailed to
+orders@getyolko.com through the Zoho mailbox.
+
+Tests never ring the shop phone: the line rings itself from its own number while KV `line:test`
+(`{ at, until, mode }`, at most five minutes) says a test is on, and notes from such calls stay
+in `line:testlog:*`. The assistant's wording, its set-up script and the test scripts are not in
+this repo (they hold no secrets, but need the phone provider's API): they are in the project
+files under `phone-line/voice-agent/`.
+
+A change to `infra/phone-line.mjs` alone does not deploy: bump `X-Yolko-Build` in the Worker.
+
 ### Competitor egg prices (Admin > Competitors, Nov 2026)
 No Australian supermarket has a price API. `infra/price-watch.mjs` reads public pages that the
 shops' robots.txt allows, with an honest `YolkoPriceCheck` user agent: Coles
