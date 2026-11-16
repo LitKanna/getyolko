@@ -151,7 +151,8 @@ export function wordsFromWebhook(fields) {
     }
     return "";
   };
-  return look(fields, 0).slice(0, 1000);
+  // Telnyx labels each channel of a recording ("Channel 0: ..."); the words alone are wanted.
+  return look(fields, 0).replace(/\bChannel \d+:\s*/g, "").trim().slice(0, 1000);
 }
 
 /** The second note a screened call leaves: what the caller said, written down. */
@@ -161,11 +162,34 @@ export function wordsEmail(call) {
   const who = known ? prettyAuNumber(number) : "a private number";
   const words = String(call?.text || "").trim();
   const last = known ? `To ring back, call ${who}. A reply to this email does not reach them.` : "The caller hid their number, so there is no number to ring back.";
+  const machine = "The words were written down by a machine, so a name can come out wrong.";
+  if (call?.back) {
+    return {
+      subject: `Rang back ${who}`,
+      text: `The YOLKO line rang ${who} back and asked what they had called about. They said:\n\n"${words}"\n\n${machine} ${last}`,
+    };
+  }
   return {
     subject: `Call from ${who}`,
-    text: `When the YOLKO line asked who was calling, ${known ? who : "the caller"} said:\n\n"${words}"\n\nThe words were written down by a machine, so a name can come out wrong. ${last}`,
+    text: `When the YOLKO line asked who was calling, ${known ? who : "the caller"} said:\n\n"${words}"\n\n${machine} ${last}`,
   };
 }
+
+/* ---------- Ringing someone back ----------
+ * The line rings a caller the shop did not get to speak to. A recorded voice says who it is
+ * and that the call is automated, then records what they had called about. The written words
+ * land in Admin > Emails. Nothing here rings the shop phone.
+ */
+export const BACK =
+  "Hello, this is an automated call back from YOLKO, the egg delivery service. You rang us earlier today and we did not get to speak. After the tone, please say what you were calling about. Your message goes to the shop, and we will get back to you.";
+
+/** What the person hears on picking up a ring back. `thanksUrl` is asked when they stop talking. */
+export function ringBack(thanksUrl, wordsUrl) {
+  return `${HEAD}<Response><Pause length="1"/>${say(BACK)}<Record action="${xml(thanksUrl)}" method="POST" maxLength="45" timeout="4" finishOnKey="#" playBeep="true" channels="single" ${TRANSCRIBE} transcriptionCallback="${xml(wordsUrl)}"/><Redirect method="POST">${xml(thanksUrl)}</Redirect></Response>`;
+}
+
+/** The end of a ring back. */
+export const ringBackThanks = () => `${HEAD}<Response>${say("Thank you. We will be in touch. Goodbye.")}<Hangup/></Response>`;
 
 /* ---------- A full test call that never rings the shop phone ----------
  * The line rings itself (through the Telnyx API) while `line:test` in KV says a test is on:

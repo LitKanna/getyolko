@@ -24,6 +24,9 @@ import {
   screenAfter,
   wordsFromWebhook,
   wordsEmail,
+  BACK,
+  ringBack,
+  ringBackThanks,
   testRole,
   testShop,
   testShopAccept,
@@ -167,6 +170,23 @@ assert.equal(wordsNote.subject, "Call from 0412 345 678");
 assert.match(wordsNote.text, /0412 345 678 said:\n\n"Sam from the cafe, a box please\."/);
 assert.match(wordsNote.text, /To ring back, call 0412 345 678\./);
 assert.match(wordsEmail({ from: "", text: "Hello" }).text, /the caller said:/);
+
+// Telnyx labels each channel of a recording: only the words are kept.
+assert.equal(wordsFromWebhook({ TranscriptionText: "Channel 0: Hi. This is Sam from the corner cafe." }), "Hi. This is Sam from the corner cafe.");
+
+// A ring back says who is calling and that it is automated, records the answer, and never dials anyone.
+const backCall = ringBack("https://getyolko.com/api/line/voice/k?step=thanks&b=1", "https://getyolko.com/api/line/voice/k?step=words&f=%2B61412345678&b=1");
+assert.match(BACK, /automated call back from YOLKO/);
+assert.match(BACK, /Your message goes to the shop/);
+assert.match(backCall, /<Record action="https:\/\/getyolko\.com\/api\/line\/voice\/k\?step=thanks&amp;b=1"/);
+assert.match(backCall, /transcriptionCallback="[^"]*step=words[^"]*b=1"/);
+assert.match(backCall, /maxLength="45"/);
+assert.doesNotMatch(backCall, /<Dial|<Number/);
+assert.match(ringBackThanks(), /We will be in touch\. Goodbye\.<\/Say><Hangup\/>/);
+const backNote = wordsEmail({ from: "+61412345678", text: "I wanted two trays.", back: true });
+assert.equal(backNote.subject, "Rang back 0412 345 678");
+assert.match(backNote.text, /rang 0412 345 678 back and asked what they had called about/);
+assert.match(backNote.text, /"I wanted two trays\."/);
 
 // A test call: the first call from the line's own number is the caller, a later one the shop; no test, no part.
 const t0 = Date.UTC(2026, 10, 16, 4, 0, 0);
