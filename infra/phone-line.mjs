@@ -191,6 +191,111 @@ export function ringBack(thanksUrl, wordsUrl) {
 /** The end of a ring back. */
 export const ringBackThanks = () => `${HEAD}<Response>${say("Thank you. We will be in touch. Goodbye.")}<Hangup/></Response>`;
 
+
+/* ---------- The voice agent ----------
+ * A talking assistant, kept at the phone provider, answers the line and only rings the shop
+ * for calls that need a person. The Worker connects each call to it, gives it the day's facts,
+ * checks suburbs for it and files its call notes in Admin > Emails. `line:config.agent` holds
+ * the assistant's id; without one the line screens or forwards calls as before.
+ */
+export const validAgentId = (v) => /^assistant-[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(String(v || ""));
+
+/** Hand the call to the assistant. `endUrl` is asked when its part of the call is over. */
+export function agentConnect(assistantId, endUrl) {
+  return `${HEAD}<Response><Connect action="${xml(endUrl)}" method="POST"><AIAssistant id="${xml(assistantId)}"></AIAssistant></Connect></Response>`;
+}
+
+/** The assistant ended because something broke (not because the call was finished). */
+export const agentBroke = (reason) => /error|fail/i.test(String(reason || ""));
+
+export const hangUp = () => `${HEAD}<Response><Hangup/></Response>`;
+
+const LONG_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const longDay = (d) => `${LONG_DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${LONG_MONTHS[d.getUTCMonth()]}`;
+
+/**
+ * The day's facts for the assistant, as its dynamic variables. `saturdayIso` is the Saturday a
+ * new order goes to (the Worker's own rule), `todayIso` Sydney's date, `hour` Sydney's hour.
+ * The shop phone is only rung between 8am and 8pm.
+ */
+export function agentFacts({ now, saturdayIso, todayIso, hour, inStock, canForward }) {
+  const saturday = new Date(`${saturdayIso}T00:00:00Z`);
+  const thursday = new Date(saturday.getTime() - 2 * 86400000);
+  const lastDayToday = thursday.toISOString().slice(0, 10) === todayIso;
+  return {
+    sydney_now: sydneyWhen(now),
+    next_delivery: longDay(saturday),
+    order_by: lastDayToday ? "tonight, before midnight" : `${longDay(thursday)}, before midnight`,
+    in_stock: inStock ? "yes" : "no",
+    forward_ok: canForward && hour >= 8 && hour < 20 ? "yes" : "no",
+  };
+}
+
+const plainName = (v) => String(v || "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+
+function editDistance(a, b) {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const keep = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = keep;
+    }
+  }
+  return row[b.length];
+}
+
+/** Suburb names that sound close to what was heard on the phone ("Berwood" for Burwood). */
+export function nearSuburbs(heard, names) {
+  const want = plainName(heard);
+  if (want.length < 4) return [];
+  const limit = want.length >= 8 ? 2 : 1;
+  const found = [];
+  for (const name of names) {
+    const have = plainName(name);
+    if (Math.abs(have.length - want.length) > limit) continue;
+    const far = editDistance(want, have);
+    if (far > 0 && far <= limit) found.push({ name, far });
+  }
+  return [...new Set(found.sort((a, b) => a.far - b.far).map((x) => x.name))].slice(0, 3);
+}
+
+/**
+ * The answer to "do you deliver to ...?", for the assistant to say. `quote` is what the site's
+ * own delivery check says about the suburb; `near` are close names when it knew none.
+ */
+export function suburbAnswer(asked, quote, near = []) {
+  if (quote?.ok && quote.deliver) return { deliver: "yes", suburb: quote.name, say: `Yes, we deliver to ${quote.name} on Saturday mornings. Delivery is $5.` };
+  if (quote?.ok) return { deliver: "no", suburb: quote.name, say: `Sorry, ${quote.name} is outside the delivery area for now.` };
+  if (near.length) return { deliver: "unknown", suburb: "", near, say: `That name was not found. Ask the caller if they mean ${near.join(" or ")}, then check again with the right name.` };
+  return { deliver: "unknown", suburb: "", say: `"${String(asked || "").slice(0, 60)}" was not found. Ask the caller to spell the suburb or give the postcode, then check again.` };
+}
+
+const noteLine = (v, max = 600) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+
+/** The assistant's note about one call, for Admin > Emails. */
+export function agentNoteEmail(note) {
+  const number = String(note?.from || "").replace(/[^\d+]/g, "");
+  const known = number.replace(/\D/g, "").length >= 6;
+  const who = known ? prettyAuNumber(number) : "a private number";
+  const name = noteLine(note?.name, 80);
+  const rows = [
+    `The voice agent took a call from ${who} at ${sydneyWhen(note?.at)}.`,
+    "",
+    `Name: ${name || "not given"}`,
+    `About: ${noteLine(note?.about, 80) || "not said"}`,
+    `What was said: ${noteLine(note?.summary, 1200) || "nothing"}`,
+    `To do: ${noteLine(note?.followUp, 400) || "nothing"}`,
+    `Passed to the shop phone: ${noteLine(note?.passed, 40) || "not tried"}`,
+    "",
+    known ? `To ring back, call ${who}. A reply to this email does not reach them.` : "The caller hid their number, so there is no number to ring back.",
+  ];
+  return { subject: `Call note: ${name ? `${name}, ` : ""}${who}`, text: rows.join("\n") };
+}
+
 /* ---------- A full test call that never rings the shop phone ----------
  * The line rings itself (through the Telnyx API) while `line:test` in KV says a test is on:
  * { at, until, mode }. The first call from the line's own number plays the caller, a later one

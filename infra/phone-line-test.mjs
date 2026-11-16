@@ -27,6 +27,14 @@ import {
   BACK,
   ringBack,
   ringBackThanks,
+  validAgentId,
+  agentConnect,
+  agentBroke,
+  hangUp,
+  agentFacts,
+  nearSuburbs,
+  suburbAnswer,
+  agentNoteEmail,
   testRole,
   testShop,
   testShopAccept,
@@ -187,6 +195,51 @@ const backNote = wordsEmail({ from: "+61412345678", text: "I wanted two trays.",
 assert.equal(backNote.subject, "Rang back 0412 345 678");
 assert.match(backNote.text, /rang 0412 345 678 back and asked what they had called about/);
 assert.match(backNote.text, /"I wanted two trays\."/);
+
+// The voice agent: the call is handed to the assistant, and the Worker is asked again when it is done.
+const AGENT = "assistant-12345678-90ab-cdef-1234-567890abcdef";
+assert.equal(validAgentId(AGENT), true);
+assert.equal(validAgentId("assistant-123"), false);
+assert.equal(validAgentId(""), false);
+const connected = agentConnect(AGENT, "https://getyolko.com/api/line/voice/k?step=agentend&f=%2B61412345678");
+assert.match(connected, /<Connect action="https:\/\/getyolko\.com\/api\/line\/voice\/k\?step=agentend&amp;f=%2B61412345678" method="POST"><AIAssistant id="assistant-12345678-90ab-cdef-1234-567890abcdef">/);
+assert.doesNotMatch(connected, /<Dial|<Number/);
+assert.equal(agentBroke("service_error"), true);
+assert.equal(agentBroke("stt_error"), true);
+assert.equal(agentBroke("hangup"), false);
+assert.equal(agentBroke(""), false);
+assert.match(hangUp(), /<Response><Hangup\/><\/Response>/);
+
+// The day's facts: a Monday order goes to that Saturday and closes on the Thursday; the shop phone is only rung 8am to 8pm.
+const monday = agentFacts({ now: new Date("2026-11-16T04:00:00Z"), saturdayIso: "2026-11-21", todayIso: "2026-11-16", hour: 15, inStock: true, canForward: true });
+assert.equal(monday.next_delivery, "Saturday 21 November");
+assert.equal(monday.order_by, "Thursday 19 November, before midnight");
+assert.equal(monday.in_stock, "yes");
+assert.equal(monday.forward_ok, "yes");
+assert.match(monday.sydney_now, /Monday 16 November/);
+const thursday = agentFacts({ now: new Date("2026-11-19T09:00:00Z"), saturdayIso: "2026-11-21", todayIso: "2026-11-19", hour: 20, inStock: false, canForward: true });
+assert.equal(thursday.order_by, "tonight, before midnight");
+assert.equal(thursday.in_stock, "no");
+assert.equal(thursday.forward_ok, "no");
+assert.equal(agentFacts({ now: new Date(), saturdayIso: "2026-11-28", todayIso: "2026-11-20", hour: 10, inStock: true, canForward: false }).forward_ok, "no");
+
+// Suburbs heard on a phone line: a close name is offered, never guessed.
+assert.deepEqual(nearSuburbs("Berwood", ["Burwood", "Ryde", "Eastwood", "Burwood Heights"]), ["Burwood"]);
+assert.deepEqual(nearSuburbs("Ryd", ["Ryde"]), []);
+assert.equal(suburbAnswer("Burwood", { ok: true, deliver: true, name: "Burwood" }).deliver, "yes");
+assert.match(suburbAnswer("Burwood", { ok: true, deliver: true, name: "Burwood" }).say, /\$5/);
+assert.equal(suburbAnswer("Penrith", { ok: true, deliver: false, name: "Penrith" }).deliver, "no");
+assert.match(suburbAnswer("Berwood", { ok: false }, ["Burwood"]).say, /Burwood/);
+assert.match(suburbAnswer("Xyz", { ok: false }).say, /spell the suburb or give the postcode/);
+
+// The agent's note about a call, as it lands in Admin > Emails.
+const agentNote = agentNoteEmail({ from: "+61412345678", at: new Date("2026-11-16T04:26:00Z"), name: "Sam", about: "wants to order", summary: "Asked the price of a box.\nWill order online.", followUp: "", passed: "" });
+assert.equal(agentNote.subject, "Call note: Sam, 0412 345 678");
+assert.match(agentNote.text, /took a call from 0412 345 678 at 3:26pm on Monday 16 November/);
+assert.match(agentNote.text, /What was said: Asked the price of a box\. Will order online\./);
+assert.match(agentNote.text, /To do: nothing/);
+assert.match(agentNote.text, /Passed to the shop phone: not tried/);
+assert.equal(agentNoteEmail({ from: "", name: "" }).subject, "Call note: a private number");
 
 // A test call: the first call from the line's own number is the caller, a later one the shop; no test, no part.
 const t0 = Date.UTC(2026, 10, 16, 4, 0, 0);
