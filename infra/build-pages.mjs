@@ -382,6 +382,18 @@ function jsonLd(graph, indent = "  ") {
 /* ---------- Shared markup ---------- */
 
 const HERO_SIZES = "(max-width: 900px) calc(100vw - 40px), (min-width: 1600px) 35vw, 560px";
+
+// Hero photographs, one per kind of page, in place of the chalk photo (the homepage and the
+// egg prices page keep the photo). The files come from infra/build-page-pictures.py; bump PIC_V
+// when one changes. Share previews and structured data still use the chalk photo.
+const PIC_V = "1";
+const PICTURES = {
+  delivery: "Brown eggs in a paper tray, seen up close in soft daylight",
+  suburbs: "Sydney suburbs seen from above at dusk",
+  bulk: "A café table seen from above with two omelettes, bread and coffee",
+};
+const pictureSrcset = (name, ext) =>
+  [640, 928, 1536].map((w) => `assets/pictures/${name}-${w}.${ext}?v=${PIC_V} ${w}w`).join(", ");
 const heroSrcset = (ext) =>
   [640, 928, 1536].map((w) => `assets/chalk-tray/${PRICE.tray1}-${w}.${ext}?v=${IMG_V} ${w}w`).join(", ");
 const perEgg = (price, eggs) => Math.round((price / eggs) * 100);
@@ -442,7 +454,8 @@ function head({ path, title, description, graph, index = true, hero = true }) {
 ${index ? `\n  <link rel="canonical" href="${url}">` : ""}
   <link rel="sitemap" type="application/xml" href="/sitemap.xml">
 ${iconLinks(a).map((l) => `  ${l}`).join("\n")}
-  <link rel="preload" as="font" type="font/woff2" href="${a("assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2")}" crossorigin>${hero ? `
+  <link rel="preload" as="font" type="font/woff2" href="${a("assets/fonts/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yw.woff2")}" crossorigin>${PICTURES[hero] ? `
+  <link rel="preload" as="image" type="image/webp" imagesrcset="${pictureSrcset(hero, "webp")}" imagesizes="${HERO_SIZES}" fetchpriority="high">` : hero ? `
   <link rel="preload" as="image" type="image/webp" imagesrcset="${heroSrcset("webp")}" imagesizes="${HERO_SIZES}" fetchpriority="high">` : ""}
   <link rel="stylesheet" href="${a(`assets/fonts.css?v=${FONTS_V}`)}">
   <link rel="stylesheet" href="${a(`styles-modern.css?v=${CSS_V}`)}">
@@ -539,7 +552,17 @@ const HERO_FACTS = `          <ul class="hero-facts">
 
 // No trail of links above the heading: Kanna found "Home / Egg delivery Sydney / Delivery areas"
 // confusing beside the menu's own names. Search engines still get it as BreadcrumbList data.
-function heroSection({ h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt = HERO_ALT }) {
+function heroSection({ h1, sub, cta = "Order now", ctaHref = "/#order", secondary, alt, picture }) {
+  // `picture` names a page picture in PICTURES; without one the hero shows the chalk photo.
+  const shown = picture
+    ? `<picture class="showcase-photo is-active">
+              <source type="image/webp" srcset="${pictureSrcset(picture, "webp")}" sizes="${HERO_SIZES}">
+              <img src="assets/pictures/${picture}-1536.jpg?v=${PIC_V}" srcset="${pictureSrcset(picture, "jpg")}" sizes="${HERO_SIZES}" width="1536" height="1536" fetchpriority="high" decoding="async" alt="${esc(alt || PICTURES[picture])}">
+            </picture>`
+    : `<picture class="showcase-photo is-active">
+              <source type="image/webp" srcset="${heroSrcset("webp")}" sizes="${HERO_SIZES}">
+              <img src="assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}" srcset="${heroSrcset("jpg")}" sizes="${HERO_SIZES}" width="1536" height="1536" fetchpriority="high" decoding="async" alt="${esc(alt || HERO_ALT)}">
+            </picture>`;
   return `    <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
@@ -553,10 +576,7 @@ ${HERO_FACTS}
         </div>
         <div class="hero-showcase">
           <div class="showcase-card">
-            <picture class="showcase-photo is-active">
-              <source type="image/webp" srcset="${heroSrcset("webp")}" sizes="${HERO_SIZES}">
-              <img src="assets/chalk-tray/${PRICE.tray1}-1536.jpg?v=${IMG_V}" srcset="${heroSrcset("jpg")}" sizes="${HERO_SIZES}" width="1536" height="1536" fetchpriority="high" decoding="async" alt="${esc(alt)}">
-            </picture>
+            ${shown}
           </div>
         </div>
       </div>
@@ -900,7 +920,8 @@ ${heroSection({
     h1: `Egg delivery in ${s.name}`,
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, at your door in ${s.name} on Saturday morning. Delivery is $${PRICE.delivery} flat.`,
     secondary: [`Suburbs near ${s.name}`, "#nearby"],
-    alt: `${HERO_ALT}. Delivered to ${s.name}`,
+    picture: "suburbs",
+    alt: `${PICTURES.suburbs}: we deliver to ${s.name}`,
   })}
 
     <section class="band band-first">
@@ -932,7 +953,7 @@ ${faqSection(`${s.name} delivery questions`, faqs)}
 
 ${ctaBand(`Eggs in ${s.name} this Saturday`, `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`)}
   </main>`;
-  return page({ path, title, description, graph, body, mobile: `Saturday delivery to ${s.name}` });
+  return page({ path, title, description, graph, hero: "suburbs", body, mobile: `Saturday delivery to ${s.name}` });
 }
 
 function sydneyPage() {
@@ -965,6 +986,7 @@ ${heroSection({
     h1: "Egg delivery across Sydney",
     sub: `A tray of 30 Pace Farm eggs for <strong>$${PRICE.tray1}</strong>, delivered on Saturday morning to nearly 700 suburbs.`,
     secondary: ["Check your suburb", "#map-title"],
+    picture: "delivery",
   })}
 
 ${timeline("How Saturday delivery works", DELIVERY_STEPS, "One delivery run a week keeps the price low.")}
@@ -975,7 +997,7 @@ ${priceCards("Prices")}
 
 ${ctaBand("Fresh eggs this Saturday", `Order by Thursday night. Delivery is $${PRICE.delivery} flat.`)}
   </main>`;
-  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}` });
+  return page({ path, title, description, graph, hero: "delivery", body, mobile: `Saturday delivery · $${PRICE.delivery}` });
 }
 
 function bulkPage() {
@@ -1008,7 +1030,7 @@ ${heroSection({
     cta: "Order boxes",
     ctaHref: "/?b=box#order",
     secondary: CONTACT_BUTTON,
-    alt: `${HERO_ALT}. Six trays make a 180-egg box`,
+    picture: "bulk",
   })}
 
     <section class="band" aria-labelledby="per-egg-title">
@@ -1042,7 +1064,7 @@ ${faqSection("Bulk order questions", faqs)}
 
 ${ctaBand("Boxes this Saturday", `$${PRICE.box} a box of 180 eggs. Order by Thursday night.`, null, ["Order boxes", "/?b=box#order"])}
   </main>`;
-  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
+  return page({ path, title, description, graph, hero: "bulk", body, mobile: `Saturday delivery · $${PRICE.delivery}`, pack: "box" });
 }
 
 /**
@@ -1146,6 +1168,7 @@ ${heroSection({
     h1: "Every suburb we deliver to",
     sub: `Saturday morning egg delivery to nearly 700 Sydney suburbs. Type yours below to check.`,
     secondary: ["Find your suburb", "#suburbs"],
+    picture: "suburbs",
   })}
 
     <section id="suburbs" class="areas areas-finder" aria-labelledby="finder-title">
@@ -1214,7 +1237,7 @@ ${ctaBand("Found your suburb?", `A tray is $${PRICE.tray1}, two trays $${PRICE.t
   </script>
 
 `;
-  return page({ path, title, description, graph, body, mobile: `Saturday delivery · $${PRICE.delivery}`, scripts });
+  return page({ path, title, description, graph, hero: "suburbs", body, mobile: `Saturday delivery · $${PRICE.delivery}`, scripts });
 }
 
 function notFoundPage() {

@@ -89,6 +89,33 @@ Round 5 (build 257), three things Kanna asked for on 15 Nov 2026:
   Weekly and `repeat=2` Fortnightly on the form's switch (`preselectRepeat` in `app.js`), as
   `b=` picks the pack. The card no longer asks people to message for a standing order.
 
+Page pictures (Kanna, 15 Nov 2026). Kanna did not want the chalk tray photo on every screen, so
+the Delivery page, the Suburbs page with its suburb pages, and the Bulk eggs page each show
+their own photograph in the hero. The homepage and the egg prices page keep the chalk photo.
+- The three are REAL photographs, all public domain (CC0), each picked for what its page is
+  about: a tray of brown eggs up close (`delivery`), Sydney's western suburbs from the air at
+  dusk (`suburbs`), a café table seen from above with two omelettes, bread and coffee
+  (`bulk`, Kanna's pick of three). The Delivery and Bulk photos are by Jakub Kapusnak
+  (foodiesfeed.com); the aerial is "Western Sydney" by Yucalyptus on Wikimedia Commons. They
+  are not photos of YOLKO's own trays or of a YOLKO customer: never caption them as such.
+- Kanna turned down two Bulk photographs before this one, both close views of eggs in trays
+  (flat from above, then rows running back), and kept the other two. Do not bring those back,
+  and do not give the Bulk page another picture of eggs sitting in a tray.
+- What Kanna turned down on the way, all drawn or generated: hand-made flat drawings
+  ("dogshit"), poster illustrations with visual jokes ("why do they look so comical"), the
+  same without the jokes and a painted version ("its cartoon look ... no taste"). Do not put
+  drawings, renders or AI pictures here again: real photographs only, nothing cartoonish.
+- Files: `assets/pictures/<name>-<640|928|1536>.<webp|jpg>`, the chalk photo's widths. The
+  2048 px masters are not in the repo; `infra/build-page-pictures.py <folder>` makes the
+  sizes from them (its header says where the masters and their sources are kept).
+- In `infra/build-pages.mjs`, `heroSection({ picture })` shows a page picture and
+  `page({ hero })` preloads it; both take a name from `PICTURES`, which also holds the alt
+  text. Bump `PIC_V` when a picture changes. Share previews (`og:image`) and the JSON-LD
+  images stay the chalk photo.
+- Rules for any new one: a real photograph free for a shop to use (CC0), no other brand, no
+  farm or hens, no faces, no readable lettering, trays rather than cartons, and it must still
+  read at 335 px wide on a phone.
+
 Sizes are in rem (round 3, non-obvious). Every length in `styles-modern.css` is written in rem,
 where rem = px / 16 (13px is `0.8125rem`), and `html` sets `font-size: clamp(16px, 1vw, 20px)`.
 Up to 1600px wide 1rem is 16px, so every size is the px number it always was. Past 1600px the
