@@ -16,6 +16,8 @@ import { emailTitlePicture } from "./email-titles.mjs";
 import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
 import {
   LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
+  callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
+  wordsFromWebhook, wordsEmail, recordingUrlOk, testRole, testShop, testShopAccept,
 } from "./phone-line.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
@@ -2206,12 +2208,11 @@ async function lineLog(env, entry) {
   await env.DATA.put(LINE_LOG_KEY, JSON.stringify(list.slice(0, 100)));
 }
 
-/** A text to the line goes to the shop mailbox, so it shows in Admin > Emails with the rest. */
-async function emailLineText(env, msg) {
+/** A note about the line (a text, a call) goes to the shop mailbox, so it shows in Admin > Emails with the rest. */
+async function emailLineNote(env, mail) {
   const auth = await zohoAuth(env);
   if (!auth) return;
   const acct = await zohoMailAccount(env, auth);
-  const mail = textEmail(msg);
   await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
     fromAddress: acct.address || SHOP_EMAIL,
     toAddress: SHOP_EMAIL,
@@ -2219,6 +2220,139 @@ async function emailLineText(env, msg) {
     content: mailHtml(mail.text),
     mailFormat: "html",
   });
+}
+
+const emailLineText = (env, msg) => emailLineNote(env, textEmail(msg));
+
+/**
+ * A call to the line leaves one note in the shop mailbox with the caller's own number. The
+ * phone the call rings on shows the line as the caller, so without the note nobody could be
+ * rung back. Telnyx can ask twice about one call: each call is noted once. The line ringing
+ * itself (a test) and the saved phone ringing the line leave no note.
+ */
+async function noteLineCall(env, call) {
+  if (call.from === LINE_NUMBER || (call.forwardTo && call.from === call.forwardTo)) return;
+  const at = new Date().toISOString();
+  const seen = `line:call:${call.sid || `${call.from}-${at.slice(0, 16)}`}`;
+  if (await env.DATA.get(seen).catch(() => null)) return;
+  await env.DATA.put(seen, "1", { expirationTtl: 24 * 3600 }).catch(() => null);
+  await emailLineNote(env, callEmail({ from: call.from, at, rang: validForwardTo(call.forwardTo) }));
+}
+
+/** What a screened caller said, written down, goes to the shop mailbox once per recording. */
+async function noteLineWords(env, call) {
+  if (!call.text) return;
+  const seen = `line:words:${call.id}`;
+  if (await env.DATA.get(seen).catch(() => null)) return;
+  await env.DATA.put(seen, "1", { expirationTtl: 24 * 3600 }).catch(() => null);
+  await emailLineNote(env, wordsEmail(call));
+}
+
+/** One step of a line test, kept on its own key so that steps arriving together are all kept. */
+async function lineTestLog(env, step, fields) {
+  const small = {};
+  for (const [k, v] of Object.entries(fields || {})) small[String(k).slice(0, 60)] = typeof v === "string" ? v.slice(0, 600) : v;
+  const at = new Date().toISOString();
+  await env.DATA.put(`line:testlog:${at}:${Math.random().toString(36).slice(2, 8)}`, JSON.stringify({ step, at, fields: small }), {
+    expirationTtl: 24 * 3600,
+  });
+}
+
+/**
+ * A call to the line, one step at a time (see phone-line.mjs). Telnyx asks this address what
+ * to do when a call arrives and again at each later step, named by `step` in the address.
+ */
+async function lineVoice(request, env, url, ctx, config, key) {
+  const raw = request.method === "POST" ? await request.text().catch(() => "") : "";
+  let fields = {};
+  if (/json/i.test(request.headers.get("Content-Type") || "") || raw.trim().startsWith("{")) {
+    try { fields = JSON.parse(raw) || {}; } catch { fields = {}; }
+  } else {
+    fields = Object.fromEntries(request.method === "POST" ? new URLSearchParams(raw) : url.searchParams);
+  }
+  const field = (name) => (typeof fields[name] === "string" ? fields[name] : "");
+  const q = url.searchParams;
+  const step = q.get("step") || (q.get("after") === "1" ? "after" : "");
+  const number = (v) => String(v || "").replace(/[^\d+]/g, "").slice(0, 20);
+  const id = (v) => String(v || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  const texml = (body) => new Response(body, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
+  const here = `https://getyolko.com/api/line/voice/${encodeURIComponent(key)}`;
+  const at = (name, params = {}) => {
+    const u = new URL(here);
+    u.searchParams.set("step", name);
+    for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v);
+    return u.toString();
+  };
+
+  // A test rings the line from its own number and never reaches the shop phone.
+  const test = q.get("t") === "1" || number(field("From")) === LINE_NUMBER ? await env.DATA.get("line:test", "json").catch(() => null) : null;
+  const role = testRole(test);
+  const testing = q.get("t") === "1";
+  if (testing && !role) return texml(sorryScreened());
+  if (role) ctx.waitUntil(lineTestLog(env, step || "arrive", { ...fields, _query: url.search.replace(key, "KEY") }).catch(() => null));
+  const t = testing || role ? "1" : "";
+
+  // The written words of a recording, some seconds after it was made.
+  if (step === "words") {
+    const text = wordsFromWebhook(fields);
+    const from = number(q.get("f"));
+    if (!t) {
+      const recording = id(field("RecordingSid") || field("recording_id") || field("CallSid") || q.get("c"));
+      ctx.waitUntil(lineLog(env, { kind: "words", from, text: text.slice(0, 300) }).catch(() => null));
+      ctx.waitUntil(noteLineWords(env, { id: recording || `${from}-${new Date().toISOString().slice(0, 16)}`, from, text }).catch((err) => console.log("line words note failed", String(err?.message || err))));
+    }
+    return json({ ok: true });
+  }
+
+  // The shop's side of a screened call: what it hears on picking up, and its answer.
+  if (step === "screen") {
+    return texml(screenWhisper(number(q.get("f")), q.get("r") || "", at("accept", { f: number(q.get("f")), c: id(q.get("c")), t })));
+  }
+  if (step === "accept") {
+    const yes = field("Digits").trim() === "1";
+    const call = id(q.get("c"));
+    if (yes && call) await env.DATA.put(`line:ok:${call}`, "1", { expirationTtl: 3600 }).catch(() => null);
+    if (!t) ctx.waitUntil(lineLog(env, { kind: yes ? "call-taken" : "call-declined", from: number(q.get("f")) }).catch(() => null));
+    return texml(screenAccept(field("Digits")));
+  }
+
+  // The pretend shop of a test.
+  if (step === "shop2") return texml(testShopAccept());
+  if (step === "testend") return texml('<?xml version="1.0" encoding="UTF-8"?>\n<Response><Hangup/></Response>');
+
+  // Later steps carry the caller's number and the call's id in the address, in case Telnyx leaves them out.
+  const from = number(q.get("f")) || number(field("From"));
+  const sid = id(q.get("c")) || id(field("CallSid"));
+
+  // The caller has said who they are (or said nothing): ring the shop.
+  if (step === "said") {
+    const recording = field("RecordingUrl");
+    const target = t ? LINE_NUMBER : config.forwardTo;
+    if (!t) ctx.waitUntil(lineLog(env, { kind: "call-said", from, seconds: Number(field("RecordingDuration")) || 0 }).catch(() => null));
+    return texml(
+      screenDial(target, at("screen", { f: from, c: sid, r: recordingUrlOk(recording) ? recording : "", t }), at("after", { s: "1", f: from, c: sid, t })),
+    );
+  }
+
+  // The ring ended.
+  if (step === "after") {
+    const status = field("DialCallStatus").slice(0, 20);
+    if (!t) ctx.waitUntil(lineLog(env, { kind: "call-end", from, status }).catch(() => null));
+    if (q.get("s") !== "1") return texml(voiceAfter(status));
+    const accepted = sid ? await env.DATA.get(`line:ok:${sid}`).catch(() => null) : null;
+    return texml(screenAfter(Boolean(accepted)));
+  }
+
+  // A call just arrived.
+  if (from === LINE_NUMBER) {
+    if (role === "caller") return texml(screenAsk(at("said", { f: from, c: sid, t: "1" }), at("words", { f: from, who: "screen", t: "1" })));
+    if (role === "shop") return texml(testShop(test.mode, at("shop2", { t: "1" }), at("words", { who: "shop", t: "1" })));
+    return texml(sorryScreened());
+  }
+  ctx.waitUntil(lineLog(env, { kind: "call", from }).catch(() => null));
+  ctx.waitUntil(noteLineCall(env, { sid, from, forwardTo: config.forwardTo }).catch((err) => console.log("line call note failed", String(err?.message || err))));
+  if (config.screen === true && validForwardTo(config.forwardTo)) return texml(screenAsk(at("said", { f: from, c: sid }), at("words", { f: from, c: sid })));
+  return texml(voiceAnswer(config, `${here}?after=1`));
 }
 
 /* ---------- Thursday reorder reminders ----------
@@ -5511,15 +5645,7 @@ async function handleApi(request, env, url, ctx) {
     const [kind, key] = url.pathname.slice("/api/line/".length).split("/");
     const config = await env.DATA.get(LINE_CONFIG_KEY, "json").catch(() => null);
     if (!config?.key || !key || !sameText(key, config.key)) return json({ error: "not found" }, 404);
-    if (kind === "voice" && (request.method === "POST" || request.method === "GET")) {
-      const form = request.method === "POST" ? new URLSearchParams(await request.text().catch(() => "")) : url.searchParams;
-      const after = url.searchParams.get("after") === "1";
-      const from = String(form.get("From") || "").replace(/[^\d+]/g, "").slice(0, 20);
-      const status = String(form.get("DialCallStatus") || "").slice(0, 20);
-      ctx.waitUntil(lineLog(env, after ? { kind: "call-end", from, status } : { kind: "call", from }).catch(() => null));
-      const answer = after ? voiceAfter(status) : voiceAnswer(config, `https://getyolko.com/api/line/voice/${encodeURIComponent(key)}?after=1`);
-      return new Response(answer, { headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store" } });
-    }
+    if (kind === "voice" && (request.method === "POST" || request.method === "GET")) return lineVoice(request, env, url, ctx, config, key);
     if (kind === "sms" && request.method === "POST") {
       const msg = textFromWebhook(await request.json().catch(() => null));
       if (!msg) return json({ ok: true, ignored: true });
@@ -6399,7 +6525,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "264",
+      "X-Yolko-Build": "265",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
