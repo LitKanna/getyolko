@@ -17,7 +17,9 @@ import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
 import {
   LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
   callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
-  wordsFromWebhook, wordsEmail, recordingUrlOk, testRole, testShop, testShopAccept,
+  wordsFromWebhook, wordsEmail,
+  ringBack,
+  ringBackThanks, recordingUrlOk, testRole, testShop, testShopAccept,
 } from "./phone-line.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
@@ -2290,7 +2292,9 @@ async function lineVoice(request, env, url, ctx, config, key) {
   const testing = q.get("t") === "1";
   if (testing && !role) return texml(sorryScreened());
   if (role) ctx.waitUntil(lineTestLog(env, step || "arrive", { ...fields, _query: url.search.replace(key, "KEY") }).catch(() => null));
-  const t = testing || role ? "1" : "";
+  // A ring back is placed from the line's own number too: it is only a test when its address says so.
+  const back = q.get("b") === "1";
+  const t = testing || (role && !back) ? "1" : "";
 
   // The written words of a recording, some seconds after it was made.
   if (step === "words") {
@@ -2298,8 +2302,8 @@ async function lineVoice(request, env, url, ctx, config, key) {
     const from = number(q.get("f"));
     if (!t) {
       const recording = id(field("RecordingSid") || field("recording_id") || field("CallSid") || q.get("c"));
-      ctx.waitUntil(lineLog(env, { kind: "words", from, text: text.slice(0, 300) }).catch(() => null));
-      ctx.waitUntil(noteLineWords(env, { id: recording || `${from}-${new Date().toISOString().slice(0, 16)}`, from, text }).catch((err) => console.log("line words note failed", String(err?.message || err))));
+      ctx.waitUntil(lineLog(env, { kind: back ? "ring-back-words" : "words", from, text: text.slice(0, 300) }).catch(() => null));
+      ctx.waitUntil(noteLineWords(env, { id: recording || `${from}-${new Date().toISOString().slice(0, 16)}`, from, text, back }).catch((err) => console.log("line words note failed", String(err?.message || err))));
     }
     return json({ ok: true });
   }
@@ -2315,6 +2319,14 @@ async function lineVoice(request, env, url, ctx, config, key) {
     if (!t) ctx.waitUntil(lineLog(env, { kind: yes ? "call-taken" : "call-declined", from: number(q.get("f")) }).catch(() => null));
     return texml(screenAccept(field("Digits")));
   }
+
+  // A ring back: the line has rung someone who called earlier (started through the Telnyx API), and they picked up.
+  if (step === "back") {
+    const to = number(q.get("f"));
+    if (!t) ctx.waitUntil(lineLog(env, { kind: "ring-back", from: to }).catch(() => null));
+    return texml(ringBack(at("thanks", { b: "1", t }), at("words", { f: to, c: id(q.get("c")), b: "1", t })));
+  }
+  if (step === "thanks") return texml(ringBackThanks());
 
   // The pretend shop of a test.
   if (step === "shop2") return texml(testShopAccept());
@@ -6525,7 +6537,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "265",
+      "X-Yolko-Build": "266",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
