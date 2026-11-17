@@ -1,5 +1,6 @@
 // Reads the news feeds that refuse Cloudflare (Google News answers the Worker with 503) and posts
-// them to the site, which parses and stores them like its own reads. Run by
+// them to the site, which parses and stores them like its own reads. It also sends a second copy
+// of the Reddit feed, which the Worker reads itself but Reddit sometimes refuses. Run by
 // .github/workflows/news-relay.yml every 15 minutes: node infra/news-relay.mjs
 //
 // The Worker trusts the post because it carries GitHub's OIDC token for this workflow on main,
@@ -13,7 +14,7 @@ const UA = "Mozilla/5.0 (compatible; YolkoNews/1.0; +https://getyolko.com)";
 async function read(source) {
   try {
     const res = await fetch(source.url, {
-      headers: { "User-Agent": UA, Accept: "application/rss+xml, application/xml, text/xml, */*;q=0.5", "Accept-Language": "en-AU,en;q=0.9" },
+      headers: { "User-Agent": UA, Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*;q=0.5", "Accept-Language": "en-AU,en;q=0.9" },
       signal: AbortSignal.timeout(20000),
     });
     const body = await res.text();
