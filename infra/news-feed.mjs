@@ -504,7 +504,8 @@ async function readAndSave(env, store, sources, { force = false, read = null, re
 function sourceList(store, custom, now = Date.now()) {
   return SOURCES.concat(customSources(custom)).map((s) => {
     let state = store.sources?.[s.id] || { ok: null, checkedAt: null, count: 0 };
-    // A relayed source shows how the last relay went while it is current, not a failed direct read.
+    // A source that was read another way a little while ago (a relay, or its own last good read
+    // within its grace) shows that read, not one failed try.
     const readAt = coveredAt(s, state, now);
     if (readAt) state = { ...state, ok: true, error: null, checkedAt: readAt, okAt: readAt };
     return {
