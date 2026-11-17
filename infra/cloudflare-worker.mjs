@@ -6441,7 +6441,8 @@ async function handleApi(request, env, url, ctx) {
   }
 
   // GitHub Actions (news-relay.yml) posts the Google News feeds here, since Google answers
-  // Cloudflare with 503. Signed by GitHub's OIDC token for this repo's main branch, no secret.
+  // Cloudflare with 503, and a second copy of the Reddit feed. Signed by GitHub's OIDC token
+  // for this repo's main branch, no secret.
   if (url.pathname === "/api/news/relay" && request.method === "POST") {
     if (!(await isGithubRelay(request))) return json({ error: "unauthorised" }, 401);
     const len = Number(request.headers.get("Content-Length") || 0);
@@ -6625,7 +6626,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "268",
+      "X-Yolko-Build": "269",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
