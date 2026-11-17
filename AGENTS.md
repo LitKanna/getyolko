@@ -674,6 +674,9 @@ minutes, `node infra/news-relay.mjs`) reads the two `relay: true` sources from G
 them to `POST /api/news/relay`. That route needs no secret: the Worker checks the GitHub Actions
 OIDC token (issuer token.actions.githubusercontent.com, audience https://getyolko.com, repository
 LitKanna/getyolko, `job_workflow_ref` news-relay.yml on refs/heads/main) against GitHub's keys.
+The job reads its feeds one at a time, a few seconds apart, and tries a refused one once more
+after 20 seconds: Google now and then answers a read with HTTP 429 (a "Sorry..." page), which
+on 17 Nov 2026 had left the bird flu search unread for two runs in a row. Waiting clears it.
 While the relay is fresh (a day, `RELAY_FRESH_MS`: GitHub runs this repo's scheduled jobs only
 every few hours) the Worker doesn't try Google itself. Stories are kept 90
 days, 500 at most, one row per headline (an outlet's own copy replaces the Google News one), all in
