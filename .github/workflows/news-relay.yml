@@ -1,7 +1,8 @@
 name: News relay
 
 # Google News answers Cloudflare Workers with 503, so this job reads the two Google News egg
-# searches and posts them to getyolko.com/api/news/relay for Admin > News. The Worker checks
+# searches and posts them to getyolko.com/api/news/relay for Admin > News. It sends a second
+# copy of the Reddit feed too, for the times Reddit refuses the Worker. The Worker checks
 # GitHub's OIDC token for this file on main, so no secret is needed.
 on:
   schedule:
@@ -32,5 +33,5 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Relay Google News to the site
+      - name: Relay Google News and Reddit to the site
         run: node infra/news-relay.mjs

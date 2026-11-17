@@ -14,7 +14,9 @@
  *   Australian Eggs, Egg Farmers of Australia, Inside FMCG (egg stories only)
  *   Outlets         7NEWS, The Guardian Australia, the Sydney Morning Herald, SBS News and Farm
  *                   Online: their general feeds, egg stories from here only
- *   Reddit          new posts about eggs in r/sydney, r/australia and r/AusFinance
+ *   Reddit          new posts with eggs in the title in REDDIT_SUBS, from Reddit's "new posts"
+ *                   feed (its search feed has refused readers who are not signed in since
+ *                   10 Nov 2026). The Worker reads it, and the GitHub job sends a copy too
  *   Added feeds     any RSS or Atom link the owner pastes in, such as a Google Alerts feed
  * Everything lives in one KV key (NEWS_KEY), written when something changed or every half hour,
  * so the cron adds few KV writes.
@@ -38,7 +40,12 @@ const NSW_URL = "https://www.nsw.gov.au/regional-and-primary-industries/biosecur
 
 const GN = (q) => "https://news.google.com/rss/search?q=" + encodeURIComponent(q) + "&hl=en-AU&gl=AU&ceid=AU:en";
 
-/** Built-in sources. `every` is minutes between reads; `filter` keeps only what fits. */
+/** Where Australians post about groceries: the country, its cities, money and the two big shops. */
+const REDDIT_SUBS = ["sydney", "australia", "AusFinance", "australian", "aussie", "AskAnAustralian", "melbourne", "brisbane", "perth", "Adelaide", "canberra", "tasmania", "newcastle", "AusEcon", "AustralianPolitics", "woolworths", "coles"];
+
+/** Built-in sources. `every` is minutes between reads; `filter` keeps only what fits. `relay: true`
+ *  means only GitHub reads it; `relay: "backup"` means the Worker reads it and GitHub does too.
+ *  `grace` is how many minutes a source may go unread before the admin says so. */
 const SOURCES = [
   {
     id: "gn-eggs", name: "Google News", group: "Google News", kind: "rss", every: 15, relay: true,
@@ -58,9 +65,11 @@ const SOURCES = [
   { id: "efa", name: "Egg Farmers of Australia", group: "Egg Farmers of Australia", kind: "rss", every: 60, url: "https://eggfarmersaustralia.org/feed/", about: "The egg farmers' group" },
   { id: "inside-fmcg", name: "Inside FMCG", group: "Inside FMCG", kind: "rss", every: 30, filter: "egg", url: "https://insidefmcg.com.au/feed/", about: "Supermarket trade news, egg stories only" },
   {
-    id: "reddit", name: "Reddit", group: "Reddit", kind: "rss", every: 30, filter: "reddit",
-    url: "https://www.reddit.com/r/sydney+australia+AusFinance/search.rss?q=eggs&restrict_sr=on&sort=new&t=month",
-    about: "New posts about eggs in r/sydney, r/australia and r/AusFinance",
+    // One feed of the newest 100 posts across REDDIT_SUBS (about seven hours of posts), filtered
+    // here by title. `relay: "backup"`: the Worker reads it itself and GitHub's copy is taken too.
+    id: "reddit", name: "Reddit", group: "Reddit", kind: "rss", every: 30, filter: "reddit", relay: "backup", grace: 180,
+    url: "https://www.reddit.com/r/" + REDDIT_SUBS.join("+") + "/new/.rss?limit=100",
+    about: "New posts about eggs in r/sydney, r/australia and " + (REDDIT_SUBS.length - 2) + " more Australian subreddits",
   },
   { id: "7news", name: "7NEWS", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://7news.com.au/feed", about: "Egg stories from 7NEWS" },
   { id: "guardian-au", name: "The Guardian", group: "News outlets", kind: "rss", every: 30, filter: "egg-local", url: "https://www.theguardian.com/australia-news/rss", about: "Egg stories from The Guardian Australia" },
@@ -226,6 +235,8 @@ const AU_PUBLISHER_RE = /australia|\babc\b|\bsbs\b|nine|9news|7news|news\.com\.a
 const EGG_RE = /\beggs?\b|egg[\s-]?(farm|farmers|industry|price|prices|supply|shortage|producers?|layers?)|\bpoultry\b|\bhens?\b|layer hens?|bird[\s-]?flu|avian (influenza|flu)|\bh5n1\b/i;
 const NOT_EGG_RE = /easter eggs?|chocolate eggs?|kinder|nest[\s-]?eggs?|egg[\s-]?hunt|scotch eggs?|eggplant|egg[\s-]?tarts?|eggnog/i;
 const REDDIT_EGG_RE = /\beggs?\b/i;
+// Reddit says "eggs" about many things that aren't groceries: IVF, wildlife, sayings, a cafe's breakfast.
+const REDDIT_NOT_RE = /\bivf\b|fertility|freez\w*\s+(?:\w+\s+)?eggs|egg[\s-]?(freezing|donors?|donation|collections?|retrieval)|hatch|\b(dove|pigeon|magpie|plover|cassowary|emu|turtle|snake|lizard|crocodile|spider|insect|mosquito|frog|fish|dinosaur|platypus|echidna|ibis|bird'?s?)\s+eggs?\b|\b(good|bad|rotten)\s+egg\b|egg\s+on\s+(?:\w+\s+)?face|\begg(ed|ing)\b|eggshells|eggs?\s+benedict|bacon\s+(and|&|n)\s+eggs?|egg\s+(roll|sandwich|mcmuffin|fried rice|noodles?)|century\s+eggs?/i;
 const FOREIGN_RE = /\b(america|american|americans|trump|britain|british|england|scotland|ireland|new zealand|canada|canadian|china|chinese|india|japan|japanese|europe|european|mexico|brazil|south africa|philippines|indonesia|korea)\b/i;
 const FOREIGN_CAPS_RE = /\bU\.?S\.?A?\b|\bUK\b|\bNZ\b|\bEU\b/;
 
@@ -235,7 +246,7 @@ const PRICE_RE = /\bprices?\b|\bpricing\b|\bcosts?\b|\bcostly\b|cheap|dearer|exp
 function keep(source, row) {
   if (!row.title || !row.url) return false;
   const t = row.title;
-  if (source.filter === "reddit") return REDDIT_EGG_RE.test(t) && !NOT_EGG_RE.test(t);
+  if (source.filter === "reddit") return REDDIT_EGG_RE.test(t) && !NOT_EGG_RE.test(t) && !REDDIT_NOT_RE.test(t);
   if (source.filter === "egg") return EGG_RE.test(t) && !NOT_EGG_RE.test(t);
   // General Australian outlets also run overseas egg stories; keep those only if they name Australia.
   if (source.filter === "egg-local") return EGG_RE.test(t) && !NOT_EGG_RE.test(t) && (!(FOREIGN_RE.test(t) || FOREIGN_CAPS_RE.test(t)) || AU_RE.test(t));
@@ -405,6 +416,8 @@ function customSources(custom) {
   return custom.map((c) => ({ id: c.id, name: c.name || hostOf(c.url) || "Added feed", group: "Added feeds", kind: "rss", every: 30, url: c.url, about: hostOf(c.url), custom: true, addedAt: c.addedAt }));
 }
 
+const REDDIT_RULE = { filter: "reddit" };
+
 /** Put new stories in front of the old ones, one row per story, newest first. */
 function mergeStories(items, fresh) {
   const byId = new Map(items.map((s) => [s.id, s]));
@@ -419,14 +432,28 @@ function mergeStories(items, fresh) {
   const cutoff = Date.now() - MAX_AGE_MS;
   const next = [...byId.values()]
     .filter((s) => Date.parse(s.at) >= cutoff)
+    // Stored Reddit posts are checked again, so a tighter rule also clears what an older one let in.
+    .filter((s) => s.kind !== "reddit" || keep(REDDIT_RULE, s))
     .sort((a, b) => (b.at > a.at ? 1 : b.at < a.at ? -1 : 0))
     .slice(0, MAX_ITEMS);
   return { items: next, added };
 }
 
-/** Relayed sources are read by GitHub; the Worker tries them itself only once the relay is quiet. */
+/** Relayed sources are read by GitHub; the Worker tries them itself only once the relay is quiet.
+ *  A source with a backup relay is always read by the Worker too. */
 function relayQuiet(source, state, now) {
-  return !source.relay || !state?.relayAt || now - Date.parse(state.relayAt) > RELAY_FRESH_MS;
+  return source.relay !== true || !state?.relayAt || now - Date.parse(state.relayAt) > RELAY_FRESH_MS;
+}
+
+/** When a failed read is not worth a warning, the time the source was last read another way: by
+ *  the relay in the last day, or (with `grace`) by the Worker itself a little while ago. Reddit
+ *  now and then answers the Worker's shared addresses with "too many requests"; the next read
+ *  picks up what that one missed. */
+function coveredAt(source, state, now) {
+  if (!state || state.ok !== false) return null;
+  if (source.relay && state.relayAt && now - Date.parse(state.relayAt) <= RELAY_FRESH_MS) return state.relayAt;
+  if (source.grace && state.okAt && now - Date.parse(state.okAt) <= source.grace * 60 * 1000) return state.okAt;
+  return null;
 }
 
 function due(source, state, now) {
@@ -477,8 +504,10 @@ async function readAndSave(env, store, sources, { force = false, read = null, re
 function sourceList(store, custom, now = Date.now()) {
   return SOURCES.concat(customSources(custom)).map((s) => {
     let state = store.sources?.[s.id] || { ok: null, checkedAt: null, count: 0 };
-    // A relayed source shows how the last relay went while it is current, not a failed direct read.
-    if (!relayQuiet(s, state, now) && state.ok === false) state = { ...state, ok: true, error: null, checkedAt: state.relayAt, okAt: state.relayAt };
+    // A source that was read another way a little while ago (a relay, or its own last good read
+    // within its grace) shows that read, not one failed try.
+    const readAt = coveredAt(s, state, now);
+    if (readAt) state = { ...state, ok: true, error: null, checkedAt: readAt, okAt: readAt };
     return {
       id: s.id,
       name: s.name,
@@ -571,7 +600,8 @@ async function isGithubRelay(request) {
 async function takeNewsRelay(env, payload) {
   const feeds = Array.isArray(payload?.feeds) ? payload.feeds : [];
   const byId = new Map(feeds.map((f) => [String(f?.id || ""), f]));
-  const sources = SOURCES.filter((s) => s.relay && byId.has(s.id));
+  // A backup copy only counts when GitHub could read it: its miss is not the source failing.
+  const sources = SOURCES.filter((s) => s.relay && byId.has(s.id) && (s.relay === true || (typeof byId.get(s.id).body === "string" && byId.get(s.id).body)));
   if (!sources.length) return { error: "No relayed feeds in that" };
   const store = await getStore(env);
   const read = (s, nowIso) => {

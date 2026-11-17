@@ -1,6 +1,6 @@
 // Checks the news parser on small copies of each feed shape: node infra/news-feed-test.mjs
 import assert from "node:assert/strict";
-import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES, isGithubRelay, takeNewsRelay, newsView } from "./news-feed.mjs";
+import { parseFeed, parseNswPage, keep, storyOf, mergeStories, SOURCES, isGithubRelay, takeNewsRelay, newsView, runScheduledNews } from "./news-feed.mjs";
 
 const now = new Date().toISOString();
 const src = (id) => SOURCES.find((s) => s.id === id);
@@ -23,6 +23,32 @@ assert.equal(r.source, "r/sydney");
 assert.equal(r.kind, "reddit");
 assert.equal(r.summary, "Coles limit 2 per person");
 assert.deepEqual(r.topics, ["prices"]);
+
+// Reddit's search feed refuses readers who are not signed in (since 10 Nov 2026), so the source is
+// the "new posts" feed of the subreddits, never a search.
+assert.match(src("reddit").url, /^https:\/\/www\.reddit\.com\/r\/sydney\+australia\+AusFinance\+[A-Za-z+]+\/new\/\.rss\?limit=100$/);
+assert.doesNotMatch(src("reddit").url, /search/);
+// "Eggs" that aren't groceries stay out: IVF, wildlife, sayings, a cafe's breakfast.
+const redditKeeps = (title) => keep(src("reddit"), { title, url: "https://www.reddit.com/r/australia/comments/1/x/" });
+for (const t of ["Egg Delivery", "Why are eggs $9 a dozen now?", "Coles has a 2 carton limit on eggs again", "Backyard eggs in Perth?", "Free range egg farm fined over stocking numbers"]) assert.equal(redditKeeps(t), true, t);
+for (const t of [
+  "Concerns grow over IVF egg collections as Calvary's hospital takeover nears",
+  "High Court rules in favour of Queensland prisoner who is trying to freeze her eggs",
+  "These Big, Fierce Birds Found Love in Australia and Laid the First Southern Cassowary Eggs at the Adelaide Zoo in 34 Years",
+  "The day we buried her these dove eggs hatched",
+  "Scotch eggs! Where do I find the best one?",
+  "Best bacon and egg roll in the inner west?",
+  "He really is a good egg",
+  "Who keeps egging houses in Marrickville",
+  "Is a $200k nest egg enough at 40?",
+  "Leggings that last",
+]) assert.equal(redditKeeps(t), false, t);
+// A tighter rule also clears Reddit posts an older rule had let in; other stories are left alone.
+{
+  const old = (title, kind) => ({ id: title, title, url: "https://www.reddit.com/r/australia/comments/1/x/", source: "r/australia", via: kind === "reddit" ? "reddit" : "abc-eggs", kind, at: now, seen: now, summary: "", topics: [] });
+  const left = mergeStories([old("Prisoner wins the right to freeze her eggs", "reddit"), old("Egg prices at Aldi", "reddit"), old("IVF egg collections paused", "news")], []).items;
+  assert.deepEqual(left.map((x) => x.title).sort(), ["Egg prices at Aldi", "IVF egg collections paused"]);
+}
 
 // Google Alerts (Atom): the link comes out of google.com/url, bold tags go.
 const alerts = `<feed><title>Google Alert - eggs australia</title><entry><title type="html">Free range &lt;b&gt;egg&lt;/b&gt; farmers face &amp;#39;housing shock&amp;#39;</title><link href="https://www.google.com/url?rct=j&amp;sa=t&amp;url=https://www.farmonline.com.au/story/123/&amp;ct=ga"/><published>2026-11-03T07:00:00Z</published></entry></feed>`;
@@ -115,6 +141,64 @@ assert.equal(await isGithubRelay(fakeReq("Bearer abc.def.ghi")), false);
   later.sources["gn-eggs"].relayAt = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
   kv.set("news:v1", JSON.stringify(later));
   assert.equal((await newsView(env)).sources.find((x) => x.id === "gn-eggs").ok, false);
+}
+
+// Reddit: the Worker reads it itself, and GitHub's copy is a backup.
+{
+  const kv = new Map();
+  const env = { DATA: { get: async (k, type) => (kv.has(k) ? (type === "json" ? JSON.parse(kv.get(k)) : kv.get(k)) : null), put: async (k, v) => { kv.set(k, v); } } };
+  const state = (id) => JSON.parse(kv.get("news:v1")).sources[id];
+  const shown = async () => (await newsView(env)).sources.find((x) => x.id === "reddit");
+  const ago = (min) => new Date(Date.now() - min * 60 * 1000).toISOString();
+
+  // GitHub read it: the posts are stored like the Worker's own.
+  const out = await takeNewsRelay(env, { feeds: [{ id: "reddit", body: reddit }] });
+  assert.equal(out.ok, true);
+  assert.equal(JSON.parse(kv.get("news:v1")).items.length, 1);
+  assert.equal(state("reddit").ok, true);
+  assert.ok(state("reddit").relayAt);
+
+  // GitHub could not read it: that is not the source failing, so nothing changes.
+  const before = kv.get("news:v1");
+  assert.equal((await takeNewsRelay(env, { feeds: [{ id: "reddit", error: "HTTP 429" }] })).error, "No relayed feeds in that");
+  assert.equal(kv.get("news:v1"), before);
+  assert.equal((await takeNewsRelay(env, { feeds: [{ id: "gn-eggs", body: gn }, { id: "reddit", error: "HTTP 429" }] })).read, 1);
+  assert.equal(state("reddit").ok, true);
+
+  // The Worker still reads Reddit itself while GitHub's copy is fresh (Google News it leaves to GitHub).
+  const store = JSON.parse(kv.get("news:v1"));
+  for (const s of SOURCES) store.sources[s.id] = { ok: true, checkedAt: ago(1), okAt: ago(1), error: null, count: 0, ...(s.relay ? { relayAt: ago(1) } : {}) };
+  store.sources.reddit.checkedAt = ago(45);
+  store.sources["gn-eggs"].checkedAt = ago(45);
+  kv.set("news:v1", JSON.stringify(store));
+  const asked = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u) => { asked.push(String(u)); return new Response("slow down", { status: 429 }); };
+  try {
+    await runScheduledNews(env);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(asked, [src("reddit").url]);
+  assert.equal(state("reddit").ok, false);
+  assert.equal(state("reddit").error, "HTTP 429");
+
+  // One refused read is not shown as a problem while GitHub's copy is fresh...
+  assert.equal((await shown()).ok, true);
+  // ...or, with no relay, while the Worker's last good read is under three hours old.
+  const later = JSON.parse(kv.get("news:v1"));
+  later.sources.reddit = { ...later.sources.reddit, relayAt: null, okAt: ago(100) };
+  kv.set("news:v1", JSON.stringify(later));
+  assert.equal((await shown()).ok, true);
+  assert.equal((await shown()).checkedAt, later.sources.reddit.okAt);
+  later.sources.reddit.okAt = ago(200);
+  kv.set("news:v1", JSON.stringify(later));
+  assert.equal((await shown()).ok, false);
+  assert.equal((await shown()).error, "HTTP 429");
+  // Sources without a grace period say so at once.
+  later.sources["abc-eggs"] = { ok: false, checkedAt: ago(1), okAt: ago(20), error: "HTTP 500", count: 3 };
+  kv.set("news:v1", JSON.stringify(later));
+  assert.equal((await newsView(env)).sources.find((x) => x.id === "abc-eggs").ok, false);
 }
 
 console.log("news feed tests passed");

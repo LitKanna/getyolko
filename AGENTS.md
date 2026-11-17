@@ -662,8 +662,7 @@ this page's `lastmod` is the day a price or stock last changed (`lastPriceChange
 (egg prices, supply and farms; bird flu on poultry farms), the ABC "Poultry and egg production"
 (`/news/feed/2276/rss.xml`) and "Bird flu" (`/news/feed/1676/rss.xml`) topic feeds, NSW DPIRD's
 bird flu updates (extensionAUS feed), Australian Eggs, Egg Farmers of Australia, Inside FMCG (egg
-stories only), Reddit search (r/sydney, r/australia, r/AusFinance, posts with "eggs" in the
-title, "nest egg" and Easter eggs left out) and the general feeds of 7NEWS, The Guardian
+stories only), Reddit (below) and the general feeds of 7NEWS, The Guardian
 Australia, the SMH, SBS News and Farm Online (filter `egg-local`: egg headlines, overseas ones only
 if they also name Australia). The NSW bird flu page has no feed, so the Worker reads its "Latest
 advice" box for the case count and whether NSW farms are clear, and adds a story when it changes.
@@ -675,11 +674,36 @@ minutes, `node infra/news-relay.mjs`) reads the two `relay: true` sources from G
 them to `POST /api/news/relay`. That route needs no secret: the Worker checks the GitHub Actions
 OIDC token (issuer token.actions.githubusercontent.com, audience https://getyolko.com, repository
 LitKanna/getyolko, `job_workflow_ref` news-relay.yml on refs/heads/main) against GitHub's keys.
-While the relay is fresh (90 minutes) the Worker doesn't try Google itself. Stories are kept 90
+While the relay is fresh (a day, `RELAY_FRESH_MS`: GitHub runs this repo's scheduled jobs only
+every few hours) the Worker doesn't try Google itself. Stories are kept 90
 days, 500 at most, one row per headline (an outlet's own copy replaces the Google News one), all in
 one KV key `news:v1`, written only when something changed or every half hour. Admin routes:
 `GET /api/news`, `POST /api/news/poll`, `POST /api/news/feeds {url}` or `{id, remove: true}`. Run
 `npm run test:news` after changing the parser. Nothing here is shown on the shop.
+
+Reddit (rebuilt 17 Nov 2026, build 269). Reddit closed its search feed (`search.rss`) to readers
+who are not signed in on 10 Nov 2026: it answers HTTP 403 with a feed titled "forbidden", from
+Cloudflare and from anywhere else, and its `.json` pages answer 403 too. Kanna saw "Couldn't
+read Reddit last time" for a week. The "new posts" feed still opens, so the source is now one
+feed, `/r/<REDDIT_SUBS joined by +>/new/.rss?limit=100`: the newest 100 posts across 17
+Australian subreddits (the country, the cities, money, Woolworths and Coles), about seven hours
+of posts, read every 30 minutes and filtered here. A post stays when its title says egg or eggs
+and is not about something else (`NOT_EGG_RE`, and `REDDIT_NOT_RE` for IVF, wildlife, sayings
+and breakfast dishes); stored Reddit posts are checked against the rule again on every merge.
+Egg posts are rare: a handful a month across all 17, so a quiet Reddit tab is normal.
+- Two routes: the Worker reads the feed itself, and the GitHub relay sends a second copy
+  (`relay: "backup"`). A copy GitHub could not read is ignored, never counted as a failure.
+- Reddit now and then refuses a shared address with HTTP 429, so the admin only says "Couldn't
+  read Reddit" when neither route has worked for a while (`grace: 180` minutes for the
+  Worker's own read, a day for the relay's, `coveredAt`).
+- Never go back to a search address, and do not page back through a subreddit to fill in old
+  posts. A proper search needs a Reddit API app (an account, and Reddit's approval), which the
+  shop does not have.
+- From this cloud container curl can read the feed but Node's `fetch` is refused by the
+  container's own proxy ("Blocked by egress policy"), so `node infra/news-relay.mjs` shows
+  Reddit as failed here. That is not Reddit. To try the relay for real, run the News relay
+  workflow on a branch: it prints what it read, and the site refuses the post (401) because
+  the branch is not main.
 
 ### Egg varieties, stock and prices (Nov 2026)
 `infra/catalogue.mjs` is the one list of everything YOLKO can sell, as Kanna set it out: trays
