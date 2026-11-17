@@ -35,7 +35,29 @@ async function oidcToken() {
   return (await res.json()).value;
 }
 
-const feeds = await Promise.all(SOURCES.filter((s) => s.relay).map(read));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const GAP_MS = Number(process.env.RELAY_GAP_MS ?? 3000);
+const RETRY_MS = Number(process.env.RELAY_RETRY_MS ?? 20000);
+
+// One feed at a time, a few seconds apart, and a refused read ("HTTP 429", a 5xx, no answer) is
+// tried once more: Google now and then answered the second of two reads sent together with 429,
+// which left the bird flu search unread for a whole run.
+async function readAll(sources) {
+  const out = [];
+  for (const s of sources) {
+    if (out.length) await sleep(GAP_MS);
+    let f = await read(s);
+    if (f.error && !/^HTTP 4(?!29)\d\d$|^Not a feed$/.test(f.error)) {
+      console.log(f.id, "failed: " + f.error + ", trying once more");
+      await sleep(RETRY_MS);
+      f = await read(s);
+    }
+    out.push(f);
+  }
+  return out;
+}
+
+const feeds = await readAll(SOURCES.filter((s) => s.relay));
 for (const f of feeds) console.log(f.id, f.error ? "failed: " + f.error : "ok, " + f.body.length + " bytes");
 
 const token = await oidcToken();
