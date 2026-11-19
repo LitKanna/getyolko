@@ -1183,8 +1183,36 @@ function testSubject(subject, now = new Date()) {
   return `[Test ${time}] ${subject}`;
 }
 
-/** Send one YOLKO email to the order's customer through Zoho CPaaS (the ZeptoMail API). */
-async function sendCustomerEmail(env, order, { subject, html, text }, { test = false } = {}) {
+/**
+ * The same email from the shop's own Zoho mailbox: the backup for when CPaaS will not take it
+ * (its email credit ran out or lapsed, a refused key, a limit). Returns { ok, error? }.
+ */
+async function sendFromMailbox(env, { to, subject, html, bcc = "" }) {
+  const auth = await zohoAuth(env);
+  if (!auth) return { ok: false, error: "mailbox not connected" };
+  try {
+    const acct = await zohoMailAccount(env, auth);
+    await zohoMailSend(env, auth, `/accounts/${encodeURIComponent(acct.accountId)}/messages`, {
+      fromAddress: acct.address || SHOP_EMAIL,
+      toAddress: to,
+      ...(bcc ? { bccAddress: bcc } : {}),
+      subject,
+      content: html,
+      mailFormat: "html",
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err).slice(0, 300) };
+  }
+}
+
+/**
+ * Send one YOLKO email to the order's customer through Zoho CPaaS (the ZeptoMail API).
+ * If CPaaS answers no, the email goes out from the shop's mailbox instead (backup: false turns
+ * that off for a caller with its own second path), so a lapsed email credit never costs a
+ * customer their confirmation. Such a send returns { ok, via: "mailbox", cpaasError }.
+ */
+async function sendCustomerEmail(env, order, { subject, html, text }, { test = false, backup = true } = {}) {
   const token = String(env.ZEPTOMAIL_TOKEN || "").trim();
   const from = String(env.ORDER_EMAIL_FROM || "").trim();
   const to = String(order.stripe?.email || order.email || "").trim();
@@ -1221,8 +1249,20 @@ async function sendCustomerEmail(env, order, { subject, html, text }, { test = f
   }
   const data = await resp.json().catch(() => null);
   if (!resp.ok) {
-    const error = data?.error?.details?.[0]?.message || data?.error?.message || `HTTP ${resp.status}`;
-    return { ok: false, transient: resp.status >= 500 || resp.status === 429, error: String(error).slice(0, 300) };
+    const error = String(data?.error?.details?.[0]?.message || data?.error?.message || `HTTP ${resp.status}`).slice(0, 300);
+    const failed = { ok: false, transient: resp.status >= 500 || resp.status === 429, error };
+    if (!backup) return failed;
+    // CPaaS answered, and the answer was no: it did not take this email, so nothing is sent
+    // twice. (No answer at all, the catch above, is left to the retry: that try may have gone.)
+    const second = await sendFromMailbox(env, { to, subject: payload.subject, html, bcc: payload.bcc?.[0]?.email_address?.address || "" }).catch((err) => ({
+      ok: false,
+      error: String(err?.message || err).slice(0, 300),
+    }));
+    if (second.ok) {
+      console.log("order sender said no, sent from the mailbox instead:", error);
+      return { ok: true, to, requestId: null, via: "mailbox", cpaasError: error };
+    }
+    return { ...failed, mailboxError: second.error || "not sent" };
   }
   return { ok: true, to, requestId: data?.request_id || null };
 }
@@ -1445,13 +1485,13 @@ async function maybeSendOrderEmail(env, orderId, { force = false } = {}) {
   const now = new Date().toISOString();
   try {
     if (result.ok) {
-      await env.DATA.put(emailSentKey(orderId), JSON.stringify({ sentAt: now, to: result.to, requestId: result.requestId }));
+      await env.DATA.put(emailSentKey(orderId), JSON.stringify({ sentAt: now, to: result.to, requestId: result.requestId, ...(result.via ? { via: result.via } : {}) }));
       await rememberEmailForEvents(env, order, result.requestId);
     }
     const fresh = (await env.DATA.get(orderId, "json")) || order;
     const prev = fresh.confirmationEmail || {};
     fresh.confirmationEmail = result.ok
-      ? { sentAt: now, to: result.to, requestId: result.requestId, attempts: (prev.attempts || 0) + 1 }
+      ? { sentAt: now, to: result.to, requestId: result.requestId, ...(result.via ? { via: result.via, cpaasError: result.cpaasError } : {}), attempts: (prev.attempts || 0) + 1 }
       : { ...prev, lastError: result.error || result.reason, lastTriedAt: now, attempts: (prev.attempts || 0) + 1 };
     await env.DATA.put(orderId, JSON.stringify(fresh));
   } catch (err) {
@@ -3189,7 +3229,7 @@ async function sendSubEmail(env, sub, mail, first = "mailbox") {
     }
   };
   const orders = async () => {
-    const r = await sendCustomerEmail(env, { name: sub.name, email: to }, mail);
+    const r = await sendCustomerEmail(env, { name: sub.name, email: to }, mail, { backup: false });
     return r.ok ? { ok: true, via: "orders" } : { ok: false, error: r.error || r.reason || "not sent" };
   };
   let last = { ok: false, error: "not sent" };
@@ -6626,7 +6666,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "269",
+      "X-Yolko-Build": "270",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
