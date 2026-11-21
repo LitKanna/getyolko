@@ -1,0 +1,1 @@
+"""MarketAgentPro core package."""
