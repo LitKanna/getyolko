@@ -15,9 +15,11 @@
     var doc = document;
     var nav = navigator;
     var API = /(^|\.)getyolko\.com$/.test(location.hostname) ? "" : "https://getyolko.com";
-    /* Seconds on screen at which the totals are sent while the page is still open. */
-    var MARKS = [3, 15, 30, 60, 180, 600];
-    var MAX_SENDS = 12;
+    /* Seconds on screen at which the totals are sent while the page is still open. They are close
+       together early on: a page inside an app's own browser is often closed with no warning at
+       all, and then the last mark that got out is all the shop ever learns. */
+    var MARKS = [3, 6, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600];
+    var MAX_SENDS = 24;
 
     var memory = {};
     function read(store, key) {
@@ -163,8 +165,7 @@
       send(true);
     }
 
-    function bump(kind, once) {
-      if (once && taps[kind]) return;
+    function bump(kind) {
       taps[kind] = Math.min(99, (taps[kind] || 0) + 1);
       clearTimeout(tapTimer);
       tapTimer = setTimeout(function () { send(false); }, 1500);
@@ -195,12 +196,22 @@
       else if (t.closest("#tray-picker, #tray-kinds, #dozen-pickers, #often-picker, #qty-minus, #qty-plus")) bump("tray");
       else if (t.closest('a[href*="#order"]')) bump("cta");
     }, true);
-    /* Entering a box of the order form: the fact only, never what is typed. */
-    doc.addEventListener("focusin", function (e) {
+    /* How many boxes of the order form were entered or filled, each counted once: the number
+       only, never which box and never what is typed. A phone that fills the form from its saved
+       contact card never enters most boxes, so a box that changes counts as well. */
+    var boxes = [];
+    function box(e) {
       var t = e.target;
       if (!t || !t.closest || !t.closest("#order-form")) return;
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !/^(radio|checkbox|hidden|submit|button)$/.test(t.type || "")) bump("form", true);
-    }, true);
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || /^(radio|checkbox|hidden|submit|button)$/.test(t.type || "")) return;
+      /* The box no person can reach is there to catch robots; filling it is not a visitor's act. */
+      if (t.tabIndex < 0) return;
+      if (boxes.indexOf(t) >= 0) return;
+      boxes.push(t);
+      bump("form");
+    }
+    doc.addEventListener("focusin", box, true);
+    doc.addEventListener("input", box, true);
 
     doc.addEventListener("visibilitychange", function () {
       if (doc.visibilityState === "hidden") hide(); else show();
