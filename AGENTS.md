@@ -134,6 +134,14 @@ script gives `.order-details` the class `has-msg` while either shows so the grid
 fee on the page stays $5, because only the server knows at checkout whether the order is a first
 one. A code that no longer exists shows nothing at all.
 
+Ad landing (23 Nov 2026). A visitor whose link carries `utm_campaign=surry-hills-test` reads
+"Fresh eggs delivered to Surry Hills" in the homepage heading in place of "across Sydney": ad
+visitors went looking for their suburb before anything else. A small script right after
+`#hero-title` in `index.html` swaps the words before the page paints, from the address or from
+`yolko_attr` in `sessionStorage` on a later page of the same visit. Nothing else on the page
+changes, and nobody else sees it. To greet another campaign, add it to `AD_SUBURBS` there, and
+only with a suburb on the delivery list. The heading must still sit on three lines on a phone.
+
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
 big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
