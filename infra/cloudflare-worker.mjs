@@ -14,6 +14,7 @@ import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
 import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
+import { applyVisitPing, netKind, visitVerdict, pagesBySession } from "./visit-engagement.mjs";
 import {
   LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
   callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
@@ -417,6 +418,25 @@ async function allowRate(env, key, limit, windowSec) {
   hits.push(now);
   await env.DATA.put(id, JSON.stringify({ hits }), { expirationTtl: windowSec + 120 });
   return true;
+}
+
+// What visitors do on a page (infra/visit-engagement.mjs) may spend at most this many KV writes
+// a day: the plan allows 1,000 a day for everything, orders included, and an order must never be
+// the write that is refused. The count sits in the edge cache, so counting costs no KV write. It
+// is kept per Cloudflare location and nearly every visitor arrives through Sydney's, so it is a
+// close count, not an exact one. KV's own daily limit also turns over at midnight UTC.
+const PING_DAILY_WRITES = 300;
+async function pingBudgetOk() {
+  try {
+    const key = new Request(`https://getyolko.com/__ping-budget/${new Date().toISOString().slice(0, 10)}`);
+    const hit = await caches.default.match(key);
+    const used = hit ? Number(await hit.text()) || 0 : 0;
+    if (used >= PING_DAILY_WRITES) return false;
+    await caches.default.put(key, new Response(String(used + 1), { headers: { "Cache-Control": "max-age=90000" } }));
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 
@@ -6383,11 +6403,29 @@ async function handleApi(request, env, url, ctx) {
       gender: null,
       name: null,
       hardwareDeviceId: null,
+      // track.js rows: what the visitor then does on the page arrives on /api/visit/ping.
+      trk: Number(body?.trk) === 2 ? 2 : null,
+      pageN: Math.min(99, Math.max(1, Math.floor(Number(body?.pageN)) || 1)),
+      net: netKind(geo.asnOrg),
     };
 
     await env.DATA.put(id, JSON.stringify(visit), { expirationTtl: 90 * 24 * 3600 });
     await pushVisitIndex(env, id);
     return json({ ok: true, id, visitorId });
+  }
+
+  // Public: what the visitor did on a page they already opened (seconds on screen, scroll, taps).
+  // The page sends running totals; the row keeps the highest (infra/visit-engagement.mjs).
+  if (url.pathname === "/api/visit/ping" && request.method === "POST") {
+    if (!isAllowedOrigin(request)) return json({ error: "forbidden", code: "origin" }, 403);
+    let body = null;
+    try {
+      body = JSON.parse((await request.text()).slice(0, 2000));
+    } catch {
+      return json({ ok: false, reason: "body" }, 400);
+    }
+    const done = await applyVisitPing(env.DATA, body, { budget: pingBudgetOk });
+    return json({ ok: done.ok, wrote: Boolean(done.wrote) }, done.ok ? 200 : 400);
   }
 
   // Admin: list tracked visits (flyer / QR / ads)
@@ -6396,7 +6434,10 @@ async function handleApi(request, env, url, ctx) {
     const srcFilter = String(url.searchParams.get("src") || "").trim().toLowerCase();
     const ids = await getVisitIndex(env);
     const rows = await Promise.all(ids.slice(0, 400).map((id) => env.DATA.get(id, "json")));
-    let visits = rows.filter(Boolean);
+    const pages = pagesBySession(rows.filter(Boolean));
+    const nowMs = Date.now();
+    // Each row says whether it looks like a person, and how many pages that browser session opened.
+    let visits = rows.filter(Boolean).map((v) => ({ ...v, verdict: visitVerdict(v, nowMs), pages: (v.sessionId && pages[v.sessionId]) || 1 }));
     if (srcFilter) {
       visits = visits.filter((v) => {
         const s = String(v.src || "").toLowerCase();
@@ -6414,7 +6455,9 @@ async function handleApi(request, env, url, ctx) {
     const byDevice = {};
     const byCity = {};
     const bySrc = {};
+    const byVerdict = { real: 0, suspect: 0 };
     for (const v of visits) {
+      if (v.verdict.label in byVerdict) byVerdict[v.verdict.label] += 1;
       const d = v.deviceType || "unknown";
       byDevice[d] = (byDevice[d] || 0) + 1;
       const city = [v.city, v.region, v.country].filter(Boolean).join(", ") || "Unknown";
@@ -6431,6 +6474,8 @@ async function handleApi(request, env, url, ctx) {
         byDevice,
         byCity,
         bySrc,
+        real: byVerdict.real,
+        suspect: byVerdict.suspect,
       },
       note: "Browsers never send gender, real name, or hardware device IDs (IMEI). Name appears when the same visitor places an order.",
     });
@@ -6600,7 +6645,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "122",
+          "X-Yolko-Admin": "123",
         },
       });
     }
@@ -6666,7 +6711,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "270",
+      "X-Yolko-Build": "271",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

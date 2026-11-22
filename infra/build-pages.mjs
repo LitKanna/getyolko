@@ -858,6 +858,11 @@ const TOPBAR_SCRIPT = `  <script>
   })();
   </script>`;
 
+// The visit log (track.js): every page a person can land on loads it, so a second page shows up
+// against the same visit. The 404 page does not, since robots probing for old addresses land there.
+const TRACK_SCRIPT = `
+  <script src="track.js?v=1" defer></script>`;
+
 function page({ path, title, description, graph, index, hero, body, mobile, pack, scripts = "" }) {
   return `${head({ path, title, description, graph, index, hero })}
 <body class="local">
@@ -866,7 +871,7 @@ ${body}
 
 ${mobile ? mobileCta(mobile, pack) + "\n\n" : ""}${footer(path)}
 
-${scripts}${body.includes("data-price-often") ? PRICE_OFTEN_SCRIPT : ""}${TOPBAR_SCRIPT}
+${scripts}${body.includes("data-price-often") ? PRICE_OFTEN_SCRIPT : ""}${TOPBAR_SCRIPT}${index === false ? "" : TRACK_SCRIPT}
 </body>
 </html>
 `;
