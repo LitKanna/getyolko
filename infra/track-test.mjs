@@ -20,11 +20,14 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
     <form id="order-form" onsubmit="return false">
       <fieldset id="tray-picker"><label id="two"><input type="radio" name="bundle" value="tray2"> 2 trays</label></fieldset>
       <input id="name" name="name" type="text">
+      <input id="phone" name="phone" type="tel">
+      <input id="suburb" name="suburb" type="text">
+      <input id="trap" name="trap" type="text" tabindex="-1">
       <button id="buynow-btn" type="submit">Buy now</button>
     </form>
   </section>
   <div style="height:1400px"></div>
-  <script src="track.js?v=1"></script>
+  <script src="track.js?v=2"></script>
 </body></html>`;
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -91,7 +94,7 @@ try {
   ok(seen.pings.length === 1 && last(seen).secs === 3 && last(seen).id === ID && last(seen).v === first.visitorId, "at 3 seconds the first total goes out, naming the row and the visitor");
   ok(last(seen).scrolled === false && last(seen).order === false && last(seen).scroll > 0 && last(seen).scroll < 40 && Object.keys(last(seen).taps).length === 0, "no scroll and no taps yet; the first screen counts as seen");
   await pass(page, 12000);
-  ok(seen.pings.length === 2 && last(seen).secs === 15, "at 15 seconds the next");
+  ok(seen.pings.map((x) => x.secs).join(",") === "3,6,10,15", "then at 6, 10 and 15 seconds: close together early, when most visitors leave");
 
   // 3. A real scroll, the order section, and taps on the controls.
   await page.mouse.wheel(0, 3100);
@@ -104,10 +107,10 @@ try {
   await pass(page, 1600);
   let t = last(seen);
   ok(t.scrolled === true && t.order === true && t.scroll > 50, "a scroll by the visitor is recorded, and the order section was reached");
-  ok(t.taps.tray === 2 && t.taps.buy === 1 && t.taps.form === 1, "tray switch twice, Buy now once, the form entered once");
+  ok(t.taps.tray === 2 && t.taps.buy === 1 && t.taps.form === 1, "tray switch twice, Buy now once, one box of the form entered");
   ok(!JSON.stringify(seen.pings).includes("Sam") && !JSON.stringify(seen.visits).includes("Sam"), "what was typed is never sent");
   const sentSoFar = seen.pings.length;
-  ok(sentSoFar === 3, "a burst of taps goes out as one send");
+  ok(sentSoFar === 5, "a burst of taps goes out as one send");
 
   // 4. Checkout cannot wait: it goes at once, as a beacon.
   await page.evaluate(() => window.YOLKO_TRACK.mark("checkout"));
@@ -117,6 +120,7 @@ try {
 
   // 5. Time away does not count, and leaving sends the last total once.
   await pass(page, 4000);
+  ok(last(seen).secs === 20 && last(seen)._type !== "ping", "the 20 second mark goes out while the page is open");
   await leave(page);
   const atLeave = last(seen).secs;
   ok(atLeave === 21 && last(seen)._type === "ping", "leaving sends the total by sendBeacon");
@@ -133,7 +137,23 @@ try {
   ok(seen.pings.length === n + 1 && last(seen).secs === 30, "back on screen it carries on from where it stopped: the 30 second mark, not 90");
   ok(seen.pings.every((x, i) => i === 0 || x.secs >= seen.pings[i - 1].secs), "totals only ever go up");
 
-  // 6. Tel and WhatsApp links, and the Order link.
+  // 6. More of the form: each box counts once, and a box the phone fills by itself counts too.
+  await page.locator("#phone").tap();
+  await page.locator("#name").tap();
+  await page.evaluate(() => {
+    const el = document.getElementById("suburb");
+    el.value = "Rhodes";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    const trap = document.getElementById("trap");
+    trap.value = "robot";
+    trap.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await pass(page, 1600);
+  ok(last(seen).taps.form === 3, "three boxes of the form: two entered, one filled by the phone, none counted twice, and the robot trap not at all");
+  ok(!JSON.stringify(seen.pings).includes("Rhodes"), "and still nothing typed or filled is sent");
+
+  // 7. Tel and WhatsApp links, and the Order link.
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.locator("#tel").tap();
   await page.locator("#wa").tap();
@@ -142,7 +162,7 @@ try {
   t = last(seen);
   ok(t.taps.phone === 1 && t.taps.whatsapp === 1 && t.taps.cta === 1, "phone, WhatsApp and the Order link are counted");
 
-  // 7. A second page in the same session says so and keeps the ad's name.
+  // 8. A second page in the same session says so and keeps the ad's name.
   await page.goto("https://getyolko.com/egg-delivery-rhodes");
   await page.waitForFunction(() => window.YOLKO_TRACK && window.YOLKO_TRACK.visitorId);
   await settle(page);
@@ -152,20 +172,20 @@ try {
   ok(seen.other.length === 0, "nothing is sent anywhere but the shop");
   await ctx.close();
 
-  // 8. A link that jumps to the order form is not a scroll by the visitor.
+  // 9. A link that jumps to the order form is not a scroll by the visitor.
   ({ ctx, page, seen } = await open({ url: "https://getyolko.com/?b=box#order" }));
   await pass(page, 3100);
   ok(last(seen).secs === 3 && last(seen).order === true && last(seen).scrolled === false, "arriving at #order: the order section was seen, but nobody scrolled");
   await ctx.close();
 
-  // 9. Gone in a second: one send on the way out, with what little there was.
+  // 10. Gone in a second: one send on the way out, with what little there was.
   ({ ctx, page, seen } = await open());
   await pass(page, 900);
   await leave(page);
   ok(seen.pings.length === 1 && seen.pings[0].secs === 0 && seen.pings[0].scrolled === false, "a bounce is one send of zero seconds");
   await ctx.close();
 
-  // 10. The shop answers slowly: the visitor has left before the row has an id. The totals still go.
+  // 11. The shop answers slowly: the visitor has left before the row has an id. The totals still go.
   ({ ctx, page, seen } = await open({ visitDelayMs: 1200 }));
   await page.clock.runFor(2000);
   await leave(page);
@@ -174,19 +194,19 @@ try {
   ok(seen.pings.length === 1 && seen.pings[0].secs === 2 && seen.pings[0].id === ID, "once the row exists the totals from before are sent");
   await ctx.close();
 
-  // 11. The shop gives no row (throttled): the page stays quiet for good.
+  // 12. The shop gives no row (throttled): the page stays quiet for good.
   ({ ctx, page, seen } = await open({ visitAnswer: { ok: true, throttled: true } }));
   await pass(page, 20000);
   await leave(page);
   ok(seen.visits.length === 1 && seen.pings.length === 0, "no row, no pings");
   await ctx.close();
 
-  // 12. A long stay stops sending: the marks run out and a page view has a ceiling.
+  // 13. A long stay stops sending: the marks run out and a page view has a ceiling.
   ({ ctx, page, seen } = await open());
   await pass(page, 700000);
-  ok(seen.pings.map((x) => x.secs).join(",") === "3,15,30,60,180,600", "the marks are 3, 15, 30, 60, 180 and 600 seconds");
-  for (let i = 0; i < 12; i++) { await leave(page); await comeBack(page); await pass(page, 2000); }
-  ok(seen.pings.length === 12, "one page view sends at most 12 times");
+  ok(seen.pings.map((x) => x.secs).join(",") === "3,6,10,15,20,30,45,60,90,120,180,300,600", "the marks run from 3 seconds to 10 minutes, closest together at the start");
+  for (let i = 0; i < 16; i++) { await leave(page); await comeBack(page); await pass(page, 2000); }
+  ok(seen.pings.length === 24, "one page view sends at most 24 times");
   await ctx.close();
 } finally {
   await browser.close();

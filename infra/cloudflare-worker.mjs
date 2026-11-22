@@ -6645,7 +6645,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "123",
+          "X-Yolko-Admin": "124",
         },
       });
     }
@@ -6711,7 +6711,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "273",
+      "X-Yolko-Build": "274",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

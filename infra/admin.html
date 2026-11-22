@@ -5322,7 +5322,7 @@ function grCsv() {
 /* ============================== flyer visits ============================== */
 let VISIT_FILTER = "flyer";
 /* What the visitor did on the page (track.js): rows from before it carry none of this. */
-const VISIT_TAPS = [["cta", "Order link"], ["tray", "Tray switch"], ["form", "Started the form"], ["buy", "Buy now"], ["checkout", "Checkout"], ["phone", "Phone"], ["whatsapp", "WhatsApp"]];
+const VISIT_TAPS = [["cta", "Order link"], ["tray", "Tray switch"], ["form", "Order form"], ["buy", "Buy now"], ["checkout", "Checkout"], ["phone", "Phone"], ["whatsapp", "WhatsApp"]];
 function visitTime(v) {
   if (v.trk !== 2) return "Not recorded";
   if (!v.eng) return v.verdict && v.verdict.label === "new" ? "Still open" : "Nothing came back";
@@ -5336,7 +5336,11 @@ function visitScroll(v) {
 function visitTaps(v) {
   if (!v.eng) return "-";
   const t = v.eng.taps || {};
-  const said = VISIT_TAPS.filter(function (k) { return Number(t[k[0]]) > 0; }).map(function (k) { return k[1] + (Number(t[k[0]]) > 1 ? " ×" + Number(t[k[0]]) : ""); });
+  const said = VISIT_TAPS.filter(function (k) { return Number(t[k[0]]) > 0; }).map(function (k) {
+    const n = Number(t[k[0]]);
+    if (k[0] === "form") return k[1] + ", " + n + (n === 1 ? " box" : " boxes");
+    return k[1] + (n > 1 ? " ×" + n : "");
+  });
   return said.length ? said.join(", ") : "Nothing";
 }
 function visitPages(v) {

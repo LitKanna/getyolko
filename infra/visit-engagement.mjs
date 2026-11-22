@@ -13,11 +13,12 @@
 // eng.scroll   deepest point seen, as a percent of the page's height (the first screen counts)
 // eng.scrolled true once the visitor moved the page with a finger, wheel or key
 // eng.order    true once the homepage order section came into view
-// eng.taps     how many times each control was tapped; "form" is 1 once a form box was entered
+// eng.taps     how many times each control was tapped; "form" is how many boxes of the order
+//              form were entered or filled, each counted once
 // eng.n        how many sends changed the row; eng.at is the time of the last one
 
 /** KV writes one page view may cost for engagement. A Buy now or checkout tap may go a little over. */
-export const PING_MAX_WRITES = 8;
+export const PING_MAX_WRITES = 16;
 const PING_VITAL_EXTRA = 4;
 /** A page view takes updates for this long after it was opened. */
 export const PING_MAX_AGE_MS = 6 * 60 * 60 * 1000;
