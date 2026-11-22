@@ -14,7 +14,7 @@ import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
 import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
-import { applyVisitPing, netKind, visitVerdict, pagesBySession } from "./visit-engagement.mjs";
+import { takeVisitPing, highestTotals, netKind, visitVerdict, pagesBySession } from "./visit-engagement.mjs";
 import {
   LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
   callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
@@ -425,6 +425,19 @@ async function allowRate(env, key, limit, windowSec) {
 // the write that is refused. The count sits in the edge cache, so counting costs no KV write. It
 // is kept per Cloudflare location and nearly every visitor arrives through Sydney's, so it is a
 // close count, not an exact one. KV's own daily limit also turns over at midnight UTC.
+/* The newest totals of each open page view, held at the edge between row writes
+   (infra/visit-engagement.mjs, takeVisitPing). The edge cache costs no KV write. */
+const visitStore = {
+  key: (id) => new Request(`https://getyolko.com/__visit-eng/${encodeURIComponent(id)}`),
+  async get(id) {
+    const hit = await caches.default.match(visitStore.key(id));
+    return hit ? await hit.json() : null;
+  },
+  async put(id, state) {
+    await caches.default.put(visitStore.key(id), new Response(JSON.stringify(state), { headers: { "Content-Type": "application/json", "Cache-Control": "max-age=21600" } }));
+  },
+};
+
 const PING_DAILY_WRITES = 300;
 async function pingBudgetOk() {
   try {
@@ -6424,8 +6437,15 @@ async function handleApi(request, env, url, ctx) {
     } catch {
       return json({ ok: false, reason: "body" }, 400);
     }
-    const done = await applyVisitPing(env.DATA, body, { budget: pingBudgetOk });
-    return json({ ok: done.ok, wrote: Boolean(done.wrote) }, done.ok ? 200 : 400);
+    // The page reports every 3 seconds. The newest totals wait at the edge and the row is written
+    // when it matters, and once more a few seconds after the reports stop.
+    const done = await takeVisitPing(env.DATA, visitStore, body, {
+      budget: pingBudgetOk,
+      defer: (ms, fn) => {
+        if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(new Promise((r) => setTimeout(r, ms)).then(fn).catch(() => null));
+      },
+    });
+    return json({ ok: done.ok, wrote: Boolean(done.wrote), held: Boolean(done.held), edge: Boolean(done.edge) }, done.ok ? 200 : 400);
   }
 
   // Admin: list tracked visits (flyer / QR / ads)
@@ -6436,6 +6456,18 @@ async function handleApi(request, env, url, ctx) {
     const rows = await Promise.all(ids.slice(0, 400).map((id) => env.DATA.get(id, "json")));
     const pages = pagesBySession(rows.filter(Boolean));
     const nowMs = Date.now();
+    // A page that is open right now has newer totals at the edge than in its row: show those.
+    const fresh = rows.filter((v) => v && v.trk === 2 && nowMs - Date.parse(v.createdAt || "") < 20 * 60 * 1000).slice(0, 10);
+    await Promise.all(
+      fresh.map(async (v) => {
+        try {
+          const held = await visitStore.get(v.id);
+          if (!held || held.v !== v.visitorId || !held.eng) return;
+          v.eng = { ...(v.eng || {}), ...highestTotals(v.eng, held.eng) };
+          v.live = nowMs - (Number(held.at) || 0) < 10000;
+        } catch {}
+      }),
+    );
     // Each row says whether it looks like a person, and how many pages that browser session opened.
     let visits = rows.filter(Boolean).map((v) => ({ ...v, verdict: visitVerdict(v, nowMs), pages: (v.sessionId && pages[v.sessionId]) || 1 }));
     if (srcFilter) {
@@ -6645,7 +6677,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "124",
+          "X-Yolko-Admin": "125",
         },
       });
     }
@@ -6711,7 +6743,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "274",
+      "X-Yolko-Build": "275",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

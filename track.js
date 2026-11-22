@@ -6,7 +6,7 @@
    never counts twice. Nothing typed is read, and no name or contact detail is sent.
 
    Phones and the Facebook and Instagram browsers often close a page without telling it, so the
-   totals also go out at fixed points while the page is on screen, not only when it is left. */
+   totals also go out every 3 seconds while the page is on screen, not only when it is left. */
 (function () {
   "use strict";
   if (window.YOLKO_TRACK) return;
@@ -15,11 +15,20 @@
     var doc = document;
     var nav = navigator;
     var API = /(^|\.)getyolko\.com$/.test(location.hostname) ? "" : "https://getyolko.com";
-    /* Seconds on screen at which the totals are sent while the page is still open. They are close
-       together early on: a page inside an app's own browser is often closed with no warning at
-       all, and then the last mark that got out is all the shop ever learns. */
-    var MARKS = [3, 6, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600];
-    var MAX_SENDS = 24;
+    /* The totals are sent every 3 seconds the page is on screen. A phone often closes a page
+       with no warning at all (a closed tab, an app's own browser), and then the last report that
+       got out is all the shop ever learns, so the gap is kept to 3 seconds. After 3 minutes it
+       eases to every 15 seconds, and it stops at 15 minutes. */
+    var STEP = 3;
+    var SLOW_AFTER = 180;
+    var SLOW_STEP = 15;
+    var STOP_AFTER = 900;
+    var MAX_SENDS = 150;
+    function nextMark(s) {
+      if (s >= STOP_AFTER) return null;
+      var step = s < SLOW_AFTER ? STEP : SLOW_STEP;
+      return (Math.floor((s + 0.05) / step) + 1) * step;
+    }
 
     var memory = {};
     function read(store, key) {
@@ -144,10 +153,7 @@
       clearTimeout(markTimer);
       if (since == null) return;
       var s = onScreen();
-      var next = null;
-      for (var i = 0; i < MARKS.length; i++) {
-        if (MARKS[i] > s + 0.05) { next = MARKS[i]; break; }
-      }
+      var next = nextMark(s);
       if (next == null) return;
       markTimer = setTimeout(function () { send(false); arm(); }, Math.ceil((next - s) * 1000) + 40);
     }
@@ -266,7 +272,7 @@
         id = d.id;
         /* The row can arrive after the first mark has passed, or after the visitor has gone. */
         if (since == null) send(true);
-        else if (onScreen() >= MARKS[0]) send(false);
+        else if (onScreen() >= STEP) send(false);
       })
       .catch(function () {});
   } catch (_) {}

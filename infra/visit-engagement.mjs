@@ -15,7 +15,13 @@
 // eng.order    true once the homepage order section came into view
 // eng.taps     how many times each control was tapped; "form" is how many boxes of the order
 //              form were entered or filled, each counted once
-// eng.n        how many sends changed the row; eng.at is the time of the last one
+// eng.n        how many times the row was written for engagement; eng.at is the time of the last
+//
+// The page reports every 3 seconds. Writing the row that often would spend the day's KV writes,
+// which orders need, so the shop holds the newest totals at the edge (takeVisitPing) and writes
+// the row when it matters: the first report, a new kind of tap, a Buy now or checkout tap, a few
+// fixed marks, and once the reports have stopped for a few seconds. That last write is what
+// makes the time exact when a phone kills the page with no warning.
 
 /** KV writes one page view may cost for engagement. A Buy now or checkout tap may go a little over. */
 export const PING_MAX_WRITES = 16;
@@ -147,6 +153,87 @@ export async function applyVisitPing(kv, body, { now = Date.now(), budget = asyn
   if (!(await budget())) return { ok: true, wrote: false, reason: "budget" };
   await kv.put(id, JSON.stringify({ ...row, eng }), { expirationTtl: ttl });
   return { ok: true, wrote: true, eng };
+}
+
+/** After this long with no new report from a page, what the edge holds is written to the row. */
+export const PING_QUIET_MS = 7000;
+/** Seconds on screen at which the row is written whatever else happens. If the quiet write is
+    ever lost, the row is still never further behind than the last of these. */
+const SAFE_MARKS = [15, 30, 60, 180, 600];
+const marksPassed = (secs) => SAFE_MARKS.filter((m) => m <= (Number(secs) || 0)).length;
+const totals = (e) => ({ secs: e.secs || 0, scroll: e.scroll || 0, scrolled: Boolean(e.scrolled), order: Boolean(e.order), taps: { ...(e.taps || {}) } });
+const sameTotals = (a, b) => Boolean(a && b) && JSON.stringify(totals(a)) === JSON.stringify(totals(b));
+
+/** The newest of two sets of totals, field by field. Either may be missing. */
+export function highestTotals(a, b) {
+  if (!a || !b) return a || b ? totals(a || b) : null;
+  const taps = { ...(a.taps || {}) };
+  for (const k of TAP_KEYS) if ((b.taps?.[k] || 0) > (taps[k] || 0)) taps[k] = b.taps[k];
+  return { secs: Math.max(a.secs || 0, b.secs || 0), scroll: Math.max(a.scroll || 0, b.scroll || 0), scrolled: Boolean(a.scrolled || b.scrolled), order: Boolean(a.order || b.order), taps };
+}
+
+/**
+ * One report from a page, taken at the edge. `store` holds the newest totals for each open page
+ * view ({ get(id), put(id, state) }, the edge cache in the Worker) and costs no KV write. The row
+ * itself is written through applyVisitPing only when it matters (see the top of this file).
+ * `defer(ms, fn)` runs fn later (ctx.waitUntil in the Worker); `clock()` is the time now.
+ *
+ * Every write carries all the totals so far, so a write that is refused, lost or late costs
+ * nothing but freshness. If the store is not there at all, each report is written after the
+ * quiet wait instead, and the per page and per day limits still hold.
+ */
+export async function takeVisitPing(kv, store, body, { clock = Date.now, budget, ttl, defer = () => {}, quietMs = PING_QUIET_MS } = {}) {
+  const id = String(body?.id || "");
+  if (!VISIT_ID.test(id)) return { ok: false, reason: "id" };
+  const v = String(body?.v || "");
+  if (!v) return { ok: false, reason: "visitor" };
+  const now = clock();
+  let state = null;
+  try { state = await store.get(id); } catch { state = null; }
+  if (state && state.v !== v) return { ok: false, reason: "visitor" };
+  if (!state) {
+    const row = await kv.get(id, "json");
+    if (!row || typeof row !== "object") return { ok: false, reason: "gone" };
+    if (row.visitorId !== v) return { ok: false, reason: "visitor" };
+    const inRow = row.eng && typeof row.eng === "object" ? totals(row.eng) : null;
+    state = { v, created: Date.parse(row.createdAt || ""), eng: inRow, sent: inRow, seq: 0 };
+  }
+  if (!(now - state.created < PING_MAX_AGE_MS)) return { ok: false, reason: "old" };
+  const merged = mergeEngagement(state.eng, cleanPing(body), { createdAtMs: state.created, nowMs: now });
+  if (!merged.changed) return { ok: true, wrote: false, held: false, reason: "same" };
+  const edge = Boolean(state.seq); // the store had this page view: it is doing its job
+  state.eng = totals(merged.eng);
+  state.seq = (state.seq || 0) + 1;
+  state.at = now;
+  const seq = state.seq;
+
+  const write = async (st) => {
+    const done = await applyVisitPing(kv, { id, v: st.v, ...st.eng }, { now: clock(), budget, ttl });
+    // Written or refused, these totals have had their turn: the next write carries them again.
+    st.sent = st.eng;
+    return Boolean(done.wrote);
+  };
+  const s = state.sent;
+  const urgent =
+    !s ||
+    TAP_KEYS.some((k) => (state.eng.taps[k] || 0) > 0 && !(s.taps?.[k] > 0)) ||
+    ["buy", "checkout"].some((k) => (state.eng.taps[k] || 0) > (s.taps?.[k] || 0)) ||
+    marksPassed(state.eng.secs) > marksPassed(s.secs);
+  let wrote = false;
+  if (urgent) wrote = await write(state);
+  try { await store.put(id, state); } catch {}
+  if (!urgent) {
+    defer(quietMs, async () => {
+      let latest = null;
+      try { latest = await store.get(id); } catch { latest = null; }
+      if (latest && latest.seq !== seq) return; // a newer report came: its own wait decides
+      const st = latest || state;
+      if (sameTotals(st.eng, st.sent)) return;
+      await write(st);
+      if (latest) { try { await store.put(id, st); } catch {} }
+    });
+  }
+  return { ok: true, wrote, held: !urgent, edge };
 }
 
 /** How many page views each browser session has in a list of rows: { sessionId: count }. */

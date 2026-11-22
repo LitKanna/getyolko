@@ -27,7 +27,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
     </form>
   </section>
   <div style="height:1400px"></div>
-  <script src="track.js?v=2"></script>
+  <script src="track.js?v=3"></script>
 </body></html>`;
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -94,7 +94,7 @@ try {
   ok(seen.pings.length === 1 && last(seen).secs === 3 && last(seen).id === ID && last(seen).v === first.visitorId, "at 3 seconds the first total goes out, naming the row and the visitor");
   ok(last(seen).scrolled === false && last(seen).order === false && last(seen).scroll > 0 && last(seen).scroll < 40 && Object.keys(last(seen).taps).length === 0, "no scroll and no taps yet; the first screen counts as seen");
   await pass(page, 12000);
-  ok(seen.pings.map((x) => x.secs).join(",") === "3,6,10,15", "then at 6, 10 and 15 seconds: close together early, when most visitors leave");
+  ok(seen.pings.map((x) => x.secs).join(",") === "3,6,9,12,15", "then every 3 seconds: a page killed with no warning loses 3 seconds at most");
 
   // 3. A real scroll, the order section, and taps on the controls.
   await page.mouse.wheel(0, 3100);
@@ -110,7 +110,7 @@ try {
   ok(t.taps.tray === 2 && t.taps.buy === 1 && t.taps.form === 1, "tray switch twice, Buy now once, one box of the form entered");
   ok(!JSON.stringify(seen.pings).includes("Sam") && !JSON.stringify(seen.visits).includes("Sam"), "what was typed is never sent");
   const sentSoFar = seen.pings.length;
-  ok(sentSoFar === 5, "a burst of taps goes out as one send");
+  ok(sentSoFar === 6, "a burst of taps goes out as one send");
 
   // 4. Checkout cannot wait: it goes at once, as a beacon.
   await page.evaluate(() => window.YOLKO_TRACK.mark("checkout"));
@@ -119,11 +119,11 @@ try {
   ok(seen.pings.length === sentSoFar + 1 && t.taps.checkout === 1 && t._type === "ping", "checkout is sent the moment it starts, by sendBeacon");
 
   // 5. Time away does not count, and leaving sends the last total once.
-  await pass(page, 4000);
-  ok(last(seen).secs === 20 && last(seen)._type !== "ping", "the 20 second mark goes out while the page is open");
+  await pass(page, 5000);
+  ok(last(seen).secs === 21 && last(seen)._type !== "ping", "the 3 second reports carry on while the page is open");
   await leave(page);
   const atLeave = last(seen).secs;
-  ok(atLeave === 21 && last(seen)._type === "ping", "leaving sends the total by sendBeacon");
+  ok(atLeave === 22 && last(seen)._type === "ping", "leaving sends the total by sendBeacon");
   const n = seen.pings.length;
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   await settle(page);
@@ -131,10 +131,10 @@ try {
   await pass(page, 60000);
   ok(seen.pings.length === n, "a hidden page sends nothing and counts no time");
   await comeBack(page);
-  await pass(page, 8500);
-  ok(seen.pings.length === n, "8 more seconds on screen is 29 in all: nothing due yet");
   await pass(page, 1000);
-  ok(seen.pings.length === n + 1 && last(seen).secs === 30, "back on screen it carries on from where it stopped: the 30 second mark, not 90");
+  ok(seen.pings.length === n, "1 more second on screen is 23 in all: nothing due yet");
+  await pass(page, 1000);
+  ok(seen.pings.length === n + 1 && last(seen).secs === 24, "back on screen it carries on from where it stopped: 24 seconds, not 84");
   ok(seen.pings.every((x, i) => i === 0 || x.secs >= seen.pings[i - 1].secs), "totals only ever go up");
 
   // 6. More of the form: each box counts once, and a box the phone fills by itself counts too.
@@ -203,10 +203,13 @@ try {
 
   // 13. A long stay stops sending: the marks run out and a page view has a ceiling.
   ({ ctx, page, seen } = await open());
-  await pass(page, 700000);
-  ok(seen.pings.map((x) => x.secs).join(",") === "3,6,10,15,20,30,45,60,90,120,180,300,600", "the marks run from 3 seconds to 10 minutes, closest together at the start");
-  for (let i = 0; i < 16; i++) { await leave(page); await comeBack(page); await pass(page, 2000); }
-  ok(seen.pings.length === 24, "one page view sends at most 24 times");
+  await pass(page, 1000000);
+  const secs = seen.pings.map((x) => x.secs);
+  ok(secs.slice(0, 60).every((s, i) => s === (i + 1) * 3), "every 3 seconds for the first 3 minutes");
+  ok(secs.slice(60).every((s, i) => s === 195 + i * 15) && secs.length === 108 && secs[107] === 900, "then every 15 seconds, and the last at 15 minutes");
+  for (let i = 0; i < 46; i++) { await leave(page); await comeBack(page); await page.clock.runFor(2000); }
+  await settle(page);
+  ok(seen.pings.length === 150, "one page view sends at most 150 times");
   await ctx.close();
 } finally {
   await browser.close();
