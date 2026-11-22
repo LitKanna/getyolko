@@ -650,7 +650,23 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <h1>Fresh eggs delivered across Sydney</h1>
+          <h1 id="hero-title">Fresh eggs delivered across Sydney</h1>
+          <script>
+          /* A visitor from an ad shown in one suburb asks one thing first: do you deliver to me?
+             The heading answers it. Keyed on the ad's campaign name, which the visit log keeps for
+             the whole session. Only suburbs on the delivery list may be named here. */
+          (function () {
+            var AD_SUBURBS = { "surry-hills-test": "Surry Hills" };
+            try {
+              var q = new URLSearchParams(location.search);
+              var campaign = q.get("utm_campaign");
+              /* A link that names its own source is a new arrival, so the earlier ad no longer counts. */
+              if (!campaign && !q.get("utm_source") && !q.get("src")) campaign = (JSON.parse(sessionStorage.getItem("yolko_attr") || "null") || {}).utm_campaign;
+              campaign = String(campaign || "").toLowerCase();
+              if (Object.prototype.hasOwnProperty.call(AD_SUBURBS, campaign)) document.getElementById("hero-title").textContent = "Fresh eggs delivered to " + AD_SUBURBS[campaign];
+            } catch (e) {}
+          })();
+          </script>
           <p class="hero-sub">A tray of 30 <b>Pace Farm</b> eggs for <strong>$13</strong>. We bring it to your door on Saturday morning, $5 flat.</p>
 
           <div class="hero-cta">

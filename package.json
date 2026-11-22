@@ -20,6 +20,7 @@
                     "test:order-email-backup":  "node infra/order-email-backup-test.mjs",
                     "test:visits":  "node infra/visit-engagement-test.mjs",
                     "test:track":  "node infra/track-test.mjs",
+                    "test:ad-landing":  "node infra/ad-landing-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {
