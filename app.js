@@ -844,6 +844,9 @@ applyPublishedAssets(API_BASE);
       localStorage.setItem(KEY_VID, visitorId);
     }
     window.YOLKO_VISITOR_ID = visitorId;
+    // track.js, loaded just before this file, has already logged the page view and goes on to
+    // record what the visitor does. This block only logs it when that file did not load.
+    if (window.YOLKO_TRACK) return;
 
     let sessionId = sessionStorage.getItem(KEY_SID);
     if (!sessionId) {
@@ -1598,6 +1601,8 @@ document.getElementById("order")?.addEventListener("focusin", prefetchOrderToken
 
 function goToCheckout(url) {
   if (!url) return false;
+  // The visit log notes that checkout was reached, before the page leaves for Stripe.
+  try { window.YOLKO_TRACK?.mark("checkout"); } catch {}
   try {
     window.location.replace(url);
   } catch {

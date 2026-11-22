@@ -18,6 +18,8 @@
                     "test:phone-line":  "node infra/phone-line-test.mjs",
                     "test:subscriptions":  "node infra/subscriptions-test.mjs",
                     "test:order-email-backup":  "node infra/order-email-backup-test.mjs",
+                    "test:visits":  "node infra/visit-engagement-test.mjs",
+                    "test:track":  "node infra/track-test.mjs",
                     "deploy":  "npx wrangler deploy"
                 },
     "repository":  {

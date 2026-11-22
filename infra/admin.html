@@ -1037,6 +1037,7 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
 .vlist { display:flex; flex-direction:column; gap:10px; }
 .vcard { padding:14px 16px; }
 .vcard .top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.vcard .vtags { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
 .vgrid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px 16px; font-size:15px; line-height:20px; }
 .vgrid div { min-width:0; overflow-wrap:anywhere; }
 .vgrid span { display:block; font-size:13px; line-height:18px; color:var(--muted); }
@@ -5320,6 +5321,32 @@ function grCsv() {
 
 /* ============================== flyer visits ============================== */
 let VISIT_FILTER = "flyer";
+/* What the visitor did on the page (track.js): rows from before it carry none of this. */
+const VISIT_TAPS = [["cta", "Order link"], ["tray", "Tray switch"], ["form", "Started the form"], ["buy", "Buy now"], ["checkout", "Checkout"], ["phone", "Phone"], ["whatsapp", "WhatsApp"]];
+function visitTime(v) {
+  if (v.trk !== 2) return "Not recorded";
+  if (!v.eng) return v.verdict && v.verdict.label === "new" ? "Still open" : "Nothing came back";
+  const s = Math.max(0, Math.floor(Number(v.eng.secs) || 0));
+  return s < 60 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s";
+}
+function visitScroll(v) {
+  if (!v.eng) return "-";
+  return (v.eng.scrolled ? "To " + (Number(v.eng.scroll) || 0) + "% of the page" : "No scroll") + (v.eng.order ? ", saw the order form" : "");
+}
+function visitTaps(v) {
+  if (!v.eng) return "-";
+  const t = v.eng.taps || {};
+  const said = VISIT_TAPS.filter(function (k) { return Number(t[k[0]]) > 0; }).map(function (k) { return k[1] + (Number(t[k[0]]) > 1 ? " ×" + Number(t[k[0]]) : ""); });
+  return said.length ? said.join(", ") : "Nothing";
+}
+function visitPages(v) {
+  const n = Number(v.pageN) || 1, all = Math.max(Number(v.pages) || 1, n);
+  return all > 1 ? "Page " + n + " of " + all : "1 page";
+}
+function visitChip(v) {
+  const l = v.verdict && v.verdict.label;
+  return l === "real" ? chip("ok", "Real") : l === "suspect" ? chip("confirmed", "Suspect") : l === "new" ? chip("plain", "Just opened") : "";
+}
 async function loadVisits(filter) {
   if (typeof filter === "string") VISIT_FILTER = filter;
   const body = $("vi-body");
@@ -5330,14 +5357,16 @@ async function loadVisits(filter) {
   const s = data.summary || {};
   const visits = data.visits || [];
   body.innerHTML =
-    '<div class="kpis three">' + kpi("Scans", String(s.total || 0), "visits tracked", "", "", "qr") + kpi("People", String(s.uniqueVisitors || 0), "different visitors", "", "", "users") + kpi("Suburbs and cities", String(Object.keys(s.byCity || {}).length), "where they scanned", "", "", "pin") + "</div>" +
+    '<div class="kpis three">' + kpi("Scans", String(s.total || 0), s.real || s.suspect ? (s.real || 0) + " real, " + (s.suspect || 0) + " suspect" : "visits tracked", "", "", "qr") + kpi("People", String(s.uniqueVisitors || 0), "different visitors", "", "", "users") + kpi("Suburbs and cities", String(Object.keys(s.byCity || {}).length), "where they scanned", "", "", "pin") + "</div>" +
     '<div style="margin-bottom:12px"><div class="seg" role="tablist"><button type="button" class="' + (VISIT_FILTER === "flyer" ? "on" : "") + '" data-action="visits-filter" data-f="flyer">Flyer and QR</button><button type="button" class="' + (VISIT_FILTER === "" ? "on" : "") + '" data-action="visits-filter" data-f="">All sources</button></div></div>' +
     (visits.length ? '<div class="vlist">' + visits.map(function (v) {
       const loc = [v.city, v.region, v.country].filter(Boolean).join(", ") || "-";
       const screen = v.screen && v.screen.w ? v.screen.w + "×" + v.screen.h + (v.screen.dpr ? " @" + v.screen.dpr + "x" : "") : "-";
       const utm = v.utm ? [v.utm.source, v.utm.medium, v.utm.campaign].filter(Boolean).join(" / ") : "-";
       const cell = function (k, val) { return "<div><span>" + esc(k) + "</span>" + esc(val || "-") + "</div>"; };
-      return '<div class="card vcard"><div class="top">' + chip("plain", v.src || "direct") + '<span class="muted" style="font-size:12px">' + esc(fmtDateTime(v.createdAt)) + '</span></div><div class="vgrid">' +
+      const why = v.verdict && v.verdict.label === "suspect" ? cell("Why suspect", v.verdict.why.charAt(0).toUpperCase() + v.verdict.why.slice(1)) : "";
+      return '<div class="card vcard"><div class="top"><span class="vtags">' + chip("plain", v.src || "direct") + visitChip(v) + '</span><span class="muted" style="font-size:12px">' + esc(fmtDateTime(v.createdAt)) + '</span></div><div class="vgrid">' +
+        cell("On the page", visitTime(v)) + cell("Scrolled", visitScroll(v)) + cell("Tapped", visitTaps(v)) + cell("Pages", visitPages(v)) + why +
         cell("Location", loc) + cell("Device", (v.deviceType || "?") + " · " + (v.os || "?") + " · " + (v.browser || "?")) + cell("Screen", screen) + cell("Network", v.connection || v.asnOrg) +
         cell("Language", v.language) + cell("Timezone", v.tz || v.timezone) + cell("Campaign", utm) + cell("Page", v.path || "/") +
         cell("IP address", v.ip) + cell("Visitor id", v.visitorId) + cell("Platform", v.platform) + cell("Name", "Only once they order") +
