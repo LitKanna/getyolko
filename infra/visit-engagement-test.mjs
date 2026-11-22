@@ -3,7 +3,8 @@
 // real or suspect label follows what they did and the network they came over.
 import {
   cleanPing, mergeEngagement, netKind, visitVerdict, applyVisitPing, pagesBySession, sayTime,
-  PING_MAX_WRITES, PING_MAX_AGE_MS,
+  takeVisitPing, highestTotals,
+  PING_MAX_WRITES, PING_MAX_AGE_MS, PING_QUIET_MS,
 } from "./visit-engagement.mjs";
 
 const ok = (cond, msg) => { if (!cond) { console.log("FAIL", msg); process.exitCode = 1; } };
@@ -126,5 +127,146 @@ ok(asked === 2 && kv.puts.length === 1, "the allowance is only asked when there 
 // ---- pages in a session ----
 const pages = pagesBySession([{ sessionId: "a" }, { sessionId: "b" }, { sessionId: "a" }, { sessionId: null }, null, { sessionId: "a" }]);
 ok(pages.a === 3 && pages.b === 1 && Object.keys(pages).length === 2, "pages are counted per browser session");
+
+// ---- reports every 3 seconds, held at the edge, written when it matters ----
+// A pretend edge: the store, the clock, and the waits that would run later in the Worker.
+const edgeOf = (kvx, { working = true } = {}) => {
+  const e = { now: T0, held: {}, waits: [], gets: 0, puts: 0, asked: 0 };
+  e.store = {
+    get: async (id) => { e.gets += 1; if (!working) return null; return id in e.held ? JSON.parse(JSON.stringify(e.held[id])) : null; },
+    put: async (id, st) => { e.puts += 1; if (working) e.held[id] = JSON.parse(JSON.stringify(st)); },
+  };
+  e.opts = { clock: () => e.now, defer: (ms, fn) => e.waits.push({ due: e.now + ms, fn }), budget: async () => { e.asked += 1; return true; } };
+  // The page reports its totals at `secs` seconds; waits that fall due before then run first.
+  e.until = async (secs) => {
+    const t = at(secs);
+    for (;;) {
+      const next = e.waits.filter((w) => w.due <= t).sort((a, b) => a.due - b.due)[0];
+      if (!next) break;
+      e.waits.splice(e.waits.indexOf(next), 1);
+      e.now = next.due;
+      await next.fn();
+    }
+    e.now = t;
+  };
+  e.report = async (secs, extra) => { await e.until(secs); return takeVisitPing(kvx, e.store, ping({ secs, ...extra }), e.opts); };
+  return e;
+};
+
+// Kanna's test: 25 seconds on the page, then the tab is closed with no warning at all.
+kv = fresh();
+let e = edgeOf(kv);
+r = await e.report(3);
+ok(r.ok && r.wrote && kv.puts.length === 1 && kv.rows[ID].eng.secs === 3, "the first report is written at once, so the row shows a person is there");
+for (const sec of [6, 9, 12]) r = await e.report(sec);
+ok(r.ok && !r.wrote && r.held && r.edge && kv.puts.length === 1, "the next ones wait at the edge: no write");
+ok(e.held[ID].eng.secs === 12 && kv.rows[ID].eng.secs === 3, "the edge has the newest totals, the row the last written");
+ok(kv.gets === 2, "and the row is not even read while the edge has the page view (once to start, once to write)");
+r = await e.report(15);
+ok(r.wrote && kv.puts.length === 2 && kv.rows[ID].eng.secs === 15, "15 seconds is one of the marks that is always written");
+for (const sec of [18, 21, 24]) r = await e.report(sec);
+ok(!r.wrote && kv.puts.length === 2, "then it waits again");
+await e.until(24 + PING_QUIET_MS / 1000 - 1);
+ok(kv.puts.length === 2, "6 seconds of silence is not yet the end");
+await e.until(24 + PING_QUIET_MS / 1000);
+ok(kv.puts.length === 3 && kv.rows[ID].eng.secs === 24 && kv.rows[ID].eng.n === 3, "7 seconds after the last report the row gets the final total: 24 seconds, in 3 writes");
+await e.until(600);
+ok(kv.puts.length === 3 && e.waits.length === 0, "the waits of the earlier reports found a newer one and wrote nothing");
+
+// taps: a new kind is written at once, more of the same waits, Buy now and checkout never wait
+kv = fresh(); e = edgeOf(kv);
+await e.report(3);
+r = await e.report(6, { taps: { tray: 1 } });
+ok(r.wrote && kv.rows[ID].eng.taps.tray === 1, "the first tray switch is written at once");
+r = await e.report(9, { taps: { tray: 3, form: 1 } });
+ok(r.wrote && kv.rows[ID].eng.taps.form === 1 && kv.rows[ID].eng.taps.tray === 3, "the first box of the form too, and it carries the tray count");
+r = await e.report(12, { taps: { tray: 3, form: 4 } });
+ok(!r.wrote && kv.rows[ID].eng.taps.form === 1, "more boxes wait at the edge");
+r = await e.report(13, { taps: { tray: 3, form: 5, buy: 1 } });
+ok(r.wrote && kv.rows[ID].eng.taps.buy === 1 && kv.rows[ID].eng.taps.form === 5, "Buy now is written at once and brings the boxes with it");
+r = await e.report(14, { taps: { tray: 3, form: 5, buy: 2, checkout: 1 } });
+ok(r.wrote && kv.rows[ID].eng.taps.checkout === 1 && kv.rows[ID].eng.taps.buy === 2, "so is every later Buy now and the checkout");
+const writesSoFar = kv.puts.length;
+await e.until(600);
+ok(kv.puts.length === writesSoFar, "nothing left to write once the page is quiet");
+
+// the same report twice, a late one, an old one
+kv = fresh(); e = edgeOf(kv);
+await e.report(3); await e.report(6);
+r = await takeVisitPing(kv, e.store, ping({ secs: 6 }), e.opts);
+ok(r.ok && !r.wrote && r.reason === "same", "the same report again changes nothing");
+r = await takeVisitPing(kv, e.store, ping({ secs: 3 }), e.opts);
+ok(r.ok && r.reason === "same" && e.held[ID].eng.secs === 6, "a late one never lowers a total");
+await e.until(6 + PING_QUIET_MS / 1000);
+ok(kv.rows[ID].eng.secs === 6 && kv.puts.length === 2, "and the quiet write still happens once");
+
+// only the browser that opened the page view, from the edge or from the row
+kv = fresh(); e = edgeOf(kv);
+r = await takeVisitPing(kv, e.store, ping({ v: "someone-else-entirely-0000000000" }), e.opts);
+ok(!r.ok && r.reason === "visitor" && kv.puts.length === 0 && !(ID in e.held), "another visitor id is refused before anything is held");
+await e.report(3);
+const getsBefore = kv.gets;
+r = await takeVisitPing(kv, e.store, ping({ v: "someone-else-entirely-0000000000", secs: 500, taps: { checkout: 9 } }), e.opts);
+ok(!r.ok && r.reason === "visitor" && kv.gets === getsBefore && e.held[ID].eng.secs === 3, "and refused from the edge too, without touching the row or what is held");
+for (const bad of ["settings", "visits:index", "order:2026-11-19T01:27:22.482Z:88fgp6", "", null]) {
+  r = await takeVisitPing(kv, e.store, ping({ id: bad }), e.opts);
+  ok(!r.ok && r.reason === "id", `${JSON.stringify(bad)} is not a visit row`);
+}
+r = await takeVisitPing(kv, e.store, ping({ id: "visit:2026-11-22T01:00:00.000Z:zzzzzz" }), e.opts);
+ok(!r.ok && r.reason === "gone", "a row that does not exist is not created");
+e.now = T0 + PING_MAX_AGE_MS + 1000;
+r = await takeVisitPing(kv, e.store, ping({ secs: 900 }), e.opts);
+ok(!r.ok && r.reason === "old", "a page view from this morning takes no more reports");
+
+// a long stay costs few writes: 3 minutes of reports every 3 seconds
+kv = fresh(); e = edgeOf(kv);
+for (let sec = 3; sec <= 180; sec += 3) await e.report(sec, { scroll: 40, scrolled: true });
+await e.until(1000);
+ok(kv.rows[ID].eng.secs === 180 && kv.puts.length === 5, "3 minutes on the page, 60 reports, 5 writes (first, 15, 30, 60 and 180 seconds): " + kv.puts.length);
+ok(e.asked === kv.puts.length, "and the day's allowance is asked once per write, not per report");
+
+// a pause in the middle (the visitor looks away, then comes back) is written, and so is the end
+kv = fresh(); e = edgeOf(kv);
+for (const sec of [3, 6, 9]) await e.report(sec);
+await e.until(40);
+ok(kv.rows[ID].eng.secs === 9 && kv.puts.length === 2, "the pause is written");
+e.now = at(100);
+for (const sec of [12, 15, 18, 21]) { r = await takeVisitPing(kv, e.store, ping({ secs: sec }), e.opts); e.now += 3000; }
+await e.until(200);
+ok(kv.rows[ID].eng.secs === 21 && kv.puts.length === 4, "back again: the 15 second mark and the new end, 4 writes in all");
+
+// the edge loses the page view (another data centre takes the next report): nothing is lost
+kv = fresh(); e = edgeOf(kv);
+for (const sec of [3, 6, 9]) await e.report(sec);
+delete e.held[ID];
+r = await e.report(12, { taps: { tray: 1 } });
+ok(r.ok && !r.edge && kv.rows[ID].eng.secs === 12 && kv.rows[ID].eng.taps.tray === 1, "it starts again from the row and the report's own totals");
+await e.until(600);
+ok(kv.rows[ID].eng.secs === 12, "and the row ends on the newest totals");
+
+// no edge store at all: every report is still written, late, and the limits hold
+kv = fresh(); e = edgeOf(kv, { working: false });
+for (let sec = 3; sec <= 120; sec += 3) await e.report(sec);
+await e.until(1000);
+ok(kv.rows[ID].eng.secs >= 60 && kv.puts.length === PING_MAX_WRITES, `without the edge a page view still stops at ${PING_MAX_WRITES} writes: ` + kv.puts.length);
+
+// the day's allowance spent: reports are still taken, nothing is written, nothing breaks
+kv = fresh(); e = edgeOf(kv);
+e.opts.budget = async () => false;
+for (const sec of [3, 6, 9, 15]) r = await e.report(sec);
+await e.until(600);
+ok(r.ok && kv.puts.length === 0 && e.held[ID].eng.secs === 15, "a spent allowance: held at the edge, no write, no error for the page");
+
+// a store that throws is treated as no store
+kv = fresh(); e = edgeOf(kv);
+e.store.get = async () => { throw new Error("cache down"); };
+e.store.put = async () => { throw new Error("cache down"); };
+r = await e.report(3);
+ok(r.ok && r.wrote && kv.rows[ID].eng.secs === 3, "a broken edge store never breaks a report");
+
+// what the admin shows for a page that is open now: the higher of the row and the edge
+let hi = highestTotals({ secs: 15, scroll: 40, scrolled: true, order: false, taps: { tray: 2 } }, { secs: 24, scroll: 35, scrolled: false, order: true, taps: { tray: 1, form: 3 } });
+ok(hi.secs === 24 && hi.scroll === 40 && hi.scrolled && hi.order && hi.taps.tray === 2 && hi.taps.form === 3, "field by field, the highest of each");
+ok(highestTotals(null, { secs: 6, taps: {} }).secs === 6 && highestTotals(undefined, null) === null, "one side missing is the other; both missing is nothing");
 
 if (!process.exitCode) console.log("visit engagement: all checks passed");

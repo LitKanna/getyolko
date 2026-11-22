@@ -5327,7 +5327,7 @@ function visitTime(v) {
   if (v.trk !== 2) return "Not recorded";
   if (!v.eng) return v.verdict && v.verdict.label === "new" ? "Still open" : "Nothing came back";
   const s = Math.max(0, Math.floor(Number(v.eng.secs) || 0));
-  return s < 60 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s";
+  return (s < 60 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s") + (v.live ? ", on the page now" : "");
 }
 function visitScroll(v) {
   if (!v.eng) return "-";
