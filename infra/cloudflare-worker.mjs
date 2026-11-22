@@ -35,7 +35,7 @@ import {
 } from "./phone-line.mjs";
 
 // Pin to commit SHA so GitHub raw serves the exact deploy (update on each push).
-const DEPLOY_SHA = "190de29ea76466a1795369a270dd9df29364dd07";
+const DEPLOY_SHA = "8599b03d7d249f7eb2746ec1836228c0b1f87cbb";
 // Chalk-tray heroes must not 404 when the storefront pin drifts (this caused the
 // black hero / “broken ratios” look after a later Worker deploy from main).
 const CHALK_ASSETS_SHA = "fef7c19ba6c7cc2dd35edbb2538b0df2a0522b49";
@@ -6743,7 +6743,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "275",
+      "X-Yolko-Build": "276",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",
