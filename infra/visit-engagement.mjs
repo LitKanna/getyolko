@@ -74,7 +74,7 @@ export function mergeEngagement(prev, ping, { createdAtMs, nowMs }) {
 }
 
 const DATACENTRE =
-  /amazon|\baws\b|microsoft|azure|digitalocean|linode|akamai|\bovh\b|hetzner|oracle|alibaba|tencent|cloudflare|fastly|vultr|constant company|choopa|contabo|scaleway|leaseweb|\bm247\b|datacamp|cdn77|hostinger|ionos|godaddy|rackspace|colocrossing|psychz|quadranet|bytedance|apple inc|hosting|data ?cent(er|re)|dedicated|\bvps\b|\bcloud\b|servers?\b/;
+  /amazon|\baws\b|microsoft|azure|digitalocean|linode|akamai|\bovh\b|hetzner|oracle|alibaba|tencent|cloudflare|fastly|vultr|constant company|choopa|contabo|scaleway|leaseweb|\bm247\b|datacamp|cdn77|hostinger|ionos|godaddy|rackspace|colocrossing|psychz|quadranet|bytedance|apple inc|anthropic|openai|hosting|data ?cent(er|re)|dedicated|\bvps\b|\bcloud\b|servers?\b/;
 
 /** The kind of network a visit came over, from its name (Cloudflare's asOrganization). */
 export function netKind(asnOrg) {
@@ -106,7 +106,8 @@ export function sayTime(secs) {
 export function visitVerdict(row, nowMs = Date.now()) {
   if (!row || row.trk !== 2) return { label: "", why: "" };
   const e = row.eng && typeof row.eng === "object" ? row.eng : null;
-  const net = row.net || netKind(row.asnOrg);
+  /* Read from the network's name when the row has it, so a name learnt later also re-reads old rows. */
+  const net = row.asnOrg ? netKind(row.asnOrg) : row.net || "unknown";
   const taps = e ? TAP_KEYS.reduce((n, k) => n + (Number(e.taps?.[k]) || 0), 0) : 0;
   const did = e ? `on the page ${sayTime(e.secs)}${e.scrolled ? `, scrolled to ${e.scroll}%` : ", no scroll"}${taps ? `, ${taps} ${taps === 1 ? "tap" : "taps"}` : ""}` : "";
   if (e && (taps > 0 || (e.scrolled && e.secs >= 5))) return { label: "real", why: did };

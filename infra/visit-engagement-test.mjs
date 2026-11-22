@@ -37,7 +37,7 @@ ok(m.eng.secs === 15, "a page opened 10 seconds ago cannot have 10 minutes on sc
 // ---- the kind of network ----
 ok(netKind("Facebook, Inc.") === "meta" && netKind("Meta Platforms Ireland") === "meta", "Meta's network");
 ok(netKind("Google LLC") === "google", "Google's network");
-for (const n of ["Amazon.com, Inc.", "AMAZON-02", "Microsoft Corporation", "DigitalOcean, LLC", "Akamai Connected Cloud", "Cloudflare, Inc.", "OVH SAS", "Hetzner Online GmbH", "Servers Australia Pty. Ltd", "Apple Inc.", "M247 Europe SRL"]) {
+for (const n of ["Amazon.com, Inc.", "AMAZON-02", "Microsoft Corporation", "DigitalOcean, LLC", "Akamai Connected Cloud", "Cloudflare, Inc.", "OVH SAS", "Hetzner Online GmbH", "Servers Australia Pty. Ltd", "Apple Inc.", "M247 Europe SRL", "Anthropic, PBC", "OpenAI, LLC"]) {
   ok(netKind(n) === "datacentre", `${n} is a data centre`);
 }
 for (const n of ["Telstra Limited", "Singtel Optus Pty Limited", "TPG Internet Pty Ltd", "Vodafone Australia Pty Ltd", "Aussie Broadband", "Superloop", "Vocus Connect International Backbone", "Exetel Pty Ltd"]) {
@@ -62,6 +62,8 @@ ok(v(row({ ...meta, eng: eng({ secs: 40 }) })) === "suspect", "sitting on the pa
 ok(v(row({ asnOrg: "Akamai International B.V.", net: "datacentre", eng: eng({ secs: 12, scrolled: true, scroll: 55 }) })) === "real", "an iPhone on Private Relay that scrolls is a person");
 ok(v(row({ asnOrg: "Akamai International B.V.", net: "datacentre", eng: eng({ secs: 2, scrolled: true }) })) === "suspect", "a data centre needs more than a flick");
 ok(v(row({ asnOrg: "Amazon.com, Inc.", net: undefined, eng: eng({ secs: 30 }) })) === "suspect", "an older row with no net field is read from its network name");
+ok(v(row({ asnOrg: "Anthropic, PBC", net: "isp", eng: eng({ secs: 40 }) })) === "suspect", "a row stored as an ordinary network is re-read once its name is known to be a robot's");
+ok(v(row({ asnOrg: "", net: "meta", eng: eng({ secs: 40 }) })) === "suspect", "with no name on the row, the stored kind stands");
 ok(/Meta's own network/.test(visitVerdict(row({ ...meta }), at(300)).why), "the reason names the network");
 ok(visitVerdict(row({ eng: eng({ secs: 83, scrolled: true, scroll: 61, taps: { tray: 2, buy: 1 } }) }), at(300)).why === "on the page 1m 23s, scrolled to 61%, 3 taps", "the reason says what they did");
 ok(sayTime(8) === "8s" && sayTime(72) === "1m 12s", "seconds read as people say them");
