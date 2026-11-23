@@ -52,6 +52,15 @@
     window.YOLKO_VISITOR_ID = visitorId;
     track.visitorId = visitorId;
 
+    /* The shop's own devices are not visitors. A browser that has signed in to the Admin is
+       marked once, and from then on this file sends nothing from it, signed in or not. The
+       checkout still gets its visitor id above. */
+    if (read(localStorage, "yolko_own") === "1" || read(localStorage, "yolko_admin_key")) {
+      write(localStorage, "yolko_own", "1");
+      track.own = true;
+      return;
+    }
+
     var sessionId = read(sessionStorage, "yolko_sid");
     if (!sessionId) {
       sessionId = rid().slice(0, 24);

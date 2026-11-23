@@ -1566,6 +1566,9 @@ const qsa = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
 let KEY = "";
 try { KEY = localStorage.getItem("yolko_admin_key") || ""; } catch (e) {}
+/* A browser signed in here is the shop's own: the site's visit log (track.js) skips it from now on. */
+function markOwnDevice() { try { localStorage.setItem("yolko_own", "1"); } catch (e) {} }
+if (KEY) markOwnDevice();
 
 const ICONS = {
   orders: '<path d="M5 8h14l-1.2 12H6.2L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
@@ -5826,6 +5829,7 @@ $("login-form").addEventListener("submit", async function (e) {
   if (res.ok) {
     KEY = k;
     try { localStorage.setItem("yolko_admin_key", k); } catch (err) {}
+    markOwnDevice();
     $("key").value = "";
     boot();
   } else {

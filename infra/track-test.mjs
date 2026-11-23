@@ -27,7 +27,7 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewp
     </form>
   </section>
   <div style="height:1400px"></div>
-  <script src="track.js?v=3"></script>
+  <script src="track.js?v=4"></script>
 </body></html>`;
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -211,6 +211,45 @@ try {
   await settle(page);
   ok(seen.pings.length === 150, "one page view sends at most 150 times");
   await ctx.close();
+
+  // 14. The shop's own device: a browser signed in to the Admin sends nothing at all.
+  {
+    const own = await browser.newContext({ ...devices["iPhone 13"] });
+    await own.addInitScript(() => { try { localStorage.setItem("yolko_admin_key", "the-admin-key"); } catch (_) {} });
+    ({ ctx, page, seen } = await open({ context: own }));
+    await pass(page, 20000);
+    await page.locator("#two").tap();
+    await page.evaluate(() => window.YOLKO_TRACK.mark("checkout"));
+    await pass(page, 5000);
+    await leave(page);
+    ok(seen.visits.length === 0 && seen.pings.length === 0, "a browser signed in to the Admin: no page view, no reports (" + seen.visits.length + ", " + seen.pings.length + ")");
+    const state = await page.evaluate(() => ({ own: window.YOLKO_TRACK.own, vid: window.YOLKO_VISITOR_ID, same: window.YOLKO_VISITOR_ID === window.YOLKO_TRACK.visitorId, flag: localStorage.getItem("yolko_own"), sid: sessionStorage.getItem("yolko_sid") }));
+    ok(state.own === true && state.same && String(state.vid).length >= 8, "the checkout still has its visitor id");
+    ok(state.flag === "1", "and the browser is marked as the shop's own");
+    await ctx.close();
+  }
+
+  // 15. Once marked, it stays quiet after signing out of the Admin too.
+  {
+    const own = await browser.newContext({ ...devices["iPhone 13"] });
+    await own.addInitScript(() => { try { localStorage.removeItem("yolko_admin_key"); localStorage.setItem("yolko_own", "1"); } catch (_) {} });
+    ({ ctx, page, seen } = await open({ context: own, url: "https://getyolko.com/?utm_source=facebook&utm_medium=paid&utm_campaign=surry-hills-test" }));
+    await pass(page, 20000);
+    await leave(page);
+    ok(seen.visits.length === 0 && seen.pings.length === 0, "marked and signed out: still nothing, even from an ad link");
+    await ctx.close();
+  }
+
+  // 16. Anything else in that box does not mark a browser: an ordinary visitor is logged as before.
+  {
+    const other = await browser.newContext({ ...devices["iPhone 13"] });
+    await other.addInitScript(() => { try { localStorage.setItem("yolko_own", "0"); } catch (_) {} });
+    ({ ctx, page, seen } = await open({ context: other }));
+    await pass(page, 4000);
+    ok(seen.visits.length === 1 && seen.pings.length === 1, "an ordinary browser is logged as before");
+    ok((await page.evaluate(() => window.YOLKO_TRACK.own)) === undefined, "and is not marked");
+    await ctx.close();
+  }
 } finally {
   await browser.close();
 }

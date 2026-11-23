@@ -142,6 +142,16 @@ visitors went looking for their suburb before anything else. A small script righ
 changes, and nobody else sees it. To greet another campaign, add it to `AD_SUBURBS` there, and
 only with a suburb on the delivery list. The heading must still sit on three lines on a phone.
 
+The shop's own visits (23 Nov 2026). The owner's devices are not visitors and are never logged.
+Three things keep them out, and all three must stay: (1) `track.js` sends nothing from a browser
+that has signed in to the Admin (`yolko_admin_key`, or the mark `yolko_own` the Admin and the
+tracker leave behind, which outlives signing out); (2) the Worker drops a page view or report
+whose address or visitor id is on the list in KV under `visits:own` (`{ ips, ids }`, see
+`infra/visit-engagement.mjs`), before anything is written; (3) `/api/visits` leaves such rows out
+of the Admin list and its counts. The list holds a home address on the internet and device ids:
+it lives in KV only, never in this repo, a commit message or a PR. The checkout still gets its
+visitor id on an own device.
+
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
 big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
