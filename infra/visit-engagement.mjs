@@ -257,6 +257,16 @@ export function isOwnVisit(own, { ip, visitorId } = {}) {
   return false;
 }
 
+/* Our own tools are not visitors either. Checks of the live site (screenshots, test runs) are
+   made by Claude from Anthropic's network, in a headless browser as a rule, and a deliberate test
+   visit names itself mr-yolko-check. Neither is logged or shown. Takes a request's details or a
+   stored row: both carry asnOrg and src. */
+export function isOwnAutomation({ asnOrg, src } = {}) {
+  if (/\banthropic\b/i.test(String(asnOrg || ""))) return true;
+  if (String(src || "").trim().toLowerCase() === "mr-yolko-check") return true;
+  return false;
+}
+
 export function pagesBySession(rows) {
   const out = {};
   for (const r of rows) if (r?.sessionId) out[r.sessionId] = (out[r.sessionId] || 0) + 1;

@@ -152,6 +152,12 @@ of the Admin list and its counts. The list holds a home address on the internet 
 it lives in KV only, never in this repo, a commit message or a PR. The checkout still gets its
 visitor id on an own device.
 
+Our own checks are not visitors either (23 Nov 2026). A page view from Anthropic's network (where
+Claude's checks of the live site run, mostly in a headless browser) or one that names itself
+`mr-yolko-check` is dropped by the Worker and left out of `/api/visits` (`isOwnAutomation` in
+`infra/visit-engagement.mjs`). So a check from the cloud can no longer put a row in the log:
+prove the log with the tests here, and by reading a real visitor's row after a deploy.
+
 ### Look (redesign, 31 Oct 2026; Figma file "YOLKO Website 2026")
 Bold modern shop, replacing the earlier "Quiet local shop" look. One font (Plus Jakarta Sans):
 big ExtraBold headings (hero up to 80px, tight letter spacing), sentence case, no trailing full
