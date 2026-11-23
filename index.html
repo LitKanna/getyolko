@@ -652,22 +652,39 @@
         <div class="hero-copy">
           <h1 id="hero-title">Fresh eggs delivered across Sydney</h1>
           <script>
-          /* A visitor from an ad shown in one suburb asks one thing first: do you deliver to me?
-             The heading answers it. Keyed on the ad's campaign name, which the visit log keeps for
-             the whole session. Only suburbs on the delivery list may be named here. */
+          /* A visitor from an ad lands on the ad's own promise. Keyed on the ad's campaign name,
+             which the visit log keeps for the whole session. A suburb named here must be on the
+             delivery list; a heading must keep to three lines on a phone. `sub` replaces the line
+             under the heading when the heading already says what that line says. */
           (function () {
-            var AD_SUBURBS = { "surry-hills-test": "Surry Hills" };
+            var AD_LANDINGS = {
+              "surry-hills-test": { suburb: "Surry Hills" },
+              "never-run-out": { title: "Eggs at your door every Saturday" },
+              "more-egg": { title: "1.75\u00a0kg of eggs for $13", sub: "A tray of 30 <b>Pace Farm</b> eggs. We bring it to your door on Saturday morning, $5 flat." }
+            };
             try {
               var q = new URLSearchParams(location.search);
               var campaign = q.get("utm_campaign");
               /* A link that names its own source is a new arrival, so the earlier ad no longer counts. */
               if (!campaign && !q.get("utm_source") && !q.get("src")) campaign = (JSON.parse(sessionStorage.getItem("yolko_attr") || "null") || {}).utm_campaign;
               campaign = String(campaign || "").toLowerCase();
-              if (Object.prototype.hasOwnProperty.call(AD_SUBURBS, campaign)) document.getElementById("hero-title").textContent = "Fresh eggs delivered to " + AD_SUBURBS[campaign];
+              if (!Object.prototype.hasOwnProperty.call(AD_LANDINGS, campaign)) return;
+              var land = AD_LANDINGS[campaign];
+              var h = document.getElementById("hero-title");
+              h.textContent = land.suburb ? "Fresh eggs delivered to " + land.suburb : land.title;
+              if (land.sub) h.setAttribute("data-sub", land.sub);
             } catch (e) {}
           })();
           </script>
           <p class="hero-sub">A tray of 30 <b>Pace Farm</b> eggs for <strong>$13</strong>. We bring it to your door on Saturday morning, $5 flat.</p>
+          <script>
+          (function () {
+            try {
+              var sub = document.getElementById("hero-title").getAttribute("data-sub");
+              if (sub) document.querySelector(".hero-sub").innerHTML = sub;
+            } catch (e) {}
+          })();
+          </script>
 
           <div class="hero-cta">
             <a class="btn btn-solid btn-lg" href="#order">Order now</a>
