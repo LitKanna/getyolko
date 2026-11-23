@@ -8,6 +8,7 @@ import {
   OWN_KEY,
   cleanOwnList,
   isOwnVisit,
+  isOwnAutomation,
 } from "./visit-engagement.mjs";
 
 const ok = (cond, msg) => { if (!cond) { console.log("FAIL", msg); process.exitCode = 1; } };
@@ -287,5 +288,14 @@ ok(highestTotals(null, { secs: 6, taps: {} }).secs === 6 && highestTotals(undefi
   ok(isOwnVisit(own, { ip: "203.0.113.50", visitorId: "zzz", createdAt: "2026-11-23T02:19:00.000Z", path: "/" }), "a stored row is checked the same way");
   ok(OWN_KEY === "visits:own", "the list lives under one key in the store");
 }
+
+// our own checks of the site: never logged, never shown
+ok(isOwnAutomation({ asnOrg: "Anthropic, PBC" }) && isOwnAutomation({ asnOrg: "ANTHROPIC" }), "a check run from Anthropic's network is ours");
+ok(isOwnAutomation({ asnOrg: "Telstra Limited", src: "mr-yolko-check" }) && isOwnAutomation({ src: " Mr-Yolko-Check " }), "a named test visit is ours on any network");
+ok(isOwnAutomation({ id: "visit:x", asnOrg: "Anthropic, PBC", src: "direct", ua: "HeadlessChrome" }), "a stored row is checked the same way");
+for (const org of ["Telstra Limited", "Google LLC", "Meta Platforms Ireland Limited", "Amazon.com, Inc.", "Microsoft Corporation", "OPTUS INTERNET - RETAIL", "Philanthropic Networks Pty Ltd", "", null, undefined]) {
+  ok(!isOwnAutomation({ asnOrg: org, src: "facebook" }), `not ours: ${org}`);
+}
+ok(!isOwnAutomation({ asnOrg: "Telstra Limited", src: "direct" }) && !isOwnAutomation({ src: "mr-yolko-checkout" }) && !isOwnAutomation({}) && !isOwnAutomation(), "ordinary sources and near names are visitors");
 
 if (!process.exitCode) console.log("visit engagement: all checks passed");
