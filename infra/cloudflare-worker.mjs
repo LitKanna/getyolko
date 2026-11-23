@@ -14,7 +14,7 @@ import { logoAlone, iconLinks } from "./brand.mjs";
 import { brandQr } from "./brand-qr.mjs";
 import { emailTitlePicture } from "./email-titles.mjs";
 import { isLinkPreviewAgent, referralCard } from "./share-preview.mjs";
-import { takeVisitPing, highestTotals, netKind, visitVerdict, pagesBySession } from "./visit-engagement.mjs";
+import { takeVisitPing, highestTotals, netKind, visitVerdict, pagesBySession, OWN_KEY, cleanOwnList, isOwnVisit } from "./visit-engagement.mjs";
 import {
   LINE_NUMBER, LINE_CONFIG_KEY, LINE_LOG_KEY, sameText, voiceAnswer, voiceAfter, textFromWebhook, textEmail,
   callEmail, validForwardTo, screenAsk, screenDial, screenWhisper, screenAccept, screenAfter, sorryScreened,
@@ -379,6 +379,20 @@ function cleanVisitId(v) {
   const s = String(v || "").trim();
   if (!/^[a-zA-Z0-9_-]{8,64}$/.test(s)) return null;
   return s;
+}
+
+// The shop's own devices and home connection (KV, see visit-engagement.mjs). Read at most once a
+// minute per isolate, so a page view costs no extra KV read.
+let ownVisitorsHeld = { at: 0, list: null };
+async function ownVisitors(env) {
+  const now = Date.now();
+  if (ownVisitorsHeld.list && now - ownVisitorsHeld.at < 60000) return ownVisitorsHeld.list;
+  let list = cleanOwnList(null);
+  try {
+    list = cleanOwnList(await env.DATA.get(OWN_KEY, "json"));
+  } catch {}
+  ownVisitorsHeld = { at: now, list };
+  return list;
 }
 
 async function getVisitIndex(env) {
@@ -6360,10 +6374,14 @@ async function handleApi(request, env, url, ctx) {
   if (url.pathname === "/api/visit" && request.method === "POST") {
     if (!isAllowedOrigin(request)) return json({ error: "forbidden", code: "origin" }, 403);
     const ip = clientIp(request);
+    // The shop's own devices are not visitors: nothing is written for them, not even a count.
+    const own = await ownVisitors(env);
+    if (isOwnVisit(own, { ip })) return json({ ok: true, own: true });
     const rlOk = await allowRate(env, `visit:${ip || "na"}`, 40, 600);
     if (!rlOk) return json({ ok: true, throttled: true });
 
     const body = await request.json().catch(() => ({}));
+    if (isOwnVisit(own, { visitorId: cleanVisitId(body?.visitorId) })) return json({ ok: true, own: true });
     const ua = String(request.headers.get("User-Agent") || body?.ua || "").slice(0, 300);
     const parsed = parseUa(ua);
     const geo = enrichCfGeo(request);
@@ -6437,6 +6455,8 @@ async function handleApi(request, env, url, ctx) {
     } catch {
       return json({ ok: false, reason: "body" }, 400);
     }
+    // A page of the shop's own that was already open keeps reporting: those reports are dropped.
+    if (isOwnVisit(await ownVisitors(env), { ip: clientIp(request), visitorId: cleanVisitId(body?.v) })) return json({ ok: true, own: true, wrote: false, held: false, edge: false });
     // The page reports every 3 seconds. The newest totals wait at the edge and the row is written
     // when it matters, and once more a few seconds after the reports stop.
     const done = await takeVisitPing(env.DATA, visitStore, body, {
@@ -6453,7 +6473,9 @@ async function handleApi(request, env, url, ctx) {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
     const srcFilter = String(url.searchParams.get("src") || "").trim().toLowerCase();
     const ids = await getVisitIndex(env);
-    const rows = await Promise.all(ids.slice(0, 400).map((id) => env.DATA.get(id, "json")));
+    const own = await ownVisitors(env);
+    // Rows the shop's own devices left before they were on the list are not shown either.
+    const rows = (await Promise.all(ids.slice(0, 400).map((id) => env.DATA.get(id, "json")))).filter((v) => v && !isOwnVisit(own, v));
     const pages = pagesBySession(rows.filter(Boolean));
     const nowMs = Date.now();
     // A page that is open right now has newer totals at the edge than in its row: show those.
@@ -6677,7 +6699,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "125",
+          "X-Yolko-Admin": "126",
         },
       });
     }

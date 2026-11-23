@@ -5,6 +5,9 @@ import {
   cleanPing, mergeEngagement, netKind, visitVerdict, applyVisitPing, pagesBySession, sayTime,
   takeVisitPing, highestTotals,
   PING_MAX_WRITES, PING_MAX_AGE_MS, PING_QUIET_MS,
+  OWN_KEY,
+  cleanOwnList,
+  isOwnVisit,
 } from "./visit-engagement.mjs";
 
 const ok = (cond, msg) => { if (!cond) { console.log("FAIL", msg); process.exitCode = 1; } };
@@ -268,5 +271,21 @@ ok(r.ok && r.wrote && kv.rows[ID].eng.secs === 3, "a broken edge store never bre
 let hi = highestTotals({ secs: 15, scroll: 40, scrolled: true, order: false, taps: { tray: 2 } }, { secs: 24, scroll: 35, scrolled: false, order: true, taps: { tray: 1, form: 3 } });
 ok(hi.secs === 24 && hi.scroll === 40 && hi.scrolled && hi.order && hi.taps.tray === 2 && hi.taps.form === 3, "field by field, the highest of each");
 ok(highestTotals(null, { secs: 6, taps: {} }).secs === 6 && highestTotals(undefined, null) === null, "one side missing is the other; both missing is nothing");
+
+// the shop's own devices: never logged, never shown
+{
+  const own = cleanOwnList({ ips: [" 203.0.113.50 ", "203.0.113.50", "", null, 7], ids: ["a1b2c3d4e5f6a7b8", "a1b2c3d4e5f6a7b8", "x"], extra: true });
+  ok(own.ips.length === 1 && own.ips[0] === "203.0.113.50" && own.ids.length === 1, "the list is trimmed, deduplicated and junk is dropped: " + JSON.stringify(own));
+  ok(isOwnVisit(own, { ip: "203.0.113.50", visitorId: "someoneelse0001" }), "a visit from the home connection is the shop's own, whatever the browser");
+  ok(isOwnVisit(own, { ip: "198.51.100.7", visitorId: "a1b2c3d4e5f6a7b8" }), "a known device is the shop's own on any connection");
+  ok(!isOwnVisit(own, { ip: "198.51.100.7", visitorId: "someoneelse0001" }), "anyone else is a visitor");
+  ok(!isOwnVisit(own, { ip: "203.0.113.5", visitorId: "a1b2c3d4e5f6a7b" }), "a near match is not a match");
+  ok(!isOwnVisit(own, {}) && !isOwnVisit(own, { ip: null, visitorId: null }) && !isOwnVisit(null, { ip: "203.0.113.50" }), "nothing to go on, or no list: a visitor");
+  const empty = cleanOwnList(null);
+  ok(empty.ips.length === 0 && empty.ids.length === 0 && !isOwnVisit(empty, { ip: "203.0.113.50", visitorId: "a1b2c3d4e5f6a7b8" }), "no list in the store: everyone is a visitor");
+  ok(cleanOwnList("nonsense").ips.length === 0 && cleanOwnList({ ips: "203.0.113.50" }).ips.length === 0, "a damaged list hides nobody");
+  ok(isOwnVisit(own, { ip: "203.0.113.50", visitorId: "zzz", createdAt: "2026-11-23T02:19:00.000Z", path: "/" }), "a stored row is checked the same way");
+  ok(OWN_KEY === "visits:own", "the list lives under one key in the store");
+}
 
 if (!process.exitCode) console.log("visit engagement: all checks passed");

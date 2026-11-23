@@ -237,6 +237,26 @@ export async function takeVisitPing(kv, store, body, { clock = Date.now, budget,
 }
 
 /** How many page views each browser session has in a list of rows: { sessionId: count }. */
+/* ---- the shop's own devices ----
+   The owner's visits are not visitors: they are never logged and never shown. The list lives in
+   KV under OWN_KEY and nowhere else (it holds a home address on the internet and device ids, so
+   it is never written in this repo): { ips: ["..."], ids: ["..."] }. */
+export const OWN_KEY = "visits:own";
+
+export function cleanOwnList(raw) {
+  const list = (v) => (Array.isArray(v) ? v : []).map((x) => String(x || "").trim()).filter((x) => x.length >= 3 && x.length <= 64);
+  const o = raw && typeof raw === "object" ? raw : {};
+  return { ips: [...new Set(list(o.ips))].slice(0, 20), ids: [...new Set(list(o.ids))].slice(0, 100) };
+}
+
+// True when this visit (or this stored row) is one of the shop's own.
+export function isOwnVisit(own, { ip, visitorId } = {}) {
+  if (!own) return false;
+  if (ip && Array.isArray(own.ips) && own.ips.includes(String(ip))) return true;
+  if (visitorId && Array.isArray(own.ids) && own.ids.includes(String(visitorId))) return true;
+  return false;
+}
+
 export function pagesBySession(rows) {
   const out = {};
   for (const r of rows) if (r?.sessionId) out[r.sessionId] = (out[r.sessionId] || 0) + 1;
