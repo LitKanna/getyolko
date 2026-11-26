@@ -142,7 +142,12 @@ eggs for $13", and because that heading says the price, its `sub` takes the pric
 under it. The words swap before the page paints, from the address or from `yolko_attr` in
 `sessionStorage` on a later page of the same visit. Nothing else changes, and nobody else sees
 it. A suburb on the list must be one we deliver to; a heading keeps to three lines on a phone
-(`npm run test:ad-landing`, then photograph every screen size).
+(`npm run test:ad-landing`, then photograph every screen size). Since 27 Nov each entry may also
+carry `bundle` (the pack the order form starts on, as the ad sells one tray for $13) and `place`
+(the example suburb and postcode in the address boxes, Surry Hills 2010 for these Surry Hills
+ads). The script puts them on `<html>` as `data-ad-bundle`, `data-ad-suburb` and
+`data-ad-postcode`, and `app.js` reads them; a `b=` in the link still wins. Everyone else starts
+on 2 trays with Strathfield 2135 as before.
 
 The shop's own visits (23 Nov 2026). The owner's devices are not visitors and are never logged.
 Three things keep them out, and all three must stay: (1) `track.js` sends nothing from a browser

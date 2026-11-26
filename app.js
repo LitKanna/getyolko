@@ -650,8 +650,9 @@ const DAY_INDEX = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4,
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Price cards on the delivery, suburb and price pages link to /?b=<pack>#order to pick that pack.
+// Without one, a visitor from an ad starts on the pack the ad sells (data-ad-bundle, set in index.html).
 (function preselectBundle() {
-  const b = new URLSearchParams(location.search).get("b");
+  const b = new URLSearchParams(location.search).get("b") || document.documentElement.getAttribute("data-ad-bundle");
   if (!["tray1", "tray2", "box"].includes(b)) return;
   const radio = document.querySelector(`input[name="bundle"][value="${b}"]`);
   if (!radio) return;
@@ -694,6 +695,13 @@ const suburbInput = document.getElementById("delivery-suburb");
 const postcodeInput = document.getElementById("delivery-postcode");
 // What the line is saying: "" (nothing), "ok", "out", "unknown" or "fix" (a box needs filling in).
 let zoneState = "";
+// A visitor from a Surry Hills ad reads their own suburb as the example (data-ad-suburb, index.html).
+(function adPlaceExample() {
+  const root = document.documentElement;
+  const suburb = root.getAttribute("data-ad-suburb"), postcode = root.getAttribute("data-ad-postcode");
+  if (suburb && suburbInput) suburbInput.placeholder = suburb;
+  if (postcode && postcodeInput) postcodeInput.placeholder = postcode;
+})();
 
 function setZoneHint(state, text) {
   if (!zoneHint) return;
