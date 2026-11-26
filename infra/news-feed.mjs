@@ -288,18 +288,26 @@ function storyOf(source, row, nowIso) {
   // Google News puts the headline and the outlet in the description; that adds nothing.
   if (source.group === "Google News" || titleKey(summary).startsWith(titleKey(row.title).slice(0, 40))) summary = "";
   if (reddit) summary = summary.replace(/submitted by\s+\/?u\/\S+.*$/i, "").replace(/\[link\]\s*\[comments\]\s*$/i, "").trim();
+  // A Reddit post's whole text is kept for its summary (news-brief.mjs): Reddit refuses the
+  // Worker its threads, so the feed is all there is to read.
+  const detail = reddit && summary.length > 220 ? clip(summary, 3000) : "";
   summary = clip(summary, 220);
   const key = reddit ? "u:" + row.url.replace(/[?#].*$/, "").replace(/\/$/, "") : "t:" + titleKey(row.title);
+  // Google News links lead to Google, not the article; the outlet's home page lets the summary
+  // (news-brief.mjs) look for the article on the outlet's own site.
+  const site = row.publisherUrl && /^https?:\/\//i.test(row.publisherUrl) ? row.publisherUrl.slice(0, 200) : "";
   return {
     id: fnv(key),
     title: clip(unshout(row.title), 200),
     url: row.url,
+    ...(site ? { site } : {}),
     source: clip(publisher, 60),
     via: source.id,
     kind: reddit ? "reddit" : source.kind === "nsw" ? "official" : "news",
     at: row.at && Date.parse(row.at) <= Date.now() + 36e5 ? row.at : nowIso,
     seen: nowIso,
     summary,
+    ...(detail ? { detail } : {}),
     topics: topicsOf(source, row.title, row.summary),
   };
 }
@@ -352,6 +360,7 @@ function nswStory(prev, next, nowIso) {
     at: nowIso,
     seen: nowIso,
     summary: clip(next.text, 220),
+    detail: next.text,
     topics: ["birdflu"],
   };
 }
@@ -423,8 +432,9 @@ function mergeStories(items, fresh) {
   const byId = new Map(items.map((s) => [s.id, s]));
   let added = 0;
   for (const s of fresh) {
-    const old = byId.get(s.id);
+    let old = byId.get(s.id);
     if (!old) { byId.set(s.id, s); added++; continue; }
+    if (s.site && !old.site && old.via.startsWith("gn-")) { old = { ...old, site: s.site }; byId.set(s.id, old); }
     // The same story from its own outlet beats the Google News copy of it.
     if (old.via.startsWith("gn-") && !s.via.startsWith("gn-")) byId.set(s.id, { ...s, seen: old.seen, at: old.at < s.at ? old.at : s.at, topics: [...new Set([...old.topics, ...s.topics])] });
     else if (s.topics.some((t) => !old.topics.includes(t))) byId.set(s.id, { ...old, topics: [...new Set([...old.topics, ...s.topics])] });

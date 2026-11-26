@@ -2,6 +2,7 @@ import { checkDeliveryAddress, quoteDelivery, SUBURBS, SITE_DELIVERY_FEE, MAX_DE
 import { priceWatchView, runPoll, runScheduledPoll, saveTyped, getLatest as latestShopPrices, lastPriceChange } from "./price-watch.mjs";
 import { fillPricesPage, sitemapWithPriceChange, PRICES_PATH } from "./prices-page.mjs";
 import { newsView, runNewsPoll, runScheduledNews, saveNewsFeed, isGithubRelay, takeNewsRelay } from "./news-feed.mjs";
+import { getBriefs, attachBriefs, runBriefs, briefNow } from "./news-brief.mjs";
 import { growersView, runGrowersCheck, runScheduledGrowers } from "./growers.mjs";
 import {
   MAIN, DOZENS_PER_CASE, VARIETIES, BUNDLES, BUNDLE_KEYS, isBundle, bundleLabel,
@@ -4594,6 +4595,12 @@ function settingsFrom(stored) {
   };
 }
 
+/** The News page's data with each story's summary on it. */
+async function newsWithBriefs(env) {
+  const [view, briefs] = await Promise.all([newsView(env), getBriefs(env)]);
+  return attachBriefs(view, briefs);
+}
+
 async function handleApi(request, env, url, ctx) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS });
@@ -6561,16 +6568,29 @@ async function handleApi(request, env, url, ctx) {
   }
 
   // Admin > News: Australian egg news, the NSW bird flu advice and how each source is doing.
+  // Each story carries its summary, written from the article itself (news-brief.mjs).
   if (url.pathname === "/api/news" && request.method === "GET") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
-    return json(await newsView(env));
+    return json(await newsWithBriefs(env));
   }
 
   // Admin: read every news source now (the Refresh button). A second tap within a minute is free.
   if (url.pathname === "/api/news/poll" && request.method === "POST") {
     if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
     const result = await runNewsPoll(env);
-    return json({ ...(await newsView(env)), ran: result.ran, added: result.added || 0, failed: result.failed || 0 });
+    return json({ ...(await newsWithBriefs(env)), ran: result.ran, added: result.added || 0, failed: result.failed || 0 });
+  }
+
+  // Admin: a story's summary, written now if the cron hasn't got to it yet. Opening a story
+  // waits for this, so it reads one article at most.
+  if (url.pathname === "/api/news/brief" && request.method === "POST") {
+    if (!isAdmin(request, env)) return json({ error: "unauthorised" }, 401);
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "").slice(0, 40);
+    const view = await newsView(env, 500);
+    const result = await briefNow(env, view.items || [], id);
+    if (result.error) return json(result, 404);
+    return json(result);
   }
 
   // Admin: add or remove a pasted news feed, such as a Google Alerts RSS link.
@@ -6579,7 +6599,7 @@ async function handleApi(request, env, url, ctx) {
     const body = await request.json().catch(() => ({}));
     const result = await saveNewsFeed(env, body);
     if (result.error) return json(result, 400);
-    return json({ ...(await newsView(env)), ...result });
+    return json({ ...(await newsWithBriefs(env)), ...result });
   }
 
   // GitHub Actions (news-relay.yml) posts the Google News feeds here, since Google answers
@@ -6629,9 +6649,16 @@ export default {
       })
     );
     ctx.waitUntil(
-      runScheduledNews(env).catch((err) => {
-        console.log("news poll failed", String(err?.message || err));
-      })
+      runScheduledNews(env)
+        .catch((err) => {
+          console.log("news poll failed", String(err?.message || err));
+        })
+        // Then summaries for the newest stories without one, a few a tick (news-brief.mjs).
+        .then(() => newsView(env, 500))
+        .then((view) => runBriefs(env, view.items || []))
+        .catch((err) => {
+          console.log("news summaries failed", String(err?.message || err));
+        })
     );
     ctx.waitUntil(
       runScheduledGrowers(env).catch((err) => {
@@ -6702,7 +6729,7 @@ export default {
           "Content-Type": "text/html; charset=utf-8",
           "X-Robots-Tag": "noindex",
           "Cache-Control": "no-store, max-age=0",
-          "X-Yolko-Admin": "126",
+          "X-Yolko-Admin": "127",
         },
       });
     }
@@ -6768,7 +6795,7 @@ export default {
     const headers = {
       "Content-Type": MIME[ext] || "application/octet-stream",
       "Cache-Control": browserCacheControl(ext, url),
-      "X-Yolko-Build": "280",
+      "X-Yolko-Build": "281",
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Strict-Transport-Security": "max-age=31536000",

@@ -980,10 +980,19 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
 
 /* ---------- news ---------- */
 /* Egg news reads like a Mail list: a round outlet badge, the headline, one quiet line under it.
-   A small solid dot marks stories that came in since the page was last opened. */
+   A small solid dot marks stories that came in since the page was last opened. Tapping a story
+   opens its summary; the round arrow at the end opens the article itself. */
 .nw-head { flex-wrap:wrap; }
 .nwl { display:flex; flex-direction:column; margin:0 -12px; }
-.nwl .row { grid-template-columns:40px minmax(0,1fr); align-items:start; min-height:68px; color:inherit; text-decoration:none; }
+.nwl .row { grid-template-columns:40px minmax(0,1fr) 44px; align-items:start; min-height:68px; padding-right:6px; color:inherit; text-decoration:none; }
+.nwl .nw-main { display:block; min-width:0; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.nwl .nw-main::before { content:""; position:absolute; inset:0; border-radius:16px; }
+.nwl .nw-main:focus-visible { outline:none; }
+.nwl .nw-main:focus-visible::before { box-shadow:inset 0 0 0 2px var(--ink); }
+.nwl .nw-go { position:relative; z-index:1; align-self:center; width:44px; height:44px; border-radius:50%; display:grid; place-items:center; color:var(--muted); transition:background-color .15s, color .15s, scale var(--t-spring) var(--spring-bouncy); }
+.nwl .nw-go:hover { background:var(--hover); color:var(--ink); }
+.nwl .nw-go:active { scale:.92; }
+.nwl .nw-go .i { width:18px; height:18px; }
 .nwl .av { font-size:13px; letter-spacing:0; }
 .nwl .nt { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; font-size:17px; line-height:22px; font-weight:600; letter-spacing:-.012em; overflow-wrap:anywhere; }
 .nwl .ns { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; margin-top:2px; color:var(--muted); font-size:15px; line-height:20px; overflow-wrap:anywhere; }
@@ -1000,6 +1009,28 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
 .nw-steps { margin:10px 0 0; padding-left:20px; color:var(--muted); font-size:15px; line-height:22px; }
 .nw-steps a { color:var(--ink); font-weight:600; }
 .modal.nw-sheet { width:min(560px, 100%); }
+/* A story's summary: the outlet and date, the summary, the key facts, a YOLKO line, and where it
+   was written from. Open link is the main button. */
+.modal.nw-brief { width:min(600px, 100%); padding-bottom:0; }
+/* Done and Open link stay in reach at the foot of a long summary; the words fade out under them. */
+.nw-brief .mact { position:sticky; bottom:0; z-index:1; margin-top:0; padding:18px 0 24px; background:linear-gradient(to bottom, color-mix(in srgb, var(--paper) 0%, transparent), var(--paper) 16px); }
+.nw-brief h2 { margin-bottom:4px; }
+.nw-brief .nb-meta { margin:0 0 16px; color:var(--muted); font-size:13px; line-height:18px; }
+.nw-brief .nb-sum { margin:0; color:var(--ink); font-size:17px; line-height:24px; letter-spacing:-.012em; }
+.nw-brief .nb-h { margin:20px 0 2px; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
+.nw-brief .nb-pts { margin:0; padding:0; list-style:none; }
+.nw-brief .nb-pts li { position:relative; margin:0; padding:9px 0 9px 18px; color:var(--ink); font-size:15px; line-height:21px; box-shadow:inset 0 -.5px 0 var(--line); }
+.nw-brief .nb-pts li:last-child { box-shadow:none; padding-bottom:2px; }
+.nw-brief .nb-pts li::before { content:""; position:absolute; left:3px; top:17px; width:5px; height:5px; border-radius:50%; background:var(--ink); }
+.nb-us { margin-top:16px; padding:12px 14px; border-radius:16px; background:var(--subtle); }
+.nb-us span { display:block; font-size:13px; line-height:18px; font-weight:600; color:var(--muted); }
+.nw-brief .nb-us p { margin:2px 0 0; color:var(--ink); font-size:15px; line-height:21px; }
+.nw-brief .nb-from { display:flex; gap:8px; align-items:flex-start; margin:18px 0 0; color:var(--muted); font-size:13px; line-height:18px; }
+.nb-from .i { flex:none; width:15px; height:15px; margin-top:1px; }
+.nb-load { padding-top:2px; }
+.nb-load .sk { display:block; height:15px; border-radius:8px; margin:0 0 10px; }
+.nw-brief .nb-load p { margin:14px 0 0; color:var(--muted); font-size:13px; line-height:18px; }
+.nw-brief .nb-none { margin:0; color:var(--ink2); font-size:15px; line-height:21px; }
 @media (max-width:899px) {
   .kpis.three.nw-k { grid-template-columns:1fr 1fr; }
   .kpis.three.nw-k .kpi:last-child { grid-column:1 / -1; }
@@ -1310,6 +1341,8 @@ a.pwr:focus-visible, button.pwr:focus-visible { outline:3px solid var(--focus); 
   .modal::before { content:""; display:block; width:36px; height:5px; border-radius:3px; background:var(--line3); margin:0 auto 14px; opacity:.6; }
   .modal .mact { gap:10px; }
   .modal .mact .btn { flex:1; min-width:0; height:50px; border-radius:25px; }
+  .modal.nw-brief { padding-bottom:0; }
+  .nw-brief .mact { padding-bottom:calc(20px + var(--safe-b) / 2); }
   .vgrid { grid-template-columns:repeat(2, minmax(0,1fr)); }
   .agrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
   .acard .a3 { grid-template-columns:1fr 1fr; }
@@ -4904,14 +4937,30 @@ function nwMono(s) {
 function nwTime(iso) {
   return iso && sydDate(Date.parse(iso)) === sydDate(Date.now()) ? rel(iso) : "";
 }
+/** The article's own page: the outlet's link once the summary found it (Google News hides it),
+ *  else the link the feed gave. */
+function nwHref(s) {
+  const b = s.brief || {};
+  const u = b.src && /^https:\/\//i.test(b.src) ? b.src : s.url;
+  return /^https:\/\//i.test(u || "") ? u : "#";
+}
+function nwMeta(s) {
+  const tags = (s.topics || []).map(function (t) { return t === "birdflu" ? "Bird flu" : "Prices"; }).join(", ");
+  return [s.source, nwTime(s.at), tags].filter(Boolean).join(" · ");
+}
+/** The line under a headline: the summary once it's written, else the feed's own short text. */
+function nwLine(s) {
+  return (s.brief && s.brief.summary) || s.summary || "";
+}
 function nwRow(s) {
   const fresh = NW_SEEN && Date.parse(s.seen) > NW_SEEN;
-  const tags = (s.topics || []).map(function (t) { return t === "birdflu" ? "Bird flu" : "Prices"; }).join(", ");
-  const meta = [s.source, nwTime(s.at), tags].filter(Boolean).join(" · ");
-  const href = /^https:\/\//i.test(s.url || "") ? s.url : "#";
-  return '<a class="row' + (fresh ? " new" : "") + '" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" aria-label="' + esc(s.title + ". " + meta + (fresh ? ". New" : "") + ". Opens in a new tab") + '">' +
-    '<span class="av" aria-hidden="true">' + esc(nwMono(s)) + '</span><span class="min0"><span class="nt">' + esc(s.title) + "</span>" +
-    (s.summary ? '<span class="ns">' + esc(s.summary) + "</span>" : "") + '<span class="mt2">' + esc(meta) + "</span></span></a>";
+  const meta = nwMeta(s);
+  const line = nwLine(s);
+  return '<div class="row' + (fresh ? " new" : "") + '" data-nw="' + esc(s.id) + '">' +
+    '<span class="av" aria-hidden="true">' + esc(nwMono(s)) + "</span>" +
+    '<button type="button" class="nw-main" data-action="nw-open" data-id="' + esc(s.id) + '" aria-label="' + esc(s.title + ". " + meta + (fresh ? ". New" : "") + ". Opens its summary") + '">' +
+      '<span class="nt">' + esc(s.title) + "</span>" + (line ? '<span class="ns">' + esc(line) + "</span>" : "") + '<span class="mt2">' + esc(meta) + "</span></button>" +
+    '<a class="nw-go" href="' + esc(nwHref(s)) + '" target="_blank" rel="noopener noreferrer" title="Open link" aria-label="' + esc("Open link: " + s.title) + '">' + ic("external", 18) + "</a></div>";
 }
 function nwListHtml() {
   const all = (NW.items || []).filter(nwShown);
@@ -5017,6 +5066,90 @@ function nwMore(t) {
   t.remove();
   list.insertAdjacentHTML("afterend", nwMoreHtml());
 }
+/* A story's summary sheet. The summary is written from the article itself by the Worker
+   (news-brief.mjs); one not written yet is written while the sheet shows a placeholder. */
+let NW_OPEN = null;
+function nwStory(id) {
+  return NW && (NW.items || []).filter(function (x) { return x.id === id; })[0];
+}
+function nwHost(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+}
+/** Where the summary came from, said plainly, so it's clear what it can be trusted for. */
+function nwFromLine(s, b) {
+  const host = nwHost(b.src || s.url);
+  const at = host && host !== "news.google.com" ? " on " + host : "";
+  const off = b.onTopic === false ? " Most of it isn't about eggs." : "";
+  if (b.from === "page") return "From the NSW Government's bird flu page, word for word.";
+  if (b.from === "thread") return "Written from the Reddit post and its replies. These are people's own words, not checked facts." + off;
+  if (b.from === "opening") return "Only the opening of this article is public" + at + ", so the summary covers just that. Every number in it is checked against the article." + off;
+  return "Written from the full article" + at + ". Every number in it is checked against the article." + off;
+}
+function nwBriefBody(s) {
+  const b = s.brief;
+  if (!b || b.pending) {
+    const wait = b && b.next && b.error ? esc(b.error) : "Reading the article";
+    return '<div class="nb-load" aria-live="polite"><span class="sk" style="width:100%"></span><span class="sk" style="width:94%"></span><span class="sk" style="width:62%"></span><p>' + wait + (b && b.next ? "" : "…") + "</p></div>";
+  }
+  if (b.failed || !b.summary) {
+    const why = b.error ? String(b.error).replace(/\.$/, "") + "." : "The article couldn't be read.";
+    return '<p class="nb-none">No summary for this one. ' + esc(why) + " Open link to read it on the outlet's site.</p>" +
+      (s.summary ? '<p class="nb-h">The outlet\'s own short text</p><p class="nb-none">' + esc(s.summary) + "</p>" : "");
+  }
+  const pts = (b.points || []).filter(Boolean);
+  return '<p class="nb-sum">' + esc(b.summary) + "</p>" +
+    (pts.length ? '<p class="nb-h">Key facts</p><ul class="nb-pts">' + pts.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ul>" : "") +
+    (b.forUs ? '<div class="nb-us"><span>For YOLKO</span><p>' + esc(b.forUs) + "</p></div>" : "") +
+    '<p class="nb-from">' + ic(b.from === "thread" ? "chat" : "check", 15) + "<span>" + esc(nwFromLine(s, b)) + "</span></p>";
+}
+function nwBriefMeta(s) {
+  const day = s.at ? fmtDay(s.at) : "";
+  return [s.source, day].filter(Boolean).join(" · ");
+}
+function nwOpenLink(s) {
+  return '<a class="btn primary" id="nb-open" href="' + esc(nwHref(s)) + '" target="_blank" rel="noopener noreferrer">Open link</a>';
+}
+function nwOpen(t) {
+  const id = t.getAttribute("data-id");
+  const s = nwStory(id);
+  if (!s) return;
+  NW_OPEN = id;
+  openModal({
+    title: s.title,
+    cls: "nw-brief",
+    html: '<p class="nb-meta">' + esc(nwBriefMeta(s)) + '</p><div id="nb-body">' + nwBriefBody(s) + "</div>",
+    actions: [{ label: "Done", kind: "ghost", value: null }],
+    onOpen: function (wrap) {
+      const act = wrap.querySelector(".mact");
+      if (act) act.insertAdjacentHTML("beforeend", nwOpenLink(s));
+    },
+  }).then(function () { if (NW_OPEN === id) NW_OPEN = null; });
+  if (!s.brief || s.brief.pending) nwFetchBrief(id);
+}
+async function nwFetchBrief(id) {
+  const r = await api("/api/news/brief", { method: "POST", body: { id: id } });
+  const s = nwStory(id);
+  if (!s) return;
+  if (!r.ok) {
+    if (NW_OPEN === id && $("nb-body")) $("nb-body").innerHTML = '<p class="nb-none">' + esc(r.data.error || "Couldn't get the summary. Check the connection and try again.") + "</p>";
+    return;
+  }
+  s.brief = r.data.brief || { failed: true };
+  // The row under the sheet shows the new summary line and the outlet's own link.
+  const row = document.querySelector('#nw-list [data-nw="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+  if (row) {
+    const ns = row.querySelector(".ns"), line = nwLine(s);
+    if (line && ns) ns.textContent = line;
+    else if (line) row.querySelector(".nt").insertAdjacentHTML("afterend", '<span class="ns">' + esc(line) + "</span>");
+    const go = row.querySelector(".nw-go");
+    if (go) go.setAttribute("href", nwHref(s));
+  }
+  if (NW_OPEN !== id || !$("nb-body")) return;
+  $("nb-body").innerHTML = nwBriefBody(s);
+  const open = $("nb-open");
+  if (open) open.setAttribute("href", nwHref(s));
+}
+
 /* The Sources sheet: how each source did last time, and feeds added here (Google Alerts). */
 function nwSourceCell(s) {
   const ok = s.ok === true, bad = s.ok === false;
@@ -5678,6 +5811,7 @@ const ACTIONS = {
   "pw-edit": function (t) { const o = PW && (PW.typed || []).filter(function (x) { return x.id === t.getAttribute("data-id"); })[0]; if (o) pwSheet(o); },
   "nw-poll": pollNewsNow,
   "nw-filter": nwFilter,
+  "nw-open": nwOpen,
   "nw-more": nwMore,
   "nw-sources": nwSources,
   "nw-feed-add": function () { nwFeedAdd(); },

@@ -10,6 +10,7 @@ on:
       - "infra/nsw-suburb-centroids.mjs"
       - "infra/price-watch.mjs"
       - "infra/news-feed.mjs"
+      - "infra/news-brief.mjs"
       - "infra/growers.mjs"
       - "infra/growers-data.json"
       - "infra/catalogue.mjs"
