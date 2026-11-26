@@ -28,9 +28,9 @@ const BRIEF_DAYS = 21;
 const PER_TICK = 3;
 const MAX_TRIES = 3;
 const RETRY_MS = 2 * 3600 * 1000;
-// Outlets list a story in their news sitemap or feed for a day or two, so an older Google News
-// story isn't looked for.
-const SITE_LOOK_DAYS = 4;
+// Outlets list a story in their news sitemap or feed for a day or two, and their search finds it
+// for longer; a Google News story older than this isn't looked for.
+const SITE_LOOK_DAYS = 14;
 // Pages read per cron tick for summaries, so a tick stays well inside the Worker's request limit.
 const READS_PER_TICK = 14;
 const DAILY_NEURONS = 6000;
@@ -278,7 +278,8 @@ function robotsAllows(rules, url) {
 /**
  * Look for the story on its outlet's own site. `site` is the outlet's home page from Google News.
  * Reads robots.txt (its news sitemaps, and what it asks readers to leave alone), the home page's
- * feed links and the common feed paths, at most MAX_SITE_READS pages in all. Returns
+ * feed links and the common feed paths, then the site's own search feed, at most MAX_SITE_READS
+ * pages plus the search. Returns
  * { url, robots } or { error, robots }. `fetchFn` is fetch.
  */
 const MAX_SITE_READS = 6;
@@ -324,6 +325,12 @@ async function findOnSite(site, title, fetchFn = fetch) {
     const home = await get(origin + "/", "text/html");
     const feeds = [...new Set([...feedLinks(home, origin + "/"), origin + "/feed/", origin + "/rss"])].slice(0, 3);
     for (const f of feeds) { if (best && best.score >= 0.95) break; await readList(f, 1); }
+  }
+  // Older stories have left those lists. Many outlets run WordPress, whose search answers as a
+  // feed: one search for the headline's main words, when robots.txt doesn't rule search out.
+  if (!best) {
+    const search = origin + "/?s=" + encodeURIComponent(titleWords(title).slice(0, 5).join(" ")) + "&feed=rss2";
+    if (robotsAllows(robots, search)) { reads = Math.min(reads, MAX_SITE_READS - 1); await readList(search, 1); }
   }
   if (best && !robotsAllows(robots, best.url)) return { error: "The outlet asks readers to leave that page alone", robots };
   return best ? { url: best.url, score: best.score, robots } : { error: "Couldn't find the article on " + new URL(origin).hostname, robots };
@@ -515,7 +522,10 @@ async function getBriefs(env) {
   const raw = await env.DATA.get(BRIEFS_KEY, "json");
   const s = raw && typeof raw === "object" ? raw : {};
   const day = utcDay();
-  return { v: 1, items: {}, ...s, day, used: s.day === day ? s.used || 0 : 0, skip: s.skip || {} };
+  const items = { ...(s.items || {}) };
+  // Version 1 gave up on Google News stories whose outlet wasn't known yet: look for those again.
+  if ((s.v || 1) < 2) for (const [id, b] of Object.entries(items)) if (b && b.failed && b.error === NO_GOOGLE_LINK) delete items[id];
+  return { ...s, v: 2, items, day, used: s.day === day ? s.used || 0 : 0, skip: s.skip || {} };
 }
 
 async function saveBriefs(env, briefs, liveIds) {
@@ -547,6 +557,8 @@ function inWindow(story, now = Date.now()) {
 function wants(story, b, now = Date.now()) {
   // The outlet's own copy of a story replaced the Google News one: read it afresh.
   if (b && !b.summary && b.forUrl && b.forUrl !== story.url) return true;
+  // A Google News story that came in before its outlet was known: look again now it is.
+  if (b && b.failed && b.noSite && story.site) return true;
   if (b && (b.summary || b.failed)) return false;
   if (b && b.next && Date.parse(b.next) > now) return false;
   return true;
@@ -559,8 +571,11 @@ const NO_GOOGLE_LINK = "Google News hides this story's own link, and its outlet'
  *  `reads` counts pages read (the caller's limit). */
 async function briefOne(env, story, prev, budget) {
   const now = new Date();
-  const base = { ...(prev || {}), tries: (prev?.tries || 0) + 1 };
+  // A record failed only for want of the outlet's site starts its tries afresh.
+  const base = { ...(prev || {}), tries: prev?.noSite ? 1 : (prev?.tries || 0) + 1 };
   delete base.next;
+  delete base.failed;
+  delete base.noSite;
   // The NSW page: the story was made from its "Latest advice" text, which is the summary.
   if (story.kind === "official") {
     const text = story.detail || story.summary || "";
@@ -572,7 +587,8 @@ async function briefOne(env, story, prev, budget) {
   if (!src) {
     // A Google News story: look for the same headline on the outlet's own site, while it's new
     // enough to be in the outlet's lists.
-    if (!story.site || Date.now() - Date.parse(story.seen || story.at) > SITE_LOOK_DAYS * 864e5) return { failed: true, error: NO_GOOGLE_LINK, tries: base.tries, at: now.toISOString() };
+    if (!story.site) return { failed: true, noSite: true, error: NO_GOOGLE_LINK, tries: base.tries, at: now.toISOString() };
+    if (Date.now() - Date.parse(story.seen || story.at) > SITE_LOOK_DAYS * 864e5) return { failed: true, error: NO_GOOGLE_LINK, tries: base.tries, at: now.toISOString() };
     const found = await findOnSite(story.site, story.title, (u, o) => { budget.reads = (budget.reads || 0) + 1; return fetch(u, o); });
     if (!found.url) return fail(base, "", found.error === "No outlet site" ? NO_GOOGLE_LINK : found.error || NO_GOOGLE_LINK);
     src = found.url;
