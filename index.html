@@ -658,9 +658,9 @@
              under the heading when the heading already says what that line says. */
           (function () {
             var AD_LANDINGS = {
-              "surry-hills-test": { suburb: "Surry Hills" },
-              "never-run-out": { title: "Eggs at your door every Saturday" },
-              "more-egg": { title: "1.75\u00a0kg of eggs for $13", sub: "A tray of 30 <b>Pace Farm</b> eggs. We bring it to your door on Saturday morning, $5 flat." }
+              "surry-hills-test": { suburb: "Surry Hills", bundle: "tray1", place: ["Surry Hills", "2010"] },
+              "never-run-out": { title: "Eggs at your door every Saturday", bundle: "tray1", place: ["Surry Hills", "2010"] },
+              "more-egg": { title: "1.75\u00a0kg of eggs for $13", sub: "A tray of 30 <b>Pace Farm</b> eggs. We bring it to your door on Saturday morning, $5 flat.", bundle: "tray1", place: ["Surry Hills", "2010"] }
             };
             try {
               var q = new URLSearchParams(location.search);
@@ -673,6 +673,10 @@
               var h = document.getElementById("hero-title");
               h.textContent = land.suburb ? "Fresh eggs delivered to " + land.suburb : land.title;
               if (land.sub) h.setAttribute("data-sub", land.sub);
+              /* The ads sell one tray for $13 to Surry Hills, so the form starts there (app.js reads these). */
+              var root = document.documentElement;
+              if (land.bundle) root.setAttribute("data-ad-bundle", land.bundle);
+              if (land.place) { root.setAttribute("data-ad-suburb", land.place[0]); root.setAttribute("data-ad-postcode", land.place[1]); }
             } catch (e) {}
           })();
           </script>
@@ -1167,6 +1171,6 @@
 
   <script src="track.js?v=4"></script>
   <script src="config.js?v=91"></script>
-  <script src="app.js?v=166"></script>
+  <script src="app.js?v=167"></script>
 </body>
 </html>

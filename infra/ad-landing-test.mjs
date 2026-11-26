@@ -22,10 +22,12 @@ function arrive({ search = "", attr, brokenStorage = false } = {}) {
   const attrs = {};
   const title = { textContent: HEADING, setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: (k) => (k in attrs ? attrs[k] : null) };
   const sub = { innerHTML: SUB };
+  const rootAttrs = {};
   const context = {
     URLSearchParams,
     location: { search },
     document: {
+      documentElement: { setAttribute: (k, v) => { rootAttrs[k] = String(v); } },
       getElementById: (id) => (id === "hero-title" ? title : null),
       querySelector: (sel) => (sel === ".hero-sub" ? sub : null),
     },
@@ -38,7 +40,7 @@ function arrive({ search = "", attr, brokenStorage = false } = {}) {
   };
   vm.runInNewContext(headScript, context);
   vm.runInNewContext(subScript, context);
-  return { h: title.textContent, sub: sub.innerHTML };
+  return { h: title.textContent, sub: sub.innerHTML, root: rootAttrs };
 }
 const head = (o) => arrive(o).h;
 
@@ -70,6 +72,18 @@ const more = arrive({ search: ad("more-egg") }).sub;
 ok(more !== SUB && !/\$13/.test(more) && /\$5 flat/.test(more) && /Pace Farm/.test(more) && /tray of 30/.test(more), "under the more egg heading the price is said once, and $5 delivery stays beside it: " + more);
 ok(!/<strong>/.test(more), "no <strong> left for app.js to put a second price in");
 
+// The order form starts on the pack the ad sells, with the ad's suburb as the example (app.js reads these).
+const root = (o) => arrive(o).root;
+const SURRY_ROOT = { "data-ad-bundle": "tray1", "data-ad-suburb": "Surry Hills", "data-ad-postcode": "2010" };
+ok(JSON.stringify(root({ search: ad("surry-hills-test") })) === JSON.stringify(SURRY_ROOT), "a Surry Hills ad visitor starts on one tray with Surry Hills 2010 as the example: " + JSON.stringify(root({ search: ad("surry-hills-test") })));
+ok(root({ search: ad("never-run-out") })["data-ad-bundle"] === "tray1" && root({ search: ad("more-egg") })["data-ad-bundle"] === "tray1", "so do visitors from the homes ads");
+ok(root({ attr: { src: "facebook", utm_campaign: "surry-hills-test" } })["data-ad-bundle"] === "tray1", "and on coming back to the homepage in the same visit");
+ok(Object.keys(root()).length === 0 && Object.keys(root({ search: "?utm_source=google" })).length === 0 && Object.keys(root({ search: "?utm_campaign=__proto__" })).length === 0, "everyone else gets nothing from this: the form starts as it always has");
+ok(Object.keys(root({ search: "?src=flyer", attr: { src: "facebook", utm_campaign: "more-egg" } })).length === 0, "nor does a later arrival from a flyer");
+const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+ok(appJs.includes('get("b") || document.documentElement.getAttribute("data-ad-bundle")'), "app.js: a b= in the link still wins over the ad's pack");
+ok(appJs.includes("suburbInput.placeholder = suburb") && appJs.includes("postcodeInput.placeholder = postcode"), "app.js: the example suburb and postcode come from the ad");
+
 // What the list holds.
 const map = headScript.match(/AD_LANDINGS\s*=\s*(\{[\s\S]*?\n\s*\});/);
 ok(map, "the list of campaigns is in the script");
@@ -86,6 +100,12 @@ for (const [campaign, land] of Object.entries(lands)) {
     ok(land.suburb.length <= "across Sydney".length, `${land.suburb}: no longer than "across Sydney", so the heading keeps its three lines`);
   }
   // The real check is the browser's: three lines at most on a phone (photographed before each change).
+  if (land.bundle) ok(["tray1", "tray2", "box"].includes(land.bundle), `${campaign}: starts on a pack the form has (${land.bundle})`);
+  if (land.place) {
+    const check = checkDeliveryAddress({ street: "1 Example Street", suburb: land.place[0], postcode: land.place[1] });
+    ok(check.ok && check.deliver, `${campaign}: the example ${land.place.join(" ")} is a place we deliver to (${check.code || "ok"})`);
+  }
+  if (/\$\d/.test(words)) ok(land.bundle === "tray1", `${campaign}: a heading saying $${tray1} starts the form on that tray`);
   ok(words.length <= 36, `${campaign}: heading about as long as today's at most (${words.length} letters)`);
   for (const p of words.match(/\$\d+/g) || []) ok(Number(p.slice(1)) === tray1, `${campaign}: a price in the heading is the tray price on the page ($${tray1})`);
   if (/\$\d/.test(words)) ok(Boolean(land.sub) && !/\$\d/.test(land.sub.replace("$5 flat", "")), `${campaign}: a heading with a price says it once on the first screen`);
