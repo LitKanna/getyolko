@@ -5,6 +5,11 @@ account_id = "3af91e3294583af96a50ed10fef9c3b3"
 # Keep plain variables added in the Cloudflare dashboard across deploys.
 keep_vars = true
 
+# Workers AI: writes the summaries in Admin > News (infra/news-brief.mjs), inside the free
+# daily allowance.
+[ai]
+binding = "AI"
+
 [[kv_namespaces]]
 binding = "DATA"
 id = "98fb94415ceb4012b3de2e5adcf253a5"
