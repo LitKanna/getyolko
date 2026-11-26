@@ -169,6 +169,24 @@ function fakeFetch(pages) {
   assert.equal(r.url, undefined);
   assert.match(r.error, /leave that page alone/);
 }
+{
+  // An older story has left the feed: the site's own search feed finds it.
+  const f = fakeFetch({
+    "https://wp.com.au/robots.txt": "User-agent: *\nDisallow: /wp-admin/",
+    "https://wp.com.au/feed/": `<rss><item><title>Something newer</title><link>https://wp.com.au/newer/</link></item></rss>`,
+    "https://wp.com.au/?s=australia%20conduct%20largest%20wild%20bird&feed=rss2": `<rss><channel><title>Search Results</title><item><title>Australia to Conduct Largest Wild-Bird Vaccination Experiment Ever Attempted</title><link>https://wp.com.au/australia-to-conduct-largest-wild-bird-vaccination-experiment/</link></item></channel></rss>`,
+  });
+  const r = await findOnSite("https://wp.com.au", "Australia to Conduct Largest Wild-Bird Vaccination Experiment Ever Attempted", f);
+  assert.equal(r.url, "https://wp.com.au/australia-to-conduct-largest-wild-bird-vaccination-experiment/");
+  assert.ok(f.calls.length <= 8, "the search is one read on top of the lists");
+}
+{
+  // A site that asks readers to keep out of its search is not searched.
+  const f = fakeFetch({ "https://nosearch.com/robots.txt": "User-agent: *\nDisallow: /?s=" });
+  const r = await findOnSite("https://nosearch.com", "Egg cartel case back in court", f);
+  assert.equal(r.url, undefined);
+  assert.ok(!f.calls.some((u) => u.includes("?s=")));
+}
 
 /* ---------- the models: one that fails hands over to the next ---------- */
 {
@@ -276,9 +294,43 @@ const articlePage = (title, text) => `<html><head><meta property="og:title" cont
     rec = (await getBriefs(env)).items.b;
     assert.equal(rec.failed, true);
     assert.match(rec.error, /HTTP 404/);
+
+    // A Google story that came in before its outlet was known is looked for once it is, with
+    // its tries started afresh, and not again and again after that.
+    const early = [{ id: "e", title: "Sunny Queen cartel case back in court", url: "https://news.google.com/rss/articles/CBMiEEE?oc=5", source: "The Outlet", kind: "news", at: now, seen: now, summary: "" }];
+    await runBriefs(env, early);
+    rec = (await getBriefs(env)).items.e;
+    assert.equal(rec.failed, true);
+    assert.equal(rec.noSite, true);
+    const known = [{ ...early[0], site: "https://outlet.com.au" }];
+    await runBriefs(env, known);
+    rec = (await getBriefs(env)).items.e;
+    assert.equal(rec.src, "https://outlet.com.au/story/sunny-queen");
+    assert.match(rec.summary, /Sunny Queen/);
+    const lost = [{ ...early[0], id: "l", title: "A story no outlet lists", site: "https://outlet.com.au" }];
+    const st = JSON.parse(env.DATA.m.get(BRIEFS_KEY));
+    st.items.l = { failed: true, noSite: true, error: "x", tries: 1 };
+    env.DATA.m.set(BRIEFS_KEY, JSON.stringify(st));
+    await runBriefs(env, lost);
+    rec = (await getBriefs(env)).items.l;
+    assert.equal(rec.tries, 1, "tries start afresh");
+    assert.equal(rec.failed, undefined, "not given up after one look");
+    assert.equal(rec.noSite, undefined);
+    assert.ok(Date.parse(rec.next) > Date.now(), "and not looked for again until later");
   } finally {
     globalThis.fetch = realFetch;
   }
+}
+
+/* ---------- summaries stored by the first version ---------- */
+{
+  const env = { DATA: kv() };
+  env.DATA.m.set(BRIEFS_KEY, JSON.stringify({ v: 1, items: { g: { failed: true, error: "Google News hides this story's own link, and its outlet's site didn't list it", tries: 1 }, h: { failed: true, error: "HTTP 404", tries: 3 }, a: { summary: "Kept." } } }));
+  const b = await getBriefs(env);
+  assert.equal(b.v, 2);
+  assert.equal(b.items.g, undefined, "a Google story given up on is looked for again");
+  assert.equal(b.items.h.failed, true);
+  assert.equal(b.items.a.summary, "Kept.");
 }
 
 /* ---------- stories keep what their summary needs ---------- */

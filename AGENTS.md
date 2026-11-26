@@ -734,6 +734,23 @@ Egg posts are rare: a handful a month across all 17, so a quiet Reddit tab is no
   workflow on a branch: it prints what it read, and the site refuses the post (401) because
   the branch is not main.
 
+Summaries (Kanna, 26 Nov 2026, builds 281 and 282). Tapping a story in Admin > News opens a
+sheet with a short summary, Key facts, a "For YOLKO" line when the story matters to the shop, a
+line on where it came from, and an Open link button; the arrow on the row still opens the
+article. `infra/news-brief.mjs` (`npm run test:news-brief`) writes them with Workers AI (the
+Worker's `AI` binding), 3 a cron tick, and at once when a story without one is opened
+(`POST /api/news/brief {id}`). They live in KV `news:v1:briefs`, capped at 6,000 neurons a day
+(`DAILY_NEURONS`, inside the free 10,000), and the admin never gets the stored article text.
+- Accuracy comes first: the model gets only the article's own text, and a sentence or fact with a
+  number that is not in the article, title or date is dropped. A paywalled page is summarised
+  from its public opening and says so. The NSW bird flu story uses the page's own words.
+- Pages are read only where robots.txt allows (`User-agent: *`).
+- Google News links hide the article. Never decode them through Google's own endpoints. The
+  outlet's site comes with the story (`site`, from the feed's `<source url>`), and
+  `findOnSite` looks for the headline in its news sitemaps, its feeds, then its WordPress search
+  feed (`/?s=...&feed=rss2`), for stories up to 14 days old. A story it can't find says "No
+  summary" and keeps Open link.
+
 ### Egg varieties, stock and prices (Nov 2026)
 `infra/catalogue.mjs` is the one list of everything YOLKO can sell, as Kanna set it out: trays
 (cage 1.75kg, which is the main tray, cage 1.5kg, cage 1kg, cage 1kg 18 pack, free range and cage
