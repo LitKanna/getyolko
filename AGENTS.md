@@ -816,10 +816,21 @@ open out of their row on phones, sheets spring up and follow the finger, widgets
 numbers, and the phone large title folds into a frosted top bar. Everything respects reduced
 motion. Apple devices get SF Pro; others get the self-hosted Inter.
 
-### No lint / test / build tooling
-There is no ESLint/Prettier/Ruff or test framework configured. `npm test` is a placeholder
-that intentionally fails (`echo "Error: no test specified" && exit 1`). do not treat that as
-a real failure. `.github/workflows/` handles GitHub Pages + Worker deploys only.
+### Shop rules and checks (28 Nov 2026)
+`npm run check` runs every `test:*` script, shop rules first, and prints one line each. The
+`Checks` workflow (`.github/workflows/checks.yml`) runs the same on every pull request and every
+push to main, so wait for it to go green before merging.
+
+`infra/shop-rules-test.mjs` (`npm run test:rules`) holds Kanna's standing rules that a script can
+see: fixed prices ($13, $25, $72 a box, $5 delivery; a box is never "$77"), the private mobile never
+shown, no Sydney Markets address or 2129, no pop-ups on the shop, no "cheapest" claims, plain
+words (no "a real person", never "homes only"), no em dashes, Saturday 6am to 12pm delivery, and
+mail only from orders@getyolko.com. If it goes red, fix the change, not the rule. When Kanna
+corrects something new about the shop that a script could catch, add a rule there in the same PR.
+Code comments are skipped, so notes about a rule do not trip it.
+
+There is no ESLint/Prettier/Ruff. `npm test` is a placeholder that intentionally fails
+(`echo "Error: no test specified" && exit 1`); use `npm run check` instead.
 
 ### Other tooling (optional, ops-only)
 - `infra/*.py` image generators need `pip install -r requirements.txt` (opencv, Pillow).

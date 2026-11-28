@@ -6,6 +6,8 @@
     "scripts":  {
                     "seo:ping":  "node infra/seo-indexnow.mjs",
                     "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1",
+                    "check":  "node infra/run-checks.mjs",
+                    "test:rules":  "node infra/shop-rules-test.mjs",
                     "test:delivery":  "node infra/delivery-zones-test.mjs",
                     "test:news":  "node infra/news-feed-test.mjs",
                     "test:news-brief":  "node infra/news-brief-test.mjs",
