@@ -1,0 +1,42 @@
+name: Checks
+
+# Every pull request and every push to main runs all repo checks, Kanna's shop rules first
+# (infra/shop-rules-test.mjs). A red check means the change breaks a rule Kanna already set:
+# fix the change, not the rule.
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Shop rules and unit checks
+        run: node infra/run-checks.mjs --skip=track
+
+      - name: Browser check (visit tracker)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run -s test:track

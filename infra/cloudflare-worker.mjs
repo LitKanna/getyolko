@@ -698,7 +698,7 @@ async function createCheckoutForOrder(env, order, settings, ctx) {
 
   const fulfillDesc = isDelivery
     ? `${repeat ? `${REPEAT_WORD[repeat]}, first delivery ` : ""}Saturday ${order.pickupDate || ""}${repeat ? "" : " delivery"} · ${order.deliveryAddress || "Sydney area"}${order.deliveryPerk ? " · Free delivery" : ""}`.trim()
-    : `Pickup ${order.pickupDay}${order.pickupDate ? " " + order.pickupDate : ""} at Paddy's Markets Flemington`;
+    : `Pickup ${order.pickupDay}${order.pickupDate ? " " + order.pickupDate : ""}`; // never a place: YOLKO has no shopfront
 
   const params = new URLSearchParams({
     mode: "payment",

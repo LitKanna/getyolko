@@ -117,7 +117,15 @@ export function visitVerdict(row, nowMs = Date.now()) {
   const net = row.asnOrg ? netKind(row.asnOrg) : row.net || "unknown";
   const taps = e ? TAP_KEYS.reduce((n, k) => n + (Number(e.taps?.[k]) || 0), 0) : 0;
   const did = e ? `on the page ${sayTime(e.secs)}${e.scrolled ? `, scrolled to ${e.scroll}%` : ", no scroll"}${taps ? `, ${taps} ${taps === 1 ? "tap" : "taps"}` : ""}` : "";
-  if (e && (taps > 0 || (e.scrolled && e.secs >= 5))) return { label: "real", why: did };
+  /* Meta's ad checker fills every box of the order form in no time and never scrolls: a form
+     filled in under 3 seconds is a robot on any network, and on Meta's or Google's own network a
+     tap alone proves nothing (people in the Facebook app come through their own provider). */
+  const formOnly = e && taps > 0 && taps === (Number(e.taps?.form) || 0);
+  if (formOnly && e.secs < 3 && !e.scrolled) {
+    return { label: "suspect", why: `form filled in under 3 seconds${NET_WORDS[net] ? `, ${NET_WORDS[net]}` : ""}` };
+  }
+  const ownNet = net === "meta" || net === "google";
+  if (e && ((taps > 0 && !ownNet) || (e.scrolled && e.secs >= 5))) return { label: "real", why: did };
   if (NET_WORDS[net]) return { label: "suspect", why: NET_WORDS[net] + (e ? `, ${did}` : "") };
   if (!e) {
     const age = nowMs - Date.parse(row.createdAt || "");
