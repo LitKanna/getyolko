@@ -829,6 +829,12 @@ mail only from orders@getyolko.com. If it goes red, fix the change, not the rule
 corrects something new about the shop that a script could catch, add a rule there in the same PR.
 Code comments are skipped, so notes about a rule do not trip it.
 
+`npm run check:live` (`infra/live-site-check.mjs`) reads the LIVE getyolko.com pages from the
+sitemap and `/api/settings` with plain GETs (no page scripts, so it is never counted as a visitor)
+and checks the same facts there: prices 13/25/72 at checkout, no "$77" box, no private mobile or
+place, Saturday 6am to 12pm on the home page, every page 200 on one build. Run it after a deploy pin
+goes live; Mr Yolko's daily check runs it too.
+
 There is no ESLint/Prettier/Ruff. `npm test` is a placeholder that intentionally fails
 (`echo "Error: no test specified" && exit 1`); use `npm run check` instead.
 
