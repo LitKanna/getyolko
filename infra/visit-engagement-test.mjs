@@ -70,6 +70,14 @@ ok(v(row({ asnOrg: "Amazon.com, Inc.", net: undefined, eng: eng({ secs: 30 }) })
 ok(v(row({ asnOrg: "Anthropic, PBC", net: "isp", eng: eng({ secs: 40 }) })) === "suspect", "a row stored as an ordinary network is re-read once its name is known to be a robot's");
 ok(v(row({ asnOrg: "", net: "meta", eng: eng({ secs: 40 }) })) === "suspect", "with no name on the row, the stored kind stands");
 ok(/Meta's own network/.test(visitVerdict(row({ ...meta }), at(300)).why), "the reason names the network");
+ok(v(row({ ...meta, eng: eng({ secs: 0, taps: { form: 6 } }) })) === "suspect", "Meta's ad checker filling the whole form at once is not a person");
+ok(v(row({ asnOrg: "Amazon.com, Inc.", net: "datacentre", eng: eng({ secs: 0, taps: { form: 6 } }) })) === "suspect", "a form filled in no time from a data centre is a robot");
+ok(v(row({ eng: eng({ secs: 1, taps: { form: 6 } }) })) === "suspect", "six boxes in one second is autofill, not a person, on any network");
+ok(/form filled in under 3 seconds/.test(visitVerdict(row({ ...meta, eng: eng({ secs: 0, taps: { form: 6 } }) }), at(300)).why), "the reason says the form was filled too fast");
+ok(v(row({ ...meta, eng: eng({ secs: 0, taps: { whatsapp: 1 } }) })) === "suspect", "on Meta's own network a tap alone is the checker");
+ok(v(row({ eng: eng({ secs: 40, taps: { form: 5 } }) })) === "real", "filling the form over 40 seconds is a person");
+ok(v(row({ eng: eng({ secs: 1, taps: { form: 1, tray: 1 } }) })) === "real", "a tray tap with the form is still a person");
+ok(v(row({ asnOrg: "Akamai International B.V.", net: "datacentre", eng: eng({ secs: 2, taps: { buy: 1 } }) })) === "real", "Private Relay taps still count");
 ok(visitVerdict(row({ eng: eng({ secs: 83, scrolled: true, scroll: 61, taps: { tray: 2, buy: 1 } }) }), at(300)).why === "on the page 1m 23s, scrolled to 61%, 3 taps", "the reason says what they did");
 ok(sayTime(8) === "8s" && sayTime(72) === "1m 12s", "seconds read as people say them");
 
